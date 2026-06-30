@@ -259,24 +259,24 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="bg-gray-900 text-white py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <section className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-violet-400">12.000+</div>
-              <p className="text-gray-300 mt-2">Negócios</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">12.000+</div>
+              <p className="text-gray-400 text-lg">Negócios</p>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-violet-400">4M+</div>
-              <p className="text-gray-300 mt-2">Agendamentos</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">4M+</div>
+              <p className="text-gray-400 text-lg">Agendamentos</p>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-violet-400">98%</div>
-              <p className="text-gray-300 mt-2">Satisfação</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">98%</div>
+              <p className="text-gray-400 text-lg">Satisfação</p>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-violet-400">−70%</div>
-              <p className="text-gray-300 mt-2">Faltas</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">−70%</div>
+              <p className="text-gray-400 text-lg">Faltas</p>
             </div>
           </div>
         </div>
