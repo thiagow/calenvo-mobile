@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next"
-import { Inter } from 'next/font/google'
+import { DM_Sans } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Providers } from '@/components/providers/session-provider'
@@ -7,7 +7,10 @@ import { DialogProvider } from '@/components/providers/dialog-provider'
 import { Toaster as ShadcnToaster } from '@/components/ui/toaster'
 import { Toaster } from 'react-hot-toast'
 
-const inter = Inter({ subsets: ['latin'] })
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+})
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -38,7 +41,7 @@ export default function RootLayout({
       <head>
         <link rel="apple-touch-icon" href="/calenvo-logo.png" />
       </head>
-      <body className={inter.className}>
+      <body className={dmSans.className}>
         <Providers>
           <ThemeProvider
             attribute="class"

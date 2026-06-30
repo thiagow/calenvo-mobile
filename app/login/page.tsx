@@ -9,7 +9,7 @@ export default function LoginPage() {
   return (
     <>
       <CookieCleaner />
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-gradient-to-br from-violet-50 to-purple-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center space-x-2 hover:opacity-80 transition-opacity">
@@ -39,7 +39,7 @@ export default function LoginPage() {
               <LoginForm />
               <div className="mt-6 text-center text-sm text-gray-600">
                 Não tem uma conta?{' '}
-                <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+                <Link href="/signup" className="text-violet-600 hover:text-violet-700 font-medium">
                   Cadastre-se gratuitamente
                 </Link>
               </div>
