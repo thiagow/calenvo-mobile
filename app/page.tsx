@@ -14,26 +14,29 @@ export default function LandingPage() {
 
   const testimonials = [
     {
-      name: 'Marina Silva',
-      role: 'Proprietária de Salão',
-      text: 'Calenvo transformou completamente meu negócio. Faltas reduziram em 70% com lembretes automáticos.',
+      name: 'Claudia Moreira',
+      role: 'Salão de Beleza · São Paulo',
+      text: '"Reduzi as faltas em quase 80% com os lembretes automáticos. Meus clientes adoram confirmar pelo WhatsApp. O Calenvo transformou o meu salão completamente."',
       rating: 5,
-      avatar: '👩‍💼'
+      initial: 'C',
+      color: 'from-pink-500 to-violet-500',
     },
     {
-      name: 'Carlos Santos',
-      role: 'Fisioterapeuta',
-      text: 'A integração com WhatsApp é perfeita. Meus pacientes adoram e o agendamento ficou muito mais fácil.',
+      name: 'Dr. Rafael Souza',
+      role: 'Clínica de Fisioterapia · Campinas',
+      text: '"Gerencio 6 fisioterapeutas em uma única tela. Os relatórios mostram os horários mais rentáveis e quais profissionais têm mais demanda. Simplesmente indispensável."',
       rating: 5,
-      avatar: '👨‍⚕️'
+      initial: 'R',
+      color: 'from-blue-500 to-blue-700',
     },
     {
-      name: 'Beatriz Costa',
-      role: 'Donos de Clínica de Estética',
-      text: 'O programa de fidelidade integrado aumentou nossas vendas cruzadas em 40%. Excelente investimento.',
+      name: 'Mariana Teixeira',
+      role: 'Spa e Estética · Rio de Janeiro',
+      text: '"O programa de fidelidade foi divisor de águas. Clientes que vinham mensalmente agora retornam toda semana. O retorno aumentou 40% em apenas 3 meses."',
       rating: 5,
-      avatar: '💄'
-    }
+      initial: 'M',
+      color: 'from-violet-500 to-blue-600',
+    },
   ]
 
   const faqItems = [
@@ -308,28 +311,40 @@ export default function LandingPage() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-16">
+      <section id="testimonials" className="py-24 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Confiem em nós
+          <div className="text-center mb-14">
+            <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
+              Depoimentos
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900">
+              Quem usa, aprova
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {testimonials.map((testimonial, idx) => (
-              <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-8">
-                <div className="flex items-center gap-1 mb-4">
+              <div key={idx} className="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col gap-6 shadow-sm">
+                {/* Stars */}
+                <div className="flex items-center gap-1">
                   {[...Array(testimonial.rating)].map((_, i) => (
                     <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                   ))}
                 </div>
-                <p className="text-gray-600 mb-6">{testimonial.text}</p>
+
+                {/* Quote */}
+                <p className="text-gray-700 text-sm leading-relaxed flex-1">
+                  {testimonial.text}
+                </p>
+
+                {/* Author */}
                 <div className="flex items-center gap-3">
-                  <div className="text-3xl">{testimonial.avatar}</div>
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${testimonial.color} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                    {testimonial.initial}
+                  </div>
                   <div>
-                    <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                    <p className="text-sm text-gray-600">{testimonial.role}</p>
+                    <p className="font-semibold text-gray-900 text-sm">{testimonial.name}</p>
+                    <p className="text-xs text-gray-500">{testimonial.role}</p>
                   </div>
                 </div>
               </div>
