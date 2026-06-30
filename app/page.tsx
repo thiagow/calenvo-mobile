@@ -259,7 +259,7 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white py-16">
+      <section className="bg-slate-950 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             <div>
