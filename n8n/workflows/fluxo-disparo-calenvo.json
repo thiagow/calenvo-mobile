@@ -1,0 +1,97 @@
+{
+  "name": "fluxo-disparo-calenvo",
+  "nodes": [
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "id": "1000e2d7-e7e9-43d7-8b23-10d31e0c177b",
+      "name": "Wait",
+      "position": [
+        640,
+        480
+      ],
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "webhookId": "23040b2a-d05f-4e63-96ca-b85dac5180e8"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Webhook').item.json.body.instancia }}",
+        "remoteJid": "={{ $('Webhook').item.json.body.destinatario }}",
+        "messageText": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options_message": {}
+      },
+      "id": "6fc2dbd5-5737-40d4-9591-e07980ea3444",
+      "name": "Enviar texto",
+      "position": [
+        928,
+        480
+      ],
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "credentials": {
+        "evolutionApi": {
+          "id": "Jm0CeivS5QtT7ipa",
+          "name": "Evolution account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "0dcbb952-7f01-40a7-9a8f-ca7babf85d40",
+        "options": {}
+      },
+      "id": "43d2cf46-9e4f-4ae6-afc5-07db8fbae872",
+      "name": "Webhook",
+      "position": [
+        368,
+        480
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "0dcbb952-7f01-40a7-9a8f-ca7babf85d40"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wait": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Enviar texto",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Wait",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "bf3f010f-c535-44fd-a72f-24c809cd6efc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68d7dfbb8678996bd8c8f55e145d1fc2c8e6ccd7e7e6d513a8d499bf72eeb45e"
+  },
+  "id": "s2ftvfPHcP2ErKaLdlOqV",
+  "tags": []
+}

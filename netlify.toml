@@ -1,0 +1,6 @@
+[build]
+  command = "npx -y prisma@6.7.0 generate && next build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "18"

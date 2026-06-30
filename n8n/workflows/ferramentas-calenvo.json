@@ -1,0 +1,228 @@
+{
+  "name": "Ferramentas Calenvo (Sub-workflow)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "trigger",
+      "name": "Execute Workflow Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tool }}",
+              "value2": "consultar_servicos"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "if-servicos",
+      "name": "IF: Serviços"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name, price, duration, description FROM \"Service\" WHERE \"userId\" = '{{ $json.userId }}' AND \"isActive\" = true"
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        440,
+        -100
+      ],
+      "id": "pg-servicos",
+      "name": "PG: Serviços"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tool }}",
+              "value2": "consultar_agendas"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        100
+      ],
+      "id": "if-agendas",
+      "name": "IF: Agendas"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, name, \"startTime\", \"endTime\" FROM \"Schedule\" WHERE \"userId\" = '{{ $json.userId }}' AND \"isActive\" = true"
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [
+        660,
+        0
+      ],
+      "id": "pg-agendas",
+      "name": "PG: Agendas"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tool }}",
+              "value2": "slots_disponiveis"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        200
+      ],
+      "id": "if-slots",
+      "name": "IF: Slots"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Placeholder: Retornando slots fixos para teste\nreturn [{ json: { slots: ['09:00', '10:00', '14:00'], date: $json.date } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "id": "code-slots",
+      "name": "Code: Slots"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.tool }}",
+              "value2": "criar_agendamento"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "id": "if-criar",
+      "name": "IF: Criar"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Placeholder: Simulando criacao\nreturn [{ json: { success: true, id: 'mock-id', status: 'SCHEDULED' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        200
+      ],
+      "id": "code-criar",
+      "name": "Code: Criar"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "IF: Serviços",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Serviços": {
+      "main": [
+        [
+          {
+            "node": "PG: Serviços",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Agendas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Agendas": {
+      "main": [
+        [
+          {
+            "node": "PG: Agendas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Slots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Slots": {
+      "main": [
+        [
+          {
+            "node": "Code: Slots",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF: Criar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Criar": {
+      "main": [
+        [
+          {
+            "node": "Code: Criar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,58 @@
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+.env.backup
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# netlify build artifacts
+/.netlify/
+
+# scripts e sessões com credenciais
+set-netlify-env.ps1
+scripts/fix-netlify-*.ps1
+session-ses_*.md
+user-info.json
+user-info.txt
+verify-user.ts
+verify-output.txt
+
+# build logs e arquivos temporários
+build-debug.txt
+build*.log
+netlify-*.log
+validate.log
+git_status_output.txt
+prisma_validate_output.txt
+scripts/*_result.txt
+scripts/*_result_utf8.txt

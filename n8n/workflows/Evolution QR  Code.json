@@ -1,0 +1,820 @@
+{
+  "name": "Evolution QR  Code",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/instance/connectionState/{{ $json.body.instanceName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        -64
+      ],
+      "id": "a7c728a7-50e5-4f10-afc7-bd481d7e2511",
+      "name": "status instancia evo",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "status-da-instancia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -64
+      ],
+      "id": "5b4ef0e2-3a8e-4add-873a-d0061b49f532",
+      "name": "status instancia",
+      "webhookId": "e7860a82-854a-48c4-b63f-236198f23feb"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        -64
+      ],
+      "id": "3ada4665-174f-4017-8306-bc0125008e53",
+      "name": "Respond to Webhook13"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gera saída binária \"qr\" a partir do base64 que veio da Evolution\n// Funciona mesmo se o base64 vier com prefixo \"data:image/png;base64,\"\n\nreturn items.map((item, i) => {\n  const full = item.json?.qrcode?.base64 || item.json?.base64 || '';\n  const b64 = full.replace(/^data:image\\/png;base64,/, '');\n\n  return {\n    json: {}, // (opcional, mas ajuda o UI)\n    binary: {\n      qr: {\n        // IMPORTANTE: aqui deve ser *string base64*, NÃO Buffer\n        data: b64,\n        mimeType: 'image/png',\n        fileName: `qrcode_${item.json?.count ?? i}.png`\n      }\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        352
+      ],
+      "id": "0032ee80-510d-4f9f-bec9-36d0e3511b2a",
+      "name": "gera_qrcode_image3"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "criar-instancia",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": ""
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        368
+      ],
+      "id": "a76ea330-36a5-4713-af2f-ec0730dea4c5",
+      "name": "criar-instancia-evolution2",
+      "webhookId": "570642e1-1b40-4606-aee9-3169a085aff1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolution-evolution-api.feidcm.easypanel.host/instance/create",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "instanceName",
+              "value": "={{ $json.body.instanceName }}"
+            },
+            {
+              "name": "qrcode",
+              "value": true
+            },
+            {
+              "name": "integration",
+              "value": "WHATSAPP-BAILEYS"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1648,
+        480
+      ],
+      "id": "8e2ba117-33d2-404f-8b49-db5cf025108f",
+      "name": "Criar instancia evolution"
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "set",
+        "inputFieldName": "qr",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2192,
+        352
+      ],
+      "id": "96499c29-9441-41b1-b799-96f51bf2f41b",
+      "name": "Respond to Webhook_Criar_instancia"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        2640,
+        432
+      ],
+      "id": "b185c878-696f-44b4-8972-c61143ec7cef",
+      "name": "Schedule Trigger",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3328,
+        432
+      ],
+      "id": "4904d501-b4cd-43d8-b6fa-d63b4da0c907",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4effd428-090c-4ca1-99b4-2eb070ce4448",
+              "leftValue": "={{ $json.connectionStatus }}",
+              "rightValue": "close",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3760,
+        448
+      ],
+      "id": "701ea383-27ba-425c-894f-73ffd740f41e",
+      "name": "verifica se esta desconectada"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3568,
+        448
+      ],
+      "id": "c115beef-9c51-4d90-9012-70130af1594a",
+      "name": "Wait",
+      "webhookId": "c14eb3e9-dfb8-4115-a750-5848fe52500d"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "name, connectionStatus, profileName, ownerJid",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3088,
+        432
+      ],
+      "id": "210c69ee-5a77-4329-b78b-39dddbe8c717",
+      "name": "dados uteis2"
+    },
+    {
+      "parameters": {
+        "content": "# STATUS\n\n",
+        "height": 80,
+        "width": 784,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1072,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "38d86f88-ca9b-4142-a769-624eb0f224d6",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "# AVISO DE DESCONEXÃO",
+        "height": 80,
+        "width": 1744,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2624,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "20f72169-2abd-4077-979e-0f0806b69934",
+      "name": "Sticky Note18"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/message/sendText/INSTANCIA AQUI",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "=Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "=NUMERO AQUI"
+            },
+            {
+              "name": "text",
+              "value": "=🚨INSTANCIA DESCONECTADA🚨\n\nNOME DA INSTANCIA:{{ $json.name }}\nSTATUS DA CONEXÃO:{{ $json.connectionStatus }}\nNOME DO PERFIL:{{ $json.profileName }}\nNUMERO:{{ $json.ownerJid }}"
+            },
+            {
+              "name": "delay",
+              "value": "={{ 3000 }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "id": "5abfc8f1-1e15-431a-9ffc-088d73b0a833",
+      "name": "notificar_proprietario_do_instancias_desconectadas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4048,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# CRIAR INSTÂNCIA\n",
+        "height": 80,
+        "width": 1152,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1072,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "dce59fed-57ea-4192-a30e-f5f9086b8c31",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "url": "https://evolution-evolution-api.feidcm.easypanel.host/instance/fetchInstances",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2848,
+        432
+      ],
+      "id": "cd6dc4ea-1202-4373-91a1-cbc61bf5b926",
+      "name": "todas instancias1"
+    },
+    {
+      "parameters": {
+        "content": "ALTERAR URL E TOKEN EVOLUTION",
+        "height": 256,
+        "width": 230
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2784,
+        352
+      ],
+      "typeVersion": 1,
+      "id": "547ee691-4f0e-45f2-b62e-83b207e14939",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "ALTERAR URL, INSTANCIA, NÚMERO E TOKEN EVOLUTION",
+        "height": 288,
+        "width": 230
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3984,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "7d3ab5ea-25f7-4c42-82c1-2e6df2e3eeb1",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/instance/connect/{{ $json.body.instanceName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1376,
+        368
+      ],
+      "id": "f6b78e14-1215-4cda-a3a7-88ac419f37ab",
+      "name": "Busca Instancia Criada",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/instance/delete/{{ $json.body.instanceName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2944,
+        -64
+      ],
+      "id": "d045dbf5-d41f-431a-b0f2-186f32c33e6a",
+      "name": "status instancia evo1",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        3248,
+        -64
+      ],
+      "id": "8966d42f-a51b-4436-9b25-d4fb843f649e",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "content": "# EXCLUIR INSTÂNCIA\n\n",
+        "height": 80,
+        "width": 784,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2624,
+        -224
+      ],
+      "typeVersion": 1,
+      "id": "3af319af-a983-490e-b90a-4f95b36e57f4",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "excluir-instancia",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        -64
+      ],
+      "id": "d5fed528-8c43-4ee3-b2e2-d4a22d47a547",
+      "name": "delete instancia",
+      "webhookId": "e7860a82-854a-48c4-b63f-236198f23feb"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "habilitar-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        800
+      ],
+      "id": "webhook-trigger-toggle",
+      "name": "habilitar-webhook",
+      "webhookId": "toggle-webhook-id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/webhook/set/{{ $json.body.instanceName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"enabled\": {{ $json.body.enabled }},\n  \"url\": \"{{ $json.body.webhookUrl }}\",\n  \"webhook_by_events\": false,\n  \"events\": [\"MESSAGES_UPSERT\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1392,
+        800
+      ],
+      "id": "http-set-webhook",
+      "name": "set-webhook-evo",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1696,
+        800
+      ],
+      "id": "respond-webhook-toggle",
+      "name": "respond-webhook-toggle"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution-evolution-api.feidcm.easypanel.host/webhook/set/{{ $('criar-instancia-evolution2').item.json.body.instanceName }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "Wh4Hgf19Kb1YEp41eQB8j8gLLqMiSMgX"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"enabled\": true,\n  \"url\": \"{{ $('criar-instancia-evolution2').item.json.body.webhookUrl }}\",\n  \"webhook_by_events\": false,\n  \"events\": [\n    \"CONNECTION_UPDATE\",\n    \"MESSAGES_UPSERT\",\n    \"MESSAGES_UPDATE\"\n  ]\n}",
+        "options": {}
+      },
+      "id": "configurar-webhook-auto",
+      "name": "Configurar Webhook Automatico",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1936,
+        640
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "status instancia evo": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status instancia": {
+      "main": [
+        [
+          {
+            "node": "status instancia evo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gera_qrcode_image3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook_Criar_instancia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar-instancia-evolution2": {
+      "main": [
+        [
+          {
+            "node": "Busca Instancia Criada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar instancia evolution": {
+      "main": [
+        [
+          {
+            "node": "gera_qrcode_image3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Configurar Webhook Automatico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "todas instancias1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verifica se esta desconectada": {
+      "main": [
+        [
+          {
+            "node": "notificar_proprietario_do_instancias_desconectadas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "verifica se esta desconectada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dados uteis2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "notificar_proprietario_do_instancias_desconectadas": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "todas instancias1": {
+      "main": [
+        [
+          {
+            "node": "dados uteis2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Busca Instancia Criada": {
+      "main": [
+        [
+          {
+            "node": "gera_qrcode_image3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar instancia evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "status instancia evo1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delete instancia": {
+      "main": [
+        [
+          {
+            "node": "status instancia evo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "habilitar-webhook": {
+      "main": [
+        [
+          {
+            "node": "set-webhook-evo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-webhook-evo": {
+      "main": [
+        [
+          {
+            "node": "respond-webhook-toggle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "a5702c3b-0b9f-4bf2-be5d-0e797bd82012",
+  "meta": {
+    "instanceId": "68d7dfbb8678996bd8c8f55e145d1fc2c8e6ccd7e7e6d513a8d499bf72eeb45e"
+  },
+  "id": "-92fUn2xAV5rnUcnjDAA6",
+  "tags": []
+}

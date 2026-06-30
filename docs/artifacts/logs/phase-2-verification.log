@@ -1,0 +1,129 @@
+🔍 Verifying Slug Generation Utility
+
+✅ Test 1: "Fernanda Guimarães Studio"
+   Expected: "fernanda-guimaraes-studio"
+   Got:      "fernanda-guimaraes-studio"
+
+✅ Test 2: "Clínica São José"
+   Expected: "clinica-sao-jose"
+   Got:      "clinica-sao-jose"
+
+✅ Test 3: "Espaço Zen & Beleza"
+   Expected: "espaco-zen-beleza"
+   Got:      "espaco-zen-beleza"
+
+✅ Test 4: "  Multiple   Spaces  "
+   Expected: "multiple-spaces"
+   Got:      "multiple-spaces"
+
+✅ Test 5: "ABC123 - Teste"
+   Expected: "abc123-teste"
+   Got:      "abc123-teste"
+
+✅ Test 6: "Café com Açúcar"
+   Expected: "cafe-com-acucar"
+   Got:      "cafe-com-acucar"
+
+✅ Test 7: "###Special!!!"
+   Expected: "special"
+   Got:      "special"
+
+✅ Test 8: "João & Maria"
+   Expected: "joao-maria"
+   Got:      "joao-maria"
+
+✅ Test 9: ""
+   Expected: ""
+   Got:      ""
+
+✅ Test 10: "   "
+   Expected: ""
+   Got:      ""
+
+
+📊 Results: 10 passed, 0 failed
+
+✅ All slug generation tests passed!
+
+📄 Test Results: {
+  "feature": "Slug Generation Utility",
+  "timestamp": "2026-01-26T13:46:13.909Z",
+  "tests": [
+    {
+      "test": "Test 1",
+      "input": "Fernanda Guimarães Studio",
+      "expected": "fernanda-guimaraes-studio",
+      "actual": "fernanda-guimaraes-studio",
+      "passed": true
+    },
+    {
+      "test": "Test 2",
+      "input": "Clínica São José",
+      "expected": "clinica-sao-jose",
+      "actual": "clinica-sao-jose",
+      "passed": true
+    },
+    {
+      "test": "Test 3",
+      "input": "Espaço Zen & Beleza",
+      "expected": "espaco-zen-beleza",
+      "actual": "espaco-zen-beleza",
+      "passed": true
+    },
+    {
+      "test": "Test 4",
+      "input": "  Multiple   Spaces  ",
+      "expected": "multiple-spaces",
+      "actual": "multiple-spaces",
+      "passed": true
+    },
+    {
+      "test": "Test 5",
+      "input": "ABC123 - Teste",
+      "expected": "abc123-teste",
+      "actual": "abc123-teste",
+      "passed": true
+    },
+    {
+      "test": "Test 6",
+      "input": "Café com Açúcar",
+      "expected": "cafe-com-acucar",
+      "actual": "cafe-com-acucar",
+      "passed": true
+    },
+    {
+      "test": "Test 7",
+      "input": "###Special!!!",
+      "expected": "special",
+      "actual": "special",
+      "passed": true
+    },
+    {
+      "test": "Test 8",
+      "input": "João & Maria",
+      "expected": "joao-maria",
+      "actual": "joao-maria",
+      "passed": true
+    },
+    {
+      "test": "Test 9",
+      "input": "[empty]",
+      "expected": "",
+      "actual": "",
+      "passed": true
+    },
+    {
+      "test": "Test 10",
+      "input": "   ",
+      "expected": "",
+      "actual": "",
+      "passed": true
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 10,
+    "failed": 0,
+    "success": true
+  }
+}

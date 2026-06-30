@@ -1,0 +1,5 @@
+Este diretório deve conter os arquivos .json exportados do n8n.
+Exemplos: 
+- whatsapp-reminder.json
+- whatsapp-send-message.json
+- etc.

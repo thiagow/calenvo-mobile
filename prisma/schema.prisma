@@ -1,0 +1,647 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum PlanType {
+  FREEMIUM
+  STANDARD
+  PREMIUM
+}
+
+enum UserRole {
+  MASTER // Usuário que criou a conta
+  PROFESSIONAL // Profissional da equipe
+  SAAS_ADMIN // Administrador global do SaaS
+}
+
+enum SegmentType {
+  BEAUTY_SALON // Salões de beleza
+  BARBERSHOP // Barbearias
+  AESTHETIC_CLINIC // Clínicas de estética
+  TECH_SAAS // Tecnologia e SaaS
+  PROFESSIONAL_SERVICES // Consultorias e Mentorias
+  HR // Recursos Humanos
+  PHYSIOTHERAPY // Clínicas de fisioterapia
+  EDUCATION // Aulas e Educação
+  PET_SHOP // Pet shops
+  OTHER // Outros
+}
+
+enum LoyaltyMode {
+  FREQUENCY // 1 agendamento concluído = 1 ponto
+  VALUE     // Valor pago convertido em pontos
+}
+
+enum LoyaltyTransactionType {
+  EARN   // Acúmulo de pontos
+  REDEEM // Resgate de pontos
+}
+
+model User {
+  id                 String      @id @default(cuid())
+  name               String?
+  email              String
+  password           String
+  role               UserRole    @default(MASTER)
+  whatsapp           String?
+  isActive           Boolean     @default(true)
+  businessName       String? // Nome do negócio
+  phone              String?
+  segmentType        SegmentType @default(BEAUTY_SALON)
+  planType           PlanType    @default(FREEMIUM)
+  stripeCustomerId   String?
+  subscriptionId     String?
+  subscriptionStatus String?
+  emailVerified      DateTime?
+  image              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  // Relacionamentos
+  accounts                 Account[]
+  sessions                 Session[]
+  appointments             Appointment[] // Agendamentos como master (dono da conta)
+  professionalAppointments Appointment[]          @relation("ProfessionalAppointments") // Agendamentos como profissional
+  clients                  Client[] // Renomeado de patients para ser mais genérico
+  businessConfig           BusinessConfig?
+  planUsage                PlanUsage?
+  schedules                Schedule[] // Agendas criadas (apenas para master)
+  services                 Service[] // Serviços criados (apenas para master)
+  scheduleProfessionals    ScheduleProfessional[] // Agendas vinculadas como profissional
+  notifications            Notification[] // Notificações do usuário
+  whatsappConfig           WhatsAppConfig? // Configuração WhatsApp
+  clientPackages           ClientPackage[] // Pacotes vendidos
+
+  // Relacionamento hierárquico
+  masterId      String? // ID do usuário master (para profissionais)
+  master        User?   @relation("MasterProfessionals", fields: [masterId], references: [id], onDelete: Cascade)
+  professionals User[]  @relation("MasterProfessionals")
+
+  packageTemplates PackageTemplate[] // Templates de pacotes criados
+
+  loyaltyConfig LoyaltyConfig? // Programa de fidelidade do Tenant
+  loyaltyBalances LoyaltyBalance[] @relation("UserLoyaltyBalances")
+  loyaltyTransactions LoyaltyTransaction[] @relation("UserLoyaltyTransactions")
+
+  errorLogs ErrorLog[]
+
+  @@unique([email, role])
+}
+
+model ErrorLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Contexto do erro
+  functionality String   // Ex: "whatsapp_send_test", "whatsapp_notification"
+  errorMessage  String   @db.Text
+  stackTrace    String?  @db.Text
+  
+  // Metadata adicional
+  metadata      Json?    // Dados extras: instanceName, destinatário, etc.
+  
+  createdAt     DateTime @default(now())
+  
+  @@index([userId])
+  @@index([functionality])
+  @@index([createdAt])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String
+  cpf       String?
+  birthDate DateTime?
+  address   String?
+  city      String?   // Cidade
+  state     String?   // UF (sigla de 2 letras, ex: SP, RJ)
+  notes     String? // Observações gerais
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  packages     ClientPackage[] // Pacotes adquiridos pelo cliente
+  loyaltyBalance      LoyaltyBalance[]      @relation("ClientLoyaltyBalance")
+  loyaltyTransactions LoyaltyTransaction[]  @relation("ClientLoyaltyTransactions")
+
+  @@unique([cpf, userId])
+}
+
+enum AppointmentStatus {
+  SCHEDULED // Agendado
+  CONFIRMED // Confirmado
+  IN_PROGRESS // Em andamento
+  COMPLETED // Concluído
+  CANCELLED // Cancelado
+  NO_SHOW // Faltou
+}
+
+enum ModalityType {
+  PRESENCIAL
+  TELECONSULTA
+}
+
+// Novo modelo: Agenda (Schedule) - Similar ao Calendly
+model Schedule {
+  id           String  @id @default(cuid())
+  name         String // Ex: "Consultas Cardiologia", "Cortes e Barbas"
+  description  String?
+  color        String? @default("#3B82F6") // Para visualização no calendário
+  isActive     Boolean @default(true)
+  acceptWalkIn Boolean @default(false) // Aceitar encaixe
+
+  // Disponibilidade (padrão - usado quando não há configuração específica por dia)
+  workingDays  Int[] // 0-6 (domingo a sábado)
+  startTime    String @default("08:00")
+  endTime      String @default("18:00")
+  slotDuration Int    @default(30) // Duração padrão dos slots em minutos
+  bufferTime   Int    @default(0) // Intervalo entre agendamentos em minutos
+
+  // Configurações de agendamento
+  lunchStart         String?
+  lunchEnd           String?
+  advanceBookingDays Int     @default(30) // Quantos dias no futuro permitir agendamento
+  minNoticeHours     Int     @default(2) // Horas mínimas de antecedência
+
+  // Controle de horários customizados
+  useCustomDayConfig Boolean @default(false) // Se true, usa ScheduleDayConfig ao invés dos horários padrão
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relações
+  services      ScheduleService[]
+  appointments  Appointment[]
+  professionals ScheduleProfessional[] // Profissionais vinculados
+  dayConfigs    ScheduleDayConfig[] // Configurações específicas por dia da semana
+  blocks        ScheduleBlock[] // Bloqueios de períodos
+}
+
+// Configuração de horários específicos por dia da semana
+model ScheduleDayConfig {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int // 0-6 (domingo a sábado)
+  isActive  Boolean @default(true) // Se false, este dia não tem atendimento
+
+  // Cada dia pode ter múltiplos intervalos de horário
+  timeSlots Json // Array de objetos: [{startTime: "10:00", endTime: "12:00"}, {startTime: "15:00", endTime: "17:00"}]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([scheduleId, dayOfWeek])
+  @@index([scheduleId])
+}
+
+// Bloqueios de períodos específicos (ex: férias, feriados)
+model ScheduleBlock {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  startDate DateTime // Data/hora de início do bloqueio
+  endDate   DateTime // Data/hora de fim do bloqueio
+  reason    String? // Motivo do bloqueio (ex: "Férias", "Feriado")
+  isAllDay  Boolean  @default(true) // Se true, bloqueia o dia inteiro
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scheduleId, startDate, endDate])
+}
+
+// Tabela de junção: Agenda <-> Profissionais
+model ScheduleProfessional {
+  id             String   @id @default(cuid())
+  scheduleId     String
+  schedule       Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   User     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([scheduleId, professionalId])
+}
+
+// Novo modelo: Serviço/Procedimento
+model Service {
+  id          String  @id @default(cuid())
+  name        String // Ex: "Consulta Cardiologia", "Corte Masculino"
+  description String?
+  duration    Int     @default(30) // em minutos
+  price       Float?
+  category    String? // Ex: "Consultas", "Cortes", "Coloração"
+  isActive    Boolean @default(true)
+
+  // Campos específicos por segmento
+  requiresDeposit Boolean @default(false)
+  depositAmount   Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relações
+  schedules    ScheduleService[]
+  appointments Appointment[]
+  packageItems ClientPackageItem[] // Itens de pacote vinculados a este serviço
+  templateItems PackageTemplateItem[] // Itens de template de pacotes
+}
+
+// Tabela de junção: Agenda <-> Serviços
+model ScheduleService {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Configurações específicas deste serviço nesta agenda
+  customDuration Int? // Sobrescrever duração padrão do serviço
+  customPrice    Float? // Sobrescrever preço padrão do serviço
+
+  createdAt DateTime @default(now())
+
+  @@unique([scheduleId, serviceId])
+}
+
+model Appointment {
+  id       String            @id @default(cuid())
+  date     DateTime
+  duration Int               @default(30) // em minutos
+  status   AppointmentStatus @default(SCHEDULED)
+  modality ModalityType      @default(PRESENCIAL)
+
+  // Vinculação com Agenda e Serviço (novo sistema)
+  scheduleId String?
+  schedule   Schedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  serviceId  String?
+  service    Service?  @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  // Profissional responsável (novo sistema)
+  professionalId   String?
+  professionalUser User?   @relation("ProfessionalAppointments", fields: [professionalId], references: [id], onDelete: SetNull)
+
+  // Vinculação com o Consumo de Pacotes (novo sistema)
+  clientPackageItemId String?
+  clientPackageItem   ClientPackageItem? @relation(fields: [clientPackageItemId], references: [id], onDelete: SetNull)
+
+  // Campos legados (mantidos para compatibilidade)
+  specialty    String?
+  insurance    String? // Convênio
+  serviceType  String? // Tipo de serviço (corte, coloração, manicure, etc.)
+  products     String? // Produtos utilizados
+  professional String? // Nome do profissional (legado)
+
+  // Campos gerais
+  notes     String?
+  price     Float? // Preço final (pode sobrescrever o do serviço)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Notificações relacionadas
+  notifications Notification[]
+
+  // Transações de fidelidade geradas por este agendamento
+  loyaltyTransactions LoyaltyTransaction[]
+
+  @@index([userId, date])
+}
+
+enum PackageStatus {
+  ACTIVE
+  EXHAUSTED
+  CANCELLED
+}
+
+// Pacote/Contrato comprado pelo cliente
+model ClientPackage {
+  id          String              @id @default(cuid())
+  clientId    String
+  client      Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  price       Float?
+  status      PackageStatus       @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  
+  items       ClientPackageItem[]
+
+  @@index([clientId])
+  @@index([userId])
+}
+
+// Serviços contidos dentro do pacote
+model ClientPackageItem {
+  id              String         @id @default(cuid())
+  clientPackageId String
+  clientPackage   ClientPackage  @relation(fields: [clientPackageId], references: [id], onDelete: Cascade)
+  serviceId       String
+  service         Service        @relation(fields: [serviceId], references: [id])
+  totalSessions   Int
+  usedSessions    Int            @default(0)
+  
+  appointments    Appointment[]
+
+  @@index([clientPackageId])
+  @@index([serviceId])
+}
+
+// Novo modelo: Template de Pacote de Serviço
+model PackageTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  price     Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     PackageTemplateItem[]
+
+  @@index([userId])
+}
+
+model PackageTemplateItem {
+  id                String          @id @default(cuid())
+  packageTemplateId String
+  packageTemplate   PackageTemplate @relation(fields: [packageTemplateId], references: [id], onDelete: Cascade)
+  serviceId         String
+  service           Service         @relation(fields: [serviceId], references: [id])
+  totalSessions     Int
+
+  @@index([packageTemplateId])
+  @@index([serviceId])
+}
+
+model BusinessConfig {
+  id                 String  @id @default(cuid())
+  workingDays        Int[] // 0-6 (domingo a sábado)
+  startTime          String  @default("08:00")
+  endTime            String  @default("18:00")
+  defaultDuration    Int     @default(30) // em minutos
+  lunchStart         String? @default("12:00")
+  lunchEnd           String? @default("13:00")
+  timezone           String  @default("America/Sao_Paulo")
+  autoConfirm        Boolean @default(false)
+  allowOnlineBooking Boolean @default(true)
+
+  // Personalização da página de agendamento do cliente
+  businessLogo String? // URL do logo
+  publicUrl    String? @unique // URL pública para agendamento (slug único)
+
+  // Informações adicionais do negócio para o Agente IA e exibição
+  address     String?  @db.Text // Endereço físico completo
+  description String?  @db.Text // Regras, diferenciais ou descrição sobre a empresa
+
+  // Campos específicos para salões
+  multipleServices  Boolean @default(false) // Permitir múltiplos serviços por agendamento
+  requiresDeposit   Boolean @default(false) // Exigir sinal/depósito
+  cancellationHours Int     @default(24) // Horas mínimas para cancelamento
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PlanUsage {
+  id                 String   @id @default(cuid())
+  appointmentsCount  Int      @default(0)
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime
+  resetAt            DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  APPOINTMENT_CREATED
+  APPOINTMENT_CONFIRMED
+  APPOINTMENT_CANCELLED
+  APPOINTMENT_REMINDER
+  APPOINTMENT_RESCHEDULED
+  APPOINTMENT_COMPLETED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  INTERNAL // Notificação interna (sino)
+  WHATSAPP // WhatsApp via Evolution API
+  BOTH // Ambos
+}
+
+model Notification {
+  id      String           @id @default(cuid())
+  title   String
+  message String
+  type    NotificationType
+  isRead  Boolean          @default(false)
+  readAt  DateTime?
+
+  // Relacionamento com agendamento (opcional)
+  appointmentId String?
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  // Destinatário
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Metadados adicionais
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
+/// Configuration for WhatsApp Integration via n8n (v3.1)
+model WhatsAppConfig {
+  id              String    @id @default(cuid())
+  /// Unique identifier for the instance in n8n/Evolution
+  instanceName    String    @unique
+  /// Legacy API Key for direct Evolution access
+  apiKey          String?   @db.Text
+  /// URL of the n8n webhook or Evolution API
+  apiUrl          String
+  /// The phone number connected to this instance
+  phoneNumber     String?   @db.Text
+  /// Whether the instance is currently in an 'open' state
+  isConnected     Boolean   @default(false)
+  /// Current base64 QR Code or Data URL
+  qrCode          String?   @db.Text
+  /// Expiration timestamp for the current QR Code
+  qrCodeExpiresAt DateTime?
+
+  // Configuração geral
+  /// Whether automated notifications are globally enabled for this user
+  enabled Boolean @default(false)
+
+  // Agente de IA
+  /// Whether AI agent is enabled to receive and respond to messages
+  aiAgentEnabled Boolean @default(false)
+
+  // Confirmação de Agendamento (logo após criação)
+  notifyOnCreate     Boolean @default(true)
+  createDelayMinutes Int     @default(0)
+  createMessage      String? @db.Text
+
+  // Cancelamento (logo após cancelar)
+  notifyOnCancel     Boolean @default(true)
+  cancelDelayMinutes Int     @default(0)
+  cancelMessage      String? @db.Text
+
+  // Confirmação de Presença (X dias antes)
+  notifyConfirmation  Boolean @default(true)
+  confirmationDays    Int     @default(1)
+  confirmationMessage String? @db.Text
+
+  // Lembrete (X horas antes)
+  notifyReminder  Boolean @default(true)
+  reminderHours   Int     @default(24)
+  reminderMessage String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Logs de auditoria para ações administrativas do SaaS
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  action    String // "TENANT_BLOCKED", "TENANT_UNBLOCKED", "ADMIN_LOGIN", etc.
+  adminId   String // ID do admin que realizou a ação
+  targetId  String? // ID do tenant alvo (quando aplicável)
+  details   Json? // Detalhes extras (motivo de bloqueio, etc.)
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ====== MÓDULO DE FIDELIZAÇÃO ======
+
+/// Programa de Fidelidade configurado pelo Tenant (1 por Tenant)
+model LoyaltyConfig {
+  id               String      @id @default(cuid())
+  name             String      // Nome do programa (ex: "Programa Fidelidade")
+  mode             LoyaltyMode @default(FREQUENCY)
+  pointsPerCurrency Float      @default(1.0)  // Pontos por R$ 1,00 (usado no modo VALUE)
+  pointsToReward   Int         @default(10)   // Quantidade de pontos para resgate
+  rewardValue      Float       @default(0)    // Valor R$ do desconto ao resgatar
+  isActive         Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Saldo de fidelidade por Cliente dentro de um Tenant
+model LoyaltyBalance {
+  id             String   @id @default(cuid())
+  totalEarned    Int      @default(0)
+  totalRedeemed  Int      @default(0)
+  currentBalance Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  clientId       String
+  client         Client   @relation("ClientLoyaltyBalance", fields: [clientId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation("UserLoyaltyBalances", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@index([clientId])
+  @@index([userId])
+}
+
+/// Historico auditavel de movimentacoes de pontos
+model LoyaltyTransaction {
+  id            String                 @id @default(cuid())
+  type          LoyaltyTransactionType
+  points        Int
+  description   String?
+  createdAt     DateTime               @default(now())
+  clientId      String
+  client        Client                 @relation("ClientLoyaltyTransactions", fields: [clientId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User                   @relation("UserLoyaltyTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  appointmentId String?
+  appointment   Appointment?           @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([createdAt])
+}
