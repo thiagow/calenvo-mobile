@@ -160,11 +160,11 @@ export const AVAILABLE_SEGMENTS = [
   { value: 'BEAUTY_SALON', label: 'Salão de Beleza', icon: '💇' },
   { value: 'BARBERSHOP', label: 'Barbearia', icon: '✂️' },
   { value: 'AESTHETIC_CLINIC', label: 'Clínica de Estética', icon: '✨' },
-  { value: 'DENTISTRY', label: 'Odontologia', icon: '🦷' },
   { value: 'PHYSIOTHERAPY', label: 'Fisioterapia', icon: '🏥' },
-  { value: 'NUTRITION', label: 'Nutrição', icon: '🥗' },
-  { value: 'THERAPY_CLINIC', label: 'Clínicas de Terapias', icon: '🧘' },
+  { value: 'EDUCATION', label: 'Educação', icon: '📚' },
   { value: 'PET_SHOP', label: 'Pet Shop', icon: '🐾' },
+  { value: 'PROFESSIONAL_SERVICES', label: 'Consultoria', icon: '🎯' },
+  { value: 'TECH_SAAS', label: 'Tecnologia', icon: '💻' },
   { value: 'OTHER', label: 'Outros', icon: '🔧' }
 ]
 
