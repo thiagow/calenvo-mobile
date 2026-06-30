@@ -69,10 +69,11 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <Link href="/" className="flex items-center space-x-2">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
               <div className="relative h-10 w-10">
                 <Image
                   src="/calenvo-logo.png"
@@ -82,18 +83,35 @@ export default function LandingPage() {
                   priority
                 />
               </div>
-              <span className="text-xl calenvo-gradient font-bold">Calenvo</span>
+              <span className="text-xl font-bold text-gray-900">Calenvo</span>
             </Link>
+
+            {/* Center Navigation */}
+            <nav className="hidden md:flex items-center space-x-8">
+              <a href="#funcionalidades" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+                Funcionalidades
+              </a>
+              <a href="#pricing" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+                Planos
+              </a>
+              <a href="#testimonials" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+                Depoimentos
+              </a>
+              <a href="#faq" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+                FAQ
+              </a>
+            </nav>
+
+            {/* Right Actions */}
             <div className="flex items-center space-x-4">
               <Link href="/login">
-                <Button variant="ghost" className="text-gray-700 hover:text-violet-600">
+                <Button variant="ghost" className="text-gray-700 hover:text-violet-600 font-medium">
                   Entrar
                 </Button>
               </Link>
               <Link href="/signup">
-                <Button className="bg-violet-600 hover:bg-violet-700 text-white">
-                  Começar Grátis
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-6">
+                  Contratar plano
                 </Button>
               </Link>
             </div>
@@ -209,8 +227,39 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-16 bg-gray-50">
+      {/* Testimonials */}
+      <section id="testimonials" className="py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Confiem em nós
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, idx) => (
+              <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-8">
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(testimonial.rating)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-gray-600 mb-6">{testimonial.text}</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-3xl">{testimonial.avatar}</div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                    <p className="text-sm text-gray-600">{testimonial.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Funcionalidades */}
+      <section id="funcionalidades" className="py-16 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -249,39 +298,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Confiem em nós
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, idx) => (
-              <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-8">
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-6">{testimonial.text}</p>
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">{testimonial.avatar}</div>
-                  <div>
-                    <p className="font-semibold text-gray-900">{testimonial.name}</p>
-                    <p className="text-sm text-gray-600">{testimonial.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Pricing */}
-      <section className="py-16 bg-gray-50" id="pricing">
+      <section className="py-16 bg-white" id="pricing">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
@@ -396,7 +414,7 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-16">
+      <section id="faq" className="py-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
