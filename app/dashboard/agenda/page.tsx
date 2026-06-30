@@ -1,26 +1,16 @@
-
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useMemo } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  Plus,
-  Filter,
-  Eye,
-  Calendar,
-  Loader2,
-  AlertCircle
-} from 'lucide-react'
+import { Plus, Filter, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useDialog } from '@/components/providers/dialog-provider'
 
-// Components
 import { AgendaViewSelector, ViewType } from '@/components/agenda/agenda-view-selector'
 import { AgendaFiltersComponent, AgendaFilters } from '@/components/agenda/agenda-filters'
 import { DateNavigation, NavigationType } from '@/components/agenda/date-navigation'
@@ -30,35 +20,20 @@ import { AgendaMonthView } from '@/components/agenda/agenda-month-view'
 import { AgendaListView } from '@/components/agenda/agenda-list-view'
 import { AgendaTimelineView } from '@/components/agenda/agenda-timeline-view'
 import { EditAppointmentDialog } from '@/components/agenda/edit-appointment-dialog'
-
-// Hooks
 import { useAppointments } from '@/hooks/use-appointments'
-import { useStats } from '@/hooks/use-stats'
-
-// Types
-import { AppointmentStatus, ModalityType } from '@prisma/client'
 
 export default function AgendaPage() {
   const { data: session, status } = useSession() || {}
   const { confirm } = useDialog()
 
-  // State - All hooks must be declared before any conditional returns
-  const [currentView, setCurrentView] = useState<ViewType>('week')
+  const [currentView, setCurrentView] = useState<ViewType>('day')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [filters, setFilters] = useState<AgendaFilters>({})
   const [showFilters, setShowFilters] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<any>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
 
-  // Get appointments from database
-  const {
-    appointments,
-    loading: appointmentsLoading,
-    error: appointmentsError,
-    updateAppointment,
-    deleteAppointment,
-    refetch: refetchAppointments
-  } = useAppointments({
+  const { appointments, loading, error, updateAppointment, deleteAppointment, refetch } = useAppointments({
     search: filters.search,
     status: filters.status,
     service: filters.service,
@@ -67,86 +42,44 @@ export default function AgendaPage() {
     dateTo: filters.dateTo,
     view: currentView,
     currentDate: currentDate.toISOString(),
-    autoFetch: !!session
+    autoFetch: !!session,
   })
 
-  // Get stats
-  const { stats, loading: statsLoading } = useStats()
-
-  // Get navigation type based on current view
-  const getNavigationType = (view: ViewType): NavigationType => {
-    switch (view) {
-      case 'day':
-        return 'day'
-      case 'week':
-        return 'week'
-      case 'month':
-        return 'month'
-      default:
-        return 'week'
-    }
-  }
-
-  // Filter appointments based on current view and date (client-side filtering for view-specific data)
   const viewFilteredAppointments = useMemo(() => {
-    if (currentView === 'list' || currentView === 'timeline') {
-      return appointments
-    }
-
+    if (currentView === 'list' || currentView === 'timeline') return appointments
     switch (currentView) {
       case 'day':
-        return appointments.filter(apt => {
-          const aptDate = new Date(apt.date)
-          return aptDate.toDateString() === currentDate.toDateString()
-        })
-
-      case 'week':
-        const startOfWeek = new Date(currentDate)
-        const day = startOfWeek.getDay()
-        const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
-        startOfWeek.setDate(diff)
-        startOfWeek.setHours(0, 0, 0, 0)
-
-        const endOfWeek = new Date(startOfWeek)
-        endOfWeek.setDate(startOfWeek.getDate() + 6)
-        endOfWeek.setHours(23, 59, 59, 999)
-
-        return appointments.filter(apt => {
-          const aptDate = new Date(apt.date)
-          return aptDate >= startOfWeek && aptDate <= endOfWeek
-        })
-
+        return appointments.filter(apt => new Date(apt.date).toDateString() === currentDate.toDateString())
+      case 'week': {
+        const start = new Date(currentDate)
+        const d = start.getDay()
+        start.setDate(start.getDate() - d + (d === 0 ? -6 : 1))
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(start)
+        end.setDate(start.getDate() + 6)
+        end.setHours(23, 59, 59, 999)
+        return appointments.filter(apt => { const ad = new Date(apt.date); return ad >= start && ad <= end })
+      }
       case 'month':
         return appointments.filter(apt => {
-          const aptDate = new Date(apt.date)
-          return aptDate.getMonth() === currentDate.getMonth() &&
-            aptDate.getFullYear() === currentDate.getFullYear()
+          const ad = new Date(apt.date)
+          return ad.getMonth() === currentDate.getMonth() && ad.getFullYear() === currentDate.getFullYear()
         })
-
       default:
         return appointments
     }
   }, [appointments, currentView, currentDate])
 
-  // Handlers
-  const handleEditAppointment = async (id: string) => {
-    const appointment = appointments.find(apt => apt.id === id)
-    if (appointment) {
-      setEditingAppointment(appointment)
-      setShowEditDialog(true)
-    }
+  const handleEditAppointment = (id: string) => {
+    const apt = appointments.find(a => a.id === id)
+    if (apt) { setEditingAppointment(apt); setShowEditDialog(true) }
   }
 
   const handleUpdateAppointment = async (id: string, data: any) => {
     await updateAppointment(id, data)
     setShowEditDialog(false)
     setEditingAppointment(null)
-    await refetchAppointments()
-  }
-
-  const handleCloseEditDialog = () => {
-    setShowEditDialog(false)
-    setEditingAppointment(null)
+    await refetch()
   }
 
   const handleDeleteAppointment = async (id: string) => {
@@ -154,141 +87,64 @@ export default function AgendaPage() {
       title: 'Excluir Agendamento',
       description: 'Tem certeza que deseja excluir este agendamento?',
       variant: 'destructive',
-      confirmText: 'Excluir'
+      confirmText: 'Excluir',
     })
-
     if (!confirmed) return
-
     try {
       await deleteAppointment(id)
-      toast.success('Agendamento excluído com sucesso!')
-    } catch (error) {
+      toast.success('Agendamento excluído!')
+    } catch {
       toast.error('Erro ao excluir agendamento')
     }
   }
 
-  const handleDayClick = (date: Date) => {
-    setCurrentDate(date)
-    setCurrentView('day')
+  const getNavigationType = (view: ViewType): NavigationType => {
+    if (view === 'day') return 'day'
+    if (view === 'week') return 'week'
+    if (view === 'month') return 'month'
+    return 'week'
   }
 
-  const handleAppointmentClick = (appointment: any) => {
-    setEditingAppointment(appointment)
-    setShowEditDialog(true)
-  }
+  const activeFiltersCount = Object.values(filters).filter(v => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)).length
 
-  // Redirect if not authenticated - AFTER all hooks
-  if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
-
-  if (!session) {
-    redirect('/login')
-  }
+  if (status === 'loading') return <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>
+  if (!session) { redirect('/login'); return null }
 
   return (
-    <div className="space-y-6">
-      {/* Error Alert */}
-      {appointmentsError && (
+    <div className="space-y-3">
+      {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {appointmentsError}
-          </AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col space-y-3 sm:space-y-4">
-        {/* Title */}
-        <div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Agendamento</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Visualize e gerencie todos os seus agendamentos
-          </p>
+      {/* Toolbar compacta para mobile */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <DateNavigation
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            navigationType={getNavigationType(currentView)}
+          />
         </div>
-
-        {/* Actions Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          {/* Stats - Hidden on very small screens */}
-          <div className="hidden md:flex items-center space-x-4 text-xs sm:text-sm text-muted-foreground">
-            <div className="flex items-center space-x-1">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span>
-                Hoje: {statsLoading ? <Loader2 className="inline h-3 w-3 animate-spin" /> : `${stats.todayAppointments} agendamento(s)`}
-              </span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span>
-                Semana: {statsLoading ? <Loader2 className="inline h-3 w-3 animate-spin" /> : `${stats.thisWeekAppointments} agendamento(s)`}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Filters Toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className={`text-xs sm:text-sm ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}`}
-            >
-              <Filter className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Filtros</span>
-              {Object.keys(filters).filter(key =>
-                filters[key as keyof AgendaFilters] !== undefined &&
-                filters[key as keyof AgendaFilters] !== '' &&
-                !(Array.isArray(filters[key as keyof AgendaFilters]) &&
-                  (filters[key as keyof AgendaFilters] as any[]).length === 0)
-              ).length > 0 && (
-                  <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs h-4 w-4 sm:h-5 sm:w-auto flex items-center justify-center p-0 sm:px-2">
-                    {Object.keys(filters).filter(key =>
-                      filters[key as keyof AgendaFilters] !== undefined &&
-                      filters[key as keyof AgendaFilters] !== '' &&
-                      !(Array.isArray(filters[key as keyof AgendaFilters]) &&
-                        (filters[key as keyof AgendaFilters] as any[]).length === 0)
-                    ).length}
-                  </Badge>
-                )}
-            </Button>
-
-            {/* View Selector */}
-            <AgendaViewSelector
-              currentView={currentView}
-              onViewChange={setCurrentView}
-            />
-
-            {/* New Appointment */}
-            <Link href="/dashboard/appointments/new" className="flex-1 sm:flex-initial">
-              <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9">
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Novo Agendamento</span>
-                <span className="sm:hidden">Novo</span>
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Stats mobile - Only on small screens */}
-        <div className="md:hidden flex items-center justify-around text-xs text-muted-foreground bg-muted rounded-lg p-2">
-          <div className="flex items-center space-x-1">
-            <Calendar className="h-3 w-3" />
-            <span>Hoje: {statsLoading ? <Loader2 className="inline h-3 w-3 animate-spin" /> : `${stats.todayAppointments} agendamento(s)`}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Calendar className="h-3 w-3" />
-            <span>Semana: {statsLoading ? <Loader2 className="inline h-3 w-3 animate-spin" /> : `${stats.thisWeekAppointments} agendamento(s)`}</span>
-          </div>
-        </div>
+        <AgendaViewSelector currentView={currentView} onViewChange={setCurrentView} />
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowFilters(!showFilters)}
+          className="relative h-9 w-9 flex-shrink-0"
+        >
+          <Filter className="h-4 w-4" />
+          {activeFiltersCount > 0 && (
+            <Badge className="absolute -top-1.5 -right-1.5 h-4 w-4 p-0 text-[10px] flex items-center justify-center">
+              {activeFiltersCount}
+            </Badge>
+          )}
+        </Button>
       </div>
 
-      {/* Filters */}
+      {/* Filtros */}
       <AgendaFiltersComponent
         filters={filters}
         onFiltersChange={setFilters}
@@ -296,95 +152,32 @@ export default function AgendaPage() {
         onToggle={() => setShowFilters(!showFilters)}
       />
 
-
-
-      {/* Main Content */}
-      <div className="min-h-[400px]">
-        {appointmentsLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Carregando agendamentos...</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {currentView === 'day' && (
-              <AgendaDayView
-                date={currentDate}
-                appointments={viewFilteredAppointments}
-                onEditAppointment={handleEditAppointment}
-                onDeleteAppointment={handleDeleteAppointment}
-                onDateChange={setCurrentDate}
-              />
-            )}
-
-            {currentView === 'week' && (
-              <AgendaWeekView
-                date={currentDate}
-                appointments={viewFilteredAppointments}
-                onEditAppointment={handleEditAppointment}
-                onDeleteAppointment={handleDeleteAppointment}
-                onDateChange={setCurrentDate}
-              />
-            )}
-
-            {currentView === 'month' && (
-              <AgendaMonthView
-                date={currentDate}
-                appointments={viewFilteredAppointments}
-                onDayClick={handleDayClick}
-                onAppointmentClick={handleAppointmentClick}
-                onDateChange={setCurrentDate}
-              />
-            )}
-
-            {currentView === 'list' && (
-              <AgendaListView
-                appointments={viewFilteredAppointments}
-                onEditAppointment={handleEditAppointment}
-                onDeleteAppointment={handleDeleteAppointment}
-              />
-            )}
-
-            {currentView === 'timeline' && (
-              <AgendaTimelineView
-                appointments={viewFilteredAppointments}
-                onEditAppointment={handleEditAppointment}
-                onDeleteAppointment={handleDeleteAppointment}
-              />
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Results Summary */}
-      {viewFilteredAppointments.length === 0 && Object.keys(filters).length > 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <Calendar className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Nenhuma consulta encontrada
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              Não há consultas que correspondam aos filtros aplicados.
-              Tente ajustar os filtros ou limpar todos os filtros.
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => setFilters({})}
-            >
-              Limpar Filtros
-            </Button>
-          </CardContent>
-        </Card>
+      {/* View */}
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          {currentView === 'day' && <AgendaDayView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} onDateChange={setCurrentDate} />}
+          {currentView === 'week' && <AgendaWeekView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} onDateChange={setCurrentDate} />}
+          {currentView === 'month' && <AgendaMonthView date={currentDate} appointments={viewFilteredAppointments} onDayClick={(d) => { setCurrentDate(d); setCurrentView('day') }} onAppointmentClick={(apt) => { setEditingAppointment(apt); setShowEditDialog(true) }} onDateChange={setCurrentDate} />}
+          {currentView === 'list' && <AgendaListView appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
+          {currentView === 'timeline' && <AgendaTimelineView appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
+        </>
       )}
 
-      {/* Edit Appointment Dialog */}
+      {/* FAB — Novo Agendamento */}
+      <Link href="/dashboard/appointments/new" className="fixed bottom-20 right-4 z-40" style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom) + 1rem)' }}>
+        <Button size="icon" className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90">
+          <Plus className="h-6 w-6" />
+        </Button>
+      </Link>
+
       {editingAppointment && (
         <EditAppointmentDialog
           isOpen={showEditDialog}
-          onClose={handleCloseEditDialog}
+          onClose={() => { setShowEditDialog(false); setEditingAppointment(null) }}
           appointment={editingAppointment}
           onUpdate={handleUpdateAppointment}
         />

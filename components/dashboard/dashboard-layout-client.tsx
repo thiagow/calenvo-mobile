@@ -1,9 +1,8 @@
-
 'use client'
 
 import { SessionProvider } from 'next-auth/react'
-import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { BottomNav } from '@/components/layout/bottom-nav'
 import { SegmentProvider } from '@/contexts/segment-context'
 
 interface DashboardLayoutClientProps {
@@ -22,14 +21,12 @@ export function DashboardLayoutClient({ children, sessionData }: DashboardLayout
   return (
     <SessionProvider>
       <SegmentProvider>
-        <div className="min-h-screen bg-background">
-          <DashboardSidebar />
-          <div className="lg:pl-64">
-            <DashboardHeader sessionData={sessionData} />
-            <main className="p-3 sm:p-4 md:p-6 pb-20 lg:pb-6">
-              {children}
-            </main>
-          </div>
+        <div className="min-h-screen bg-background flex flex-col">
+          <DashboardHeader sessionData={sessionData} />
+          <main className="flex-1 overflow-y-auto px-3 py-4 pb-24">
+            {children}
+          </main>
+          <BottomNav />
         </div>
       </SegmentProvider>
     </SessionProvider>
