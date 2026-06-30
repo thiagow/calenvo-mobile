@@ -472,112 +472,112 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section className="py-16 bg-white" id="pricing">
+      <section className="py-24 bg-white" id="pricing">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
-              Planos que crescem com você
-            </h2>
 
-            {/* Toggle */}
-            <div className="flex justify-center items-center gap-4 mb-12">
-              <span className={`font-medium ${!isAnnual ? 'text-gray-900' : 'text-gray-600'}`}>
-                Mensal
-              </span>
+          {/* Header */}
+          <div className="text-center mb-12">
+            <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
+              Planos
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Simples, transparente, sem surpresas
+            </h2>
+            <p className="text-gray-500">14 dias grátis em qualquer plano. Sem cartão de crédito.</p>
+          </div>
+
+          {/* Toggle */}
+          <div className="flex justify-center mb-14">
+            <div className="flex items-center bg-gray-100 rounded-full p-1">
               <button
-                onClick={() => setIsAnnual(!isAnnual)}
-                className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-300 transition-colors"
-                style={{
-                  backgroundColor: isAnnual ? '#7C3AED' : '#d1d5db'
-                }}
+                onClick={() => setIsAnnual(false)}
+                className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${!isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
               >
-                <span
-                  className="inline-block h-6 w-6 transform rounded-full bg-white transition-transform"
-                  style={{
-                    transform: isAnnual ? 'translateX(28px)' : 'translateX(2px)'
-                  }}
-                />
+                Mensal
               </button>
-              <span className={`font-medium ${isAnnual ? 'text-gray-900' : 'text-gray-600'}`}>
-                Anual <span className="text-violet-600 font-bold">−20%</span>
-              </span>
+              <button
+                onClick={() => setIsAnnual(true)}
+                className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all ${isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
+              >
+                Anual
+                <span className="bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">−20%</span>
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Freemium */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">{PLAN_CONFIGS.FREEMIUM.name}</h3>
-              <p className="text-gray-600 mb-6">Perfeito para começar</p>
-              <div className="mb-8">
-                <span className="text-4xl font-bold text-gray-900">Grátis</span>
-                <p className="text-gray-600 mt-1">Para sempre</p>
+          {/* Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
+
+            {/* Básico */}
+            <div className="bg-white border border-gray-200 rounded-3xl p-8">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Básico</p>
+              <div className="mb-1">
+                <span className="text-sm text-gray-500">R$</span>
+                <span className="text-5xl font-bold text-gray-900">{isAnnual ? '14' : '19'}</span>
+                <span className="text-gray-500">,{isAnnual ? '90' : '90'}/mês</span>
               </div>
-              <Link href="/signup" className="w-full">
-                <Button variant="outline" className="w-full mb-8">
-                  Começar Grátis
+              <p className="text-xs text-gray-400 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
+              <Link href="/signup" className="w-full block mb-8">
+                <Button variant="outline" className="w-full font-semibold rounded-xl">
+                  Começar grátis
                 </Button>
               </Link>
-              <ul className="space-y-4">
-                {PLAN_CONFIGS.FREEMIUM.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-violet-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-700">{feature}</span>
+              <ul className="space-y-3">
+                {['Até 2 profissionais', '150 agendamentos/mês', 'Notificações por e-mail', 'Link de agendamento próprio', 'Suporte por chat'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                    <Check className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                    {f}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Standard - Highlighted */}
-            <div className="bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-2xl p-8 relative transform md:scale-105 md:shadow-2xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full text-sm font-bold">
-                ⭐ Mais Popular
+            {/* PRO — destaque, maior */}
+            <div className="bg-violet-600 rounded-3xl p-8 relative shadow-2xl md:-my-4">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 px-5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">
+                Mais Popular
               </div>
-              <h3 className="text-2xl font-bold mb-2">{PLAN_CONFIGS.STANDARD.name}</h3>
-              <p className="text-violet-100 mb-6">Para negócios em crescimento</p>
-              <div className="mb-8">
-                <span className="text-4xl font-bold">
-                  {isAnnual
-                    ? formatCurrency((PLAN_CONFIGS.STANDARD.price * 12 * 0.8) / 12)
-                    : formatCurrency(PLAN_CONFIGS.STANDARD.price)}
-                </span>
-                <p className="text-violet-100 mt-1">/mês{isAnnual ? ' (faturado anualmente)' : ''}</p>
+              <p className="text-xs font-bold text-violet-300 uppercase tracking-widest mb-6">PRO</p>
+              <div className="mb-1">
+                <span className="text-sm text-violet-200">R$</span>
+                <span className="text-5xl font-bold text-white">{isAnnual ? '27' : '39'}</span>
+                <span className="text-violet-200">,90/mês</span>
               </div>
-              <Link href="/signup/standard" className="w-full">
-                <Button className="w-full mb-8 bg-white text-violet-600 hover:bg-gray-100 font-semibold">
-                  Assinar Standard
+              <p className="text-xs text-violet-300 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
+              <Link href="/signup/standard" className="w-full block mb-8">
+                <Button className="w-full bg-white text-violet-700 hover:bg-gray-100 font-bold rounded-xl">
+                  Contratar Pro
                 </Button>
               </Link>
-              <ul className="space-y-4">
-                {PLAN_CONFIGS.STANDARD.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-yellow-300 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-violet-50">{feature}</span>
+              <ul className="space-y-3">
+                {['Tudo do Básico', 'Até 8 profissionais', 'WhatsApp + SMS + E-mail ilimitados', 'Programa de fidelidade completo', 'Relatórios e métricas avançadas', 'Suporte prioritário'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-violet-100">
+                    <Check className="h-4 w-4 text-violet-300 flex-shrink-0" />
+                    {f}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Premium */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">{PLAN_CONFIGS.PREMIUM.name}</h3>
-              <p className="text-gray-600 mb-6">Para negócios estabelecidos</p>
-              <div className="mb-8">
-                <span className="text-4xl font-bold text-gray-900">
-                  {isAnnual
-                    ? formatCurrency((PLAN_CONFIGS.PREMIUM.price * 12 * 0.8) / 12)
-                    : formatCurrency(PLAN_CONFIGS.PREMIUM.price)}
-                </span>
-                <p className="text-gray-600 mt-1">/mês{isAnnual ? ' (faturado anualmente)' : ''}</p>
+            {/* Business */}
+            <div className="bg-white border border-gray-200 rounded-3xl p-8">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Business</p>
+              <div className="mb-1">
+                <span className="text-sm text-gray-500">R$</span>
+                <span className="text-5xl font-bold text-gray-900">{isAnnual ? '49' : '69'}</span>
+                <span className="text-gray-500">,90/mês</span>
               </div>
-              <Button disabled className="w-full mb-8 bg-gray-200 text-gray-600">
-                Em breve
-              </Button>
-              <ul className="space-y-4">
-                {PLAN_CONFIGS.PREMIUM.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-violet-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-700">{feature}</span>
+              <p className="text-xs text-gray-400 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
+              <Link href="/signup" className="w-full block mb-8">
+                <Button variant="outline" className="w-full font-semibold rounded-xl">
+                  Contratar Business
+                </Button>
+              </Link>
+              <ul className="space-y-3">
+                {['Tudo do Pro', 'Profissionais ilimitados', 'Múltiplas unidades', 'API e integrações avançadas', 'Account manager dedicado', 'SLA garantido'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                    <Check className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                    {f}
                   </li>
                 ))}
               </ul>
