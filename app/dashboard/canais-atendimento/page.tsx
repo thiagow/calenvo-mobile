@@ -1,170 +1,122 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
-import { prisma } from '@/lib/db';
-import { redirect } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Lock, MessageSquare, Bot } from 'lucide-react';
-import Link from 'next/link';
-import { WhatsAppConnection } from './_components/whatsapp-connection';
-import { NotificationSettings } from './_components/notification-settings';
-import { AiAgentSettings } from './_components/ai-agent-settings';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth-options'
+import { prisma } from '@/lib/db'
+import { redirect } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Lock, MessageSquare, Bot } from 'lucide-react'
+import Link from 'next/link'
+import { WhatsAppConnection } from './_components/whatsapp-connection'
+import { NotificationSettings } from './_components/notification-settings'
+import { AiAgentSettings } from './_components/ai-agent-settings'
 
-interface ExtendedUser {
-    id: string;
-    email: string;
-    planType?: string;
-}
-
-interface ExtendedSession {
-    user: ExtendedUser;
-}
+interface ExtendedUser { id: string; email: string; planType?: string }
+interface ExtendedSession { user: ExtendedUser }
 
 export default async function CanaisAtendimentoPage() {
-    const session = (await getServerSession(authOptions)) as ExtendedSession | null;
+  const session = (await getServerSession(authOptions)) as ExtendedSession | null
+  if (!session?.user?.id) redirect('/auth/signin')
 
-    if (!session?.user?.id) {
-        redirect('/auth/signin');
-    }
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, planType: true, businessName: true },
+  })
+  if (!user) redirect('/auth/signin')
 
-    // Get user with plan type
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: {
-            id: true,
-            planType: true,
-            businessName: true,
-        },
-    });
+  const isPlanFree = user.planType === 'FREEMIUM'
+  const hasAccess = !isPlanFree
 
-    if (!user) {
-        redirect('/auth/signin');
-    }
+  let whatsAppConfig = null
+  if (hasAccess) {
+    whatsAppConfig = await prisma.whatsAppConfig.findUnique({ where: { userId: user.id } })
+  }
 
-    const isPlanFree = user.planType === 'FREEMIUM';
-    const hasAccess = !isPlanFree;
+  return (
+    <div className="space-y-4">
+      {/* Plano gratuito — bloqueio */}
+      {isPlanFree && (
+        <Card className="border border-amber-500/20 bg-amber-500/5">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <Lock className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Recurso Premium</p>
+                <p className="text-xs text-muted-foreground">Disponível nos planos Standard e Premium</p>
+              </div>
+            </div>
 
-    // Get WhatsApp config if has access
-    let whatsAppConfig = null;
-    if (hasAccess) {
-        whatsAppConfig = await prisma.whatsAppConfig.findUnique({
-            where: { userId: user.id },
-        });
-    }
+            <ul className="text-xs text-muted-foreground space-y-1.5 pl-1">
+              {[
+                'Lembretes automáticos pelo WhatsApp',
+                'Agente IA respondendo clientes 24/7',
+                'Confirmações de agendamento instantâneas',
+                'Mensagens personalizadas com variáveis',
+              ].map(b => (
+                <li key={b} className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5">•</span>
+                  {b}
+                </li>
+              ))}
+            </ul>
 
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Canais de Atendimento</h1>
-                <p className="text-sm sm:text-base text-gray-600 mt-1">
-                    Gerencie suas conexões de WhatsApp, notificações de agendamento e o Agente IA de atendimento.
+            <Link href="/dashboard/plans" className="block">
+              <Button className="w-full">Fazer Upgrade</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Plano pago */}
+      {hasAccess && (
+        <div className="space-y-4">
+          {/* Conexão WhatsApp — sempre visível */}
+          <WhatsAppConnection config={whatsAppConfig} />
+
+          {/* Configurações — só se conectado */}
+          {whatsAppConfig?.isConnected ? (
+            <div className="space-y-4">
+              {/* Notificações */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MessageSquare className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Notificações por WhatsApp</p>
+                    <p className="text-xs text-muted-foreground">Mensagens automáticas de confirmação e lembrete</p>
+                  </div>
+                </div>
+                <NotificationSettings config={whatsAppConfig} disabled={!whatsAppConfig.isConnected} />
+              </div>
+
+              {/* Agente IA */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                    <Bot className="h-3.5 w-3.5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">Agente IA de Atendimento</p>
+                    <p className="text-xs text-muted-foreground">IA que responde clientes pelo n8n, 24/7</p>
+                  </div>
+                </div>
+                <AiAgentSettings config={whatsAppConfig} />
+              </div>
+            </div>
+          ) : (
+            <Card className="border border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                <MessageSquare className="h-8 w-8 text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  Conecte seu WhatsApp acima para liberar Notificações e Agente IA
                 </p>
-            </div>
-
-            {/* Content */}
-            <div className="space-y-6">
-                {/* Free Plan Blocker */}
-                {isPlanFree && (
-                    <Card className="border-amber-200 bg-amber-50/50">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Lock className="h-5 w-5" />
-                                Recurso Premium
-                            </CardTitle>
-                            <CardDescription>
-                                Os Canais de Atendimento (WhatsApp e Agente IA) estão disponíveis apenas para planos Standard e Premium
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Alert>
-                                <AlertDescription>
-                                    <strong>Benefícios das Integrações:</strong>
-                                    <ul className="list-disc list-inside mt-2 space-y-1">
-                                        <li>Reduza ausências com lembretes automáticos pelo WhatsApp</li>
-                                        <li>Utilize Inteligência Artificial para responder clientes 24/7</li>
-                                        <li>Confirme agendamentos instantaneamente</li>
-                                        <li>Personalize mensagens com variáveis dinâmicas</li>
-                                    </ul>
-                                </AlertDescription>
-                            </Alert>
-
-                            <div className="pt-2">
-                                <Link href="/dashboard/plans">
-                                    <Button size="lg" className="w-full sm:w-auto">
-                                        Fazer Upgrade do Plano
-                                    </Button>
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* WhatsApp Connection & Configs (Only for paid plans) */}
-                {hasAccess && (
-                    <>
-                        {/* COMPONENTE DE CONEXÃO FIXO NO TOPO */}
-                        <WhatsAppConnection config={whatsAppConfig} />
-
-                        {/* Configurações (Apenas visível se conectado) */}
-                        {whatsAppConfig && whatsAppConfig.isConnected ? (
-
-                            <Tabs defaultValue="notifications" className="w-full mt-6">
-                                <TabsList className="flex flex-col h-auto w-full gap-1 p-1 bg-muted rounded-md mb-6 md:mb-0 md:grid md:grid-cols-2">
-                                    <TabsTrigger value="notifications" className="w-full justify-start md:justify-center py-2 gap-2">
-                                        <MessageSquare className="h-4 w-4" /> Notificações Transacionais
-                                    </TabsTrigger>
-                                    <TabsTrigger value="ai_agent" className="w-full justify-start md:justify-center py-2 gap-2">
-                                        <Bot className="h-4 w-4" /> Atendimento de IA
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                {/* ABA 1: NOTIFICAÇÕES (LEMBRETES DE AGENDAMENTO, CANCELAMENTO, ETC) */}
-                                <TabsContent value="notifications" className="mt-6">
-                                    <div className="mb-4">
-                                        <h2 className="text-xl font-bold text-gray-900">Notificações por WhatsApp</h2>
-                                        <p className="text-sm text-gray-600 mt-1">
-                                            Configure em quais momentos o sistema envia mensagens automáticas para o cliente (agendamento criado, cancelado ou lembretes).
-                                        </p>
-                                    </div>
-                                    <NotificationSettings
-                                        config={whatsAppConfig}
-                                        disabled={!whatsAppConfig.isConnected}
-                                    />
-                                </TabsContent>
-
-                                {/* ABA 2: AGENTE DE IA (RESPOSTAS AUTOMATIZADAS VIA N8N) */}
-                                <TabsContent value="ai_agent" className="mt-6">
-                                    <div className="mb-4">
-                                        <h2 className="text-xl font-bold text-gray-900">Agente IA de Atendimento</h2>
-                                        <p className="text-sm text-gray-600 mt-1">
-                                            Conecte seu fluxo do n8n para que uma IA responda clientes baseado nas suas regras de negócio e informações configuradas no sistema.
-                                        </p>
-                                    </div>
-                                    <AiAgentSettings
-                                        config={whatsAppConfig}
-                                    />
-                                </TabsContent>
-
-                            </Tabs>
-
-                        ) : (
-                            /* Info when not connected */
-                            <Card>
-                                <CardContent className="py-8">
-                                    <div className="text-center space-y-2">
-                                        <p className="text-muted-foreground">
-                                            Conecte seu WhatsApp acima para liberar as configurações de Notificações e Atendimento IA.
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </>
-                )}
-            </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-    );
+      )}
+    </div>
+  )
 }
