@@ -60,10 +60,10 @@ export default function LandingPage() {
   ]
 
   const segments = [
-    { name: 'Salões de Beleza', icon: '💇' },
-    { name: 'Barbearias', icon: '✂️' },
-    { name: 'Clínicas de Estética', icon: '✨' },
-    { name: 'Fisioterapia', icon: '🏥' }
+    { name: 'Salões e Barbearias', icon: '💇' },
+    { name: 'Clínicas e Consultórios', icon: '🏥' },
+    { name: 'Spas e Estética', icon: '✨' },
+    { name: 'Fisioterapia', icon: '🧘' }
   ]
 
   return (
@@ -283,23 +283,20 @@ export default function LandingPage() {
       </section>
 
       {/* Segments */}
-      <section className="py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Para diversos segmentos
-            </h2>
-            <p className="text-lg text-gray-600">
-              Uma plataforma que se adapta às necessidades do seu negócio
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-6">
+              Feito para múltiplos segmentos
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-6">
             {segments.map((segment) => (
               <div
                 key={segment.name}
-                className="px-6 py-3 bg-gray-50 rounded-full text-gray-900 font-medium hover:bg-violet-50 hover:text-violet-600 transition-colors text-sm md:text-base"
+                className="px-6 py-3 bg-white border border-gray-200 rounded-full text-gray-700 font-medium hover:border-violet-600 hover:text-violet-600 transition-all text-base"
               >
-                <span className="mr-2">{segment.icon}</span>
+                <span className="mr-2 text-lg">{segment.icon}</span>
                 {segment.name}
               </div>
             ))}
