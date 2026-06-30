@@ -2,240 +2,150 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import {
-    Gift, Star, TrendingUp, Users, Edit, Plus, ArrowUpRight, ArrowDownRight
-} from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Gift, Users, Edit, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface LoyaltyConfig {
-    id: string
-    name: string
-    mode: 'FREQUENCY' | 'VALUE'
-    pointsPerCurrency: number
-    pointsToReward: number
-    rewardValue: number
-    isActive: boolean
-    createdAt: string
+  id: string; name: string; mode: 'FREQUENCY' | 'VALUE'
+  pointsPerCurrency: number; pointsToReward: number; rewardValue: number
+  isActive: boolean; createdAt: string
 }
 
 interface LoyaltyStats {
-    totalPointsEarned: number
-    totalPointsRedeemed: number
-    activeClientsWithBalance: number
+  totalPointsEarned: number; totalPointsRedeemed: number; activeClientsWithBalance: number
 }
 
 export default function LoyaltyPage() {
-    const router = useRouter()
-    const [config, setConfig] = useState<LoyaltyConfig | null>(null)
-    const [stats, setStats] = useState<LoyaltyStats | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [toggling, setToggling] = useState(false)
+  const router = useRouter()
+  const [config, setConfig] = useState<LoyaltyConfig | null>(null)
+  const [stats, setStats] = useState<LoyaltyStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState(false)
 
-    const fetchData = async () => {
-        try {
-            const res = await fetch('/api/loyalty/config')
-            const data = await res.json()
-            setConfig(data.config)
-            setStats(data.stats)
-        } catch {
-            toast.error('Erro ao carregar programa de fidelidade')
-        } finally {
-            setLoading(false)
-        }
-    }
+  useEffect(() => {
+    fetch('/api/loyalty/config')
+      .then(r => r.json())
+      .then(d => { setConfig(d.config); setStats(d.stats) })
+      .catch(() => toast.error('Erro ao carregar programa de fidelidade'))
+      .finally(() => setLoading(false))
+  }, [])
 
-    useEffect(() => { fetchData() }, [])
+  const handleToggle = async (isActive: boolean) => {
+    setToggling(true)
+    try {
+      const res = await fetch('/api/loyalty/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ isActive }) })
+      if (res.ok) { setConfig(await res.json()); toast.success(isActive ? 'Programa ativado!' : 'Programa desativado') }
+    } catch { toast.error('Erro ao atualizar') } finally { setToggling(false) }
+  }
 
-    const handleToggle = async (isActive: boolean) => {
-        setToggling(true)
-        try {
-            const res = await fetch('/api/loyalty/config', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ isActive })
-            })
-            if (res.ok) {
-                const updated = await res.json()
-                setConfig(updated)
-                toast.success(isActive ? 'Programa ativado!' : 'Programa desativado')
-            }
-        } catch {
-            toast.error('Erro ao atualizar status')
-        } finally {
-            setToggling(false)
-        }
-    }
+  if (loading) return (
+    <div className="space-y-3">
+      {[1,2,3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+    </div>
+  )
 
-    if (loading) {
-        return (
-            <div className="p-4 sm:p-6 lg:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <Gift className="h-7 w-7 text-amber-500" />
-                    <h1 className="text-2xl font-bold">Fidelidade</h1>
+  if (!config) return (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
+      <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center">
+        <Gift className="h-10 w-10 text-amber-500" />
+      </div>
+      <h2 className="text-xl font-semibold">Programa de Fidelidade</h2>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        Recompense seus clientes por frequência ou valor gasto e aumente o retorno!
+      </p>
+      <Button onClick={() => router.push('/dashboard/loyalty/edit')} className="bg-amber-500 hover:bg-amber-600 text-white">
+        <Plus className="h-4 w-4 mr-2" />Criar Programa
+      </Button>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {/* Header do programa */}
+      <Card className="border border-border">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                <Gift className="h-5 w-5 text-amber-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{config.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {config.mode === 'FREQUENCY' ? '🔢 Frequência' : '💰 Valor'}
+                  </Badge>
+                  <Badge variant={config.isActive ? 'default' : 'secondary'} className={`text-[10px] px-1.5 py-0 ${config.isActive ? 'bg-green-500/10 text-green-600 border-green-500/20' : ''}`}>
+                    {config.isActive ? 'Ativo' : 'Inativo'}
+                  </Badge>
                 </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                    {[1, 2, 3].map(i => (
-                        <Card key={i} className="animate-pulse">
-                            <CardContent className="pt-6"><div className="h-20 bg-gray-200 rounded" /></CardContent>
-                        </Card>
-                    ))}
-                </div>
+              </div>
             </div>
-        )
-    }
-
-    // Se não tem programa criado
-    if (!config) {
-        return (
-            <div className="p-4 sm:p-6 lg:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <Gift className="h-7 w-7 text-amber-500" />
-                    <h1 className="text-2xl font-bold">Fidelidade</h1>
-                </div>
-                <Card className="max-w-lg mx-auto">
-                    <CardContent className="pt-8 pb-8 text-center space-y-4">
-                        <div className="mx-auto w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center">
-                            <Gift className="h-10 w-10 text-amber-500" />
-                        </div>
-                        <h2 className="text-xl font-semibold">Crie seu Programa de Fidelidade</h2>
-                        <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-                            Recompense seus clientes por frequência ou valor gasto. Fidelize e aumente o retorno!
-                        </p>
-                        <Button
-                            onClick={() => router.push('/dashboard/loyalty/edit')}
-                            className="bg-amber-500 hover:bg-amber-600 text-white"
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Criar Programa
-                        </Button>
-                    </CardContent>
-                </Card>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Switch checked={config.isActive} onCheckedChange={handleToggle} disabled={toggling} />
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push('/dashboard/loyalty/edit')}>
+                <Edit className="h-4 w-4" />
+              </Button>
             </div>
-        )
-    }
+          </div>
+        </CardContent>
+      </Card>
 
-    return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Gift className="h-7 w-7 text-amber-500" />
-                    <div>
-                        <h1 className="text-2xl font-bold">{config.name}</h1>
-                        <p className="text-muted-foreground text-sm">Programa de Fidelidade</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                            {config.isActive ? 'Ativo' : 'Inativo'}
-                        </span>
-                        <Switch
-                            checked={config.isActive}
-                            onCheckedChange={handleToggle}
-                            disabled={toggling}
-                        />
-                    </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push('/dashboard/loyalty/edit')}
-                    >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                    </Button>
-                </div>
-            </div>
-
-            {/* Status Badge */}
-            <div className="flex items-center gap-3">
-                <Badge variant={config.isActive ? 'default' : 'secondary'} className={config.isActive ? 'bg-green-100 text-green-800' : ''}>
-                    {config.isActive ? '● Ativo' : '○ Inativo'}
-                </Badge>
-                <Badge variant="outline">
-                    {config.mode === 'FREQUENCY' ? '🔢 Modo Frequência' : '💰 Modo Valor'}
-                </Badge>
-            </div>
-
-            {/* KPIs */}
-            {stats && (
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Pontos Emitidos</CardTitle>
-                            <ArrowUpRight className="h-4 w-4 text-green-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-green-600">
-                                {stats.totalPointsEarned.toLocaleString('pt-BR')}
-                            </div>
-                            <p className="text-xs text-muted-foreground">Total acumulado</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Resgates</CardTitle>
-                            <ArrowDownRight className="h-4 w-4 text-blue-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-blue-600">
-                                {stats.totalPointsRedeemed.toLocaleString('pt-BR')}
-                            </div>
-                            <p className="text-xs text-muted-foreground">Pontos resgatados</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Clientes com Saldo</CardTitle>
-                            <Users className="h-4 w-4 text-amber-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-amber-600">
-                                {stats.activeClientsWithBalance}
-                            </div>
-                            <p className="text-xs text-muted-foreground">Clientes ativos no programa</p>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* Detalhes do Programa */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">Detalhes do Programa</CardTitle>
-                    <CardDescription>Configurações de acúmulo e resgate</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Modo</p>
-                            <p className="text-sm font-semibold mt-1">
-                                {config.mode === 'FREQUENCY' ? 'Frequência (1 visita = 1 ponto)' : `Valor (R$ 1 = ${config.pointsPerCurrency} pts)`}
-                            </p>
-                        </div>
-                        {config.mode === 'VALUE' && (
-                            <div className="p-4 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-muted-foreground uppercase tracking-wider">Taxa de Conversão</p>
-                                <p className="text-sm font-semibold mt-1">{config.pointsPerCurrency} ponto(s) por R$ 1,00</p>
-                            </div>
-                        )}
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Meta p/ Resgate</p>
-                            <p className="text-sm font-semibold mt-1">{config.pointsToReward} pontos</p>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Valor do Desconto</p>
-                            <p className="text-sm font-semibold mt-1">R$ {config.rewardValue.toFixed(2)}</p>
-                        </div>
-                    </div>
-                </CardContent>
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Emitidos', value: stats.totalPointsEarned.toLocaleString('pt-BR'), icon: ArrowUpRight, color: 'text-green-600' },
+            { label: 'Resgatados', value: stats.totalPointsRedeemed.toLocaleString('pt-BR'), icon: ArrowDownRight, color: 'text-blue-600' },
+            { label: 'C/ saldo', value: stats.activeClientsWithBalance.toString(), icon: Users, color: 'text-amber-600' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <Card key={label} className="border border-border">
+              <CardContent className="p-3 text-center">
+                <Icon className={`h-4 w-4 ${color} mx-auto mb-1`} />
+                <p className={`text-lg font-bold ${color}`}>{value}</p>
+                <p className="text-[10px] text-muted-foreground">{label}</p>
+              </CardContent>
             </Card>
+          ))}
         </div>
-    )
+      )}
+
+      {/* Detalhes */}
+      <Card className="border border-border">
+        <CardContent className="p-4 space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Regras do Programa</p>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b border-border/50">
+              <span className="text-xs text-muted-foreground">Modo</span>
+              <span className="text-xs font-medium">{config.mode === 'FREQUENCY' ? '1 visita = 1 ponto' : `R$ 1 = ${config.pointsPerCurrency} pts`}</span>
+            </div>
+            {config.mode === 'VALUE' && (
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-xs text-muted-foreground">Taxa de conversão</span>
+                <span className="text-xs font-medium">{config.pointsPerCurrency} pt(s)/R$1</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center py-2 border-b border-border/50">
+              <span className="text-xs text-muted-foreground">Meta para resgate</span>
+              <span className="text-xs font-medium">{config.pointsToReward} pontos</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-xs text-muted-foreground">Valor do desconto</span>
+              <span className="text-xs font-medium text-green-600">R$ {config.rewardValue.toFixed(2)}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button variant="outline" className="w-full" onClick={() => router.push('/dashboard/patients')}>
+        <Users className="h-4 w-4 mr-2" />
+        Ver Clientes com Pontos
+      </Button>
+    </div>
+  )
 }
