@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding } from 'lucide-react'
+import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding, CalendarDays, Bell, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -339,40 +339,118 @@ export default function LandingPage() {
       </section>
 
       {/* Funcionalidades */}
-      <section id="funcionalidades" className="py-16 bg-gray-50">
+      <section id="funcionalidades" className="py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Tudo que você precisa
+          {/* Header */}
+          <div className="text-center mb-16">
+            <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
+              Funcionalidades
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
+              Tudo que você precisa,<br />em um só sistema
             </h2>
+            <p className="text-gray-500 text-lg max-w-xl mx-auto">
+              Do agendamento ao programa de fidelidade, o Calenvo cuida de tudo para você focar no que importa.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Feature 1 - Purple */}
-            <div className="bg-violet-600 text-white rounded-2xl p-8">
-              <div className="text-4xl mb-4">📅</div>
-              <h3 className="text-2xl font-bold mb-3">Agendamento 24/7</h3>
-              <p className="text-violet-100">
-                Seus clientes agendam online a qualquer hora. Sem intermediários, sem surpresas.
-              </p>
+          {/* Top row: purple card + white card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Card 1 — Agendamento (purple) */}
+            <div className="bg-violet-600 rounded-3xl p-8 flex flex-col gap-6">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                <CalendarDays className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white mb-3">Agendamento online 24/7</h3>
+                <p className="text-violet-100 text-sm leading-relaxed">
+                  Seus clientes agendam quando quiserem pelo celular, sem precisar ligar. Link personalizado, cardápio de serviços e confirmação automática.
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {['Link exclusivo de agendamento', 'Equipe multiprofissional', 'Confirmação automática por mensagem'].map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-sm text-violet-100">
+                    <Check className="h-4 w-4 text-violet-300 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {/* Feature 2 - White */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-8">
-              <div className="text-4xl mb-4">📱</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Notificações WhatsApp</h3>
-              <p className="text-gray-600">
-                Confirmações, lembretes e atualizações automáticas. Reduz faltas em até 70%.
-              </p>
+            {/* Card 2 — Notificações (white) */}
+            <div className="bg-white border border-gray-100 rounded-3xl p-8 flex flex-col gap-6">
+              <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center">
+                <Bell className="h-6 w-6 text-violet-500" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Notificações automáticas</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  Reduza faltas em até 70%. Envie lembretes automáticos por WhatsApp, SMS e e-mail. Clientes confirmam ou remarcam com um toque, sem precisar ligar.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                  <span className="w-2 h-2 bg-green-500 rounded-full" />
+                  WhatsApp
+                </span>
+                <span className="px-4 py-1.5 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium">
+                  SMS
+                </span>
+                <span className="px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                  E-mail
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom row: wide fidelidade card */}
+          <div className="bg-gray-50 border border-gray-100 rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            {/* Left */}
+            <div className="flex flex-col gap-6">
+              <div className="w-12 h-12 bg-violet-100 rounded-2xl flex items-center justify-center">
+                <Star className="h-6 w-6 text-violet-500" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Programa de fidelidade e pontos</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">
+                  Fidelize clientes com um programa de pontos personalizável. Eles acumulam a cada visita e resgatam recompensas — voltando mais vezes e gastando mais.
+                </p>
+              </div>
             </div>
 
-            {/* Feature 3 - Wide */}
-            <div className="md:col-span-3 lg:col-span-1 bg-white border border-gray-200 rounded-2xl p-8">
-              <div className="text-4xl mb-4">🎁</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Programa de Fidelidade</h3>
-              <p className="text-gray-600">
-                Pacotes, cupons e bônus automáticos integrados ao agendamento.
-              </p>
+            {/* Right — mockup */}
+            <div className="flex flex-col gap-3">
+              {/* Categoria card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-1">Categoria atual</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-gray-900">Bronze → Prata</p>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Prata</span>
+                </div>
+              </div>
+
+              {/* Progress card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <p className="text-xs text-gray-400 mb-3">Progresso para resgate</p>
+                <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
+                  <div className="bg-violet-500 h-2 rounded-full" style={{ width: '70%' }} />
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>350 pts</span>
+                  <span>500 pts</span>
+                </div>
+              </div>
+
+              {/* Impact card */}
+              <div className="bg-violet-600 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-violet-200 mb-1">Impacto no negócio</p>
+                  <p className="text-xl font-bold text-white">+40% de retorno</p>
+                </div>
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-white" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
