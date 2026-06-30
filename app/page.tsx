@@ -120,56 +120,136 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 md:py-32">
-        <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-purple-600 to-violet-700" />
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden bg-white py-20 md:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
             <div>
-              <div className="inline-block mb-6 px-4 py-2 bg-white/20 text-white rounded-full text-sm font-medium backdrop-blur-sm">
-                ✨ Plataforma Completa de Agendamento
+              <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-violet-100 text-violet-600 rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-violet-600 rounded-full"></span>
+                Agendamento e fidelização completos
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 leading-tight">
-                Agende. Fidelize. Cresça.
+              <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+                <div>Agende.</div>
+                <div>Fidelize.</div>
+                <div><span className="text-violet-600">Cresça.</span></div>
               </h1>
-              <p className="text-xl text-violet-100 mb-8 leading-relaxed">
-                A solução completa para agendamento online, automação de notificações e programa de fidelidade integrado. Idealizada para salões, clínicas e consultórios.
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
+                Gestão completa de agendas, equipe multiprofissional, notificações automáticas e muito mais. A solução ideal para o seu negócio crescer.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link href="/signup">
-                  <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 font-semibold px-8 py-6 text-lg">
-                    Experimente Grátis
+                  <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-8 py-6 rounded-full text-base">
+                    Contratar plano
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
+                <Button variant="outline" className="font-semibold px-8 py-6 rounded-full text-base border-gray-300">
+                  Ver funcionalidades
+                </Button>
+              </div>
+
+              {/* Social Proof */}
+              <div className="flex items-center gap-4">
+                <div className="flex -space-x-2">
+                  <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center text-white font-bold border-2 border-white">C</div>
+                  <div className="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white font-bold border-2 border-white">R</div>
+                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold border-2 border-white">M</div>
+                  <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold border-2 border-white">A</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-sm text-gray-700 font-medium">+12.000 negócios confiam no Calenvo</p>
               </div>
             </div>
 
             {/* Right Mockup */}
-            <div className="relative h-96 md:h-full flex items-center justify-center">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-purple-400/20 rounded-3xl blur-2xl" />
-              <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="font-bold text-gray-900">Agendamentos</h3>
-                  <span className="text-2xl">📅</span>
+            <div className="relative">
+              <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-3xl p-8">
+                {/* Notification - Top Right */}
+                <div className="absolute top-8 right-8 bg-white rounded-2xl shadow-lg p-4 w-72">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
+                      <span className="text-xl">⭐</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">+50 pontos!</p>
+                      <p className="text-xs text-gray-600">Carlos atingiu Gold</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="bg-violet-50 rounded-lg p-4 border-l-4 border-violet-600">
-                    <p className="font-medium text-sm text-gray-900">Marina Silva</p>
-                    <p className="text-xs text-gray-600">Hoje, 14:30</p>
+
+                {/* Agenda Card */}
+                <div className="bg-white rounded-2xl shadow-lg p-6 mt-12">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">AGENDA DO DIA</p>
+                      <p className="text-lg font-bold text-gray-900">Quinta, 19 de Junho</p>
+                    </div>
+                    <p className="text-sm text-violet-600 font-semibold">3 agendados</p>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-600">
-                    <p className="font-medium text-sm text-gray-900">Carlos Santos</p>
-                    <p className="text-xs text-gray-600">Amanhã, 10:00</p>
+
+                  <div className="space-y-4">
+                    {/* Appointment 1 */}
+                    <div className="flex items-center justify-between pb-4 border-b">
+                      <div>
+                        <p className="text-2xl font-bold text-violet-600">09</p>
+                        <p className="text-sm text-violet-600 font-medium">:00</p>
+                      </div>
+                      <div className="flex-1 ml-4">
+                        <p className="font-semibold text-gray-900">Ana Beatriz</p>
+                        <p className="text-xs text-gray-600">Corte + Hidratação · 60 min</p>
+                      </div>
+                      <button className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white">
+                        ✓
+                      </button>
+                    </div>
+
+                    {/* Appointment 2 */}
+                    <div className="flex items-center justify-between pb-4 border-b">
+                      <div>
+                        <p className="text-2xl font-bold text-gray-600">10</p>
+                        <p className="text-sm text-gray-600 font-medium">:30</p>
+                      </div>
+                      <div className="flex-1 ml-4">
+                        <p className="font-semibold text-gray-900">Carlos Mendes</p>
+                        <p className="text-xs text-gray-600">Barba + Corte · 45 min</p>
+                      </div>
+                      <button className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-gray-400">
+                        ◎
+                      </button>
+                    </div>
+
+                    {/* Appointment 3 */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">14</p>
+                        <p className="text-sm text-green-600 font-medium">:00</p>
+                      </div>
+                      <div className="flex-1 ml-4">
+                        <p className="font-semibold text-gray-900">Mariana Souza</p>
+                        <p className="text-xs text-gray-600">Massagem relaxante · 90 min</p>
+                      </div>
+                      <button className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white">
+                        ✓
+                      </button>
+                    </div>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-600">
-                    <p className="font-medium text-sm text-gray-900">Beatriz Costa</p>
-                    <p className="text-xs text-gray-600">30 jun, 15:45</p>
+                </div>
+
+                {/* WhatsApp Notification - Bottom Right */}
+                <div className="absolute bottom-8 right-8 bg-white rounded-2xl shadow-lg p-4 w-64">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white">
+                      💬
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">Ana confirmou!</p>
+                      <p className="text-xs text-gray-600">Lembrete via WhatsApp ✓</p>
+                    </div>
                   </div>
                 </div>
               </div>
