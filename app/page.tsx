@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ArrowRight, Star, Check } from 'lucide-react'
+import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -60,10 +60,10 @@ export default function LandingPage() {
   ]
 
   const segments = [
-    { name: 'Salões e Barbearias', icon: '💇' },
-    { name: 'Clínicas e Consultórios', icon: '🏥' },
-    { name: 'Spas e Estética', icon: '✨' },
-    { name: 'Fisioterapia', icon: '🧘' }
+    { name: 'Salões e Barbearias', icon: Scissors },
+    { name: 'Clínicas e Consultórios', icon: Cross },
+    { name: 'Spas e Estética', icon: Droplets },
+    { name: 'Fisioterapia', icon: PersonStanding },
   ]
 
   return (
@@ -283,23 +283,26 @@ export default function LandingPage() {
       </section>
 
       {/* Segments */}
-      <section className="py-20 bg-white">
+      <section className="py-14 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-6">
+          <div className="text-center mb-8">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
               Feito para múltiplos segmentos
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-6">
-            {segments.map((segment) => (
-              <div
-                key={segment.name}
-                className="px-6 py-3 bg-white border border-gray-200 rounded-full text-gray-700 font-medium hover:border-violet-600 hover:text-violet-600 transition-all text-base"
-              >
-                <span className="mr-2 text-lg">{segment.icon}</span>
-                {segment.name}
-              </div>
-            ))}
+          <div className="flex flex-wrap justify-center gap-4">
+            {segments.map((segment) => {
+              const Icon = segment.icon
+              return (
+                <div
+                  key={segment.name}
+                  className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-full text-gray-700 font-medium hover:border-violet-400 hover:text-violet-600 transition-all text-sm cursor-default"
+                >
+                  <Icon className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                  {segment.name}
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
