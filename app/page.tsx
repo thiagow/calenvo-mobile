@@ -72,7 +72,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-[#FAFAFF] border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
@@ -123,7 +123,7 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-white py-20 md:py-32">
+      <section className="relative overflow-hidden bg-[#FAFAFF] py-20 md:py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Content */}
@@ -262,24 +262,24 @@ export default function LandingPage() {
       </section>
 
       {/* Stats Bar */}
-      <section className="bg-slate-950 text-white py-16">
+      <section className="bg-[#F9FAFB] text-slate-900 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             <div>
-              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">12.000+</div>
-              <p className="text-gray-400 text-lg">Negócios</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">12.000+</div>
+              <p className="text-gray-600 text-lg">Negócios</p>
             </div>
             <div>
-              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">4M+</div>
-              <p className="text-gray-400 text-lg">Agendamentos</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">4M+</div>
+              <p className="text-gray-600 text-lg">Agendamentos</p>
             </div>
             <div>
-              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">98%</div>
-              <p className="text-gray-400 text-lg">Satisfação</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">98%</div>
+              <p className="text-gray-600 text-lg">Satisfação</p>
             </div>
             <div>
-              <div className="text-5xl md:text-6xl font-bold text-violet-400 mb-3">−70%</div>
-              <p className="text-gray-400 text-lg">Faltas</p>
+              <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">−70%</div>
+              <p className="text-gray-600 text-lg">Faltas</p>
             </div>
           </div>
         </div>
