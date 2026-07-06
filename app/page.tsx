@@ -90,17 +90,17 @@ export default function LandingPage() {
             </Link>
 
             {/* Center Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="#funcionalidades" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+            <nav className="hidden md:flex items-center space-x-8 bg-[#7C3AED] rounded-full px-8 py-3">
+              <a href="#funcionalidades" className="text-white hover:text-violet-100 font-medium text-sm">
                 Funcionalidades
               </a>
-              <a href="#pricing" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+              <a href="#pricing" className="text-white hover:text-violet-100 font-medium text-sm">
                 Planos
               </a>
-              <a href="#testimonials" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+              <a href="#testimonials" className="text-white hover:text-violet-100 font-medium text-sm">
                 Depoimentos
               </a>
-              <a href="#faq" className="text-gray-700 hover:text-violet-600 font-medium text-sm">
+              <a href="#faq" className="text-white hover:text-violet-100 font-medium text-sm">
                 FAQ
               </a>
             </nav>
@@ -113,7 +113,7 @@ export default function LandingPage() {
                 </Button>
               </Link>
               <Link href="/signup">
-                <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-6">
+                <Button className="bg-[#EDE9FE] hover:bg-violet-200 text-[#7C3AED] font-semibold px-6">
                   Contratar plano
                 </Button>
               </Link>
@@ -354,7 +354,7 @@ export default function LandingPage() {
       </section>
 
       {/* Funcionalidades */}
-      <section id="funcionalidades" className="py-24 bg-white">
+      <section id="funcionalidades" className="py-24 bg-[#CCCCCC]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="text-center mb-16">
@@ -519,7 +519,7 @@ export default function LandingPage() {
               <p className="text-xs text-gray-400 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
               <Link href="/signup" className="w-full block mb-8">
                 <Button variant="outline" className="w-full font-semibold rounded-xl">
-                  Começar grátis
+                  Contratar Básico
                 </Button>
               </Link>
               <ul className="space-y-3">
@@ -587,7 +587,7 @@ export default function LandingPage() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="py-16">
+      <section id="faq" className="py-16 bg-[#F9FAFB]">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -630,9 +630,9 @@ export default function LandingPage() {
           <p className="text-lg text-violet-100 mb-8">
             Junte-se a milhares de negócios que já transformaram seu agendamento com Calenvo
           </p>
-          <Link href="/signup">
+          <Link href="#pricing">
             <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 font-semibold px-8 py-6 text-lg">
-              Começar Agora - É Grátis
+              Escolha Agora Seu Plano
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
