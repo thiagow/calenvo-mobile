@@ -72,7 +72,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <header className="sticky top-0 z-50 bg-[#FAFAFF] border-b border-gray-200">
+      <header className="sticky top-0 z-50 bg-[#7C3AED] border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
@@ -86,7 +86,7 @@ export default function LandingPage() {
                   priority
                 />
               </div>
-              <span className="text-xl font-bold text-gray-900">Calenvo</span>
+              <span className="text-xl font-bold text-white">Calenvo</span>
             </Link>
 
             {/* Center Navigation */}
@@ -108,7 +108,7 @@ export default function LandingPage() {
             {/* Right Actions */}
             <div className="flex items-center space-x-4">
               <Link href="/login">
-                <Button variant="ghost" className="text-gray-700 hover:text-violet-600 font-medium">
+                <Button variant="ghost" className="text-white hover:text-violet-100 font-medium">
                   Entrar
                 </Button>
               </Link>
