@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Search, Eye, Lock, Unlock } from 'lucide-react'
+import { Search, Eye, Lock, Unlock, Plus } from 'lucide-react'
 import { useDialog } from '@/components/providers/dialog-provider'
+import Link from 'next/link'
 
 interface Tenant {
     id: string
@@ -17,6 +18,7 @@ interface Tenant {
     segmentType: string
     planType: string
     isActive: boolean
+    isPaymentExempt: boolean
     createdAt: string
     _count: {
         professionals: number
@@ -107,6 +109,12 @@ export default function TenantsPage() {
                     <h1 className="text-3xl font-bold">Clientes</h1>
                     <p className="text-muted-foreground">Gerenciar donos de negócio cadastrados</p>
                 </div>
+                <Link href="/saas-admin/tenants/new">
+                    <Button>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Novo Cliente
+                    </Button>
+                </Link>
             </div>
 
             <Card>
@@ -145,6 +153,9 @@ export default function TenantsPage() {
                                                 {tenant.isActive ? 'Ativo' : 'Bloqueado'}
                                             </Badge>
                                             <Badge variant="outline">{tenant.planType}</Badge>
+                                            {tenant.isPaymentExempt && (
+                                                <Badge variant="secondary">Isento</Badge>
+                                            )}
                                         </div>
                                         <p className="text-sm text-muted-foreground">{tenant.email}</p>
                                         <p className="text-xs text-muted-foreground mt-1">

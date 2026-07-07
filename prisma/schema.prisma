@@ -35,9 +35,19 @@ model Session {
 }
 
 enum PlanType {
-  FREEMIUM
-  STANDARD
-  PREMIUM
+  BASICO
+  PRO
+  BUSINESS
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum Currency {
+  BRL
+  USD
 }
 
 enum UserRole {
@@ -80,7 +90,11 @@ model User {
   businessName       String? // Nome do negócio
   phone              String?
   segmentType        SegmentType @default(BEAUTY_SALON)
-  planType           PlanType    @default(FREEMIUM)
+  planType           PlanType    @default(BASICO)
+  billingInterval    BillingInterval?
+  currency           Currency    @default(BRL)
+  locale             String      @default("pt")
+  isPaymentExempt    Boolean     @default(false)
   stripeCustomerId   String?
   subscriptionId     String?
   subscriptionStatus String?
@@ -103,6 +117,8 @@ model User {
   notifications            Notification[] // Notificações do usuário
   whatsappConfig           WhatsAppConfig? // Configuração WhatsApp
   clientPackages           ClientPackage[] // Pacotes vendidos
+  apiTokens                ApiToken[] // Tokens de API para integrações externas
+  chatWidgetConfig         ChatWidgetConfig? // Configuração do chat de IA embedável
 
   // Relacionamento hierárquico
   masterId      String? // ID do usuário master (para profissionais)
@@ -588,6 +604,37 @@ model AdminAuditLog {
   @@index([adminId])
   @@index([action])
   @@index([createdAt])
+}
+
+/// Tokens de API para integrações externas (parceiros, agentes de IA).
+/// O token em texto puro só existe no momento da criação — armazenamos apenas o hash.
+model ApiToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String // Rótulo dado pelo usuário, ex: "Integração Zapier"
+  tokenHash   String    @unique // SHA-256 do token completo
+  tokenPrefix String // Primeiros caracteres exibidos na listagem (ex: cal_live_ab12)
+  scopes      String[]  @default(["appointments:read", "appointments:write"])
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Configuração do chat de IA embedável em sites de terceiros (widget)
+model ChatWidgetConfig {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled        Boolean  @default(false)
+  welcomeMessage String   @default("Olá! Como posso ajudar a agendar seu horário?")
+  primaryColor   String   @default("#7C3AED")
+  position       String   @default("bottom-right") // bottom-right | bottom-left
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ====== MÓDULO DE FIDELIZAÇÃO ======

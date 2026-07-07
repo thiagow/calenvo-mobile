@@ -27,7 +27,7 @@ export default async function SaasAdminLayout({
         user: {
             name: session.user?.name,
             email: session.user?.email,
-            planType: 'PREMIUM',
+            planType: 'BUSINESS',
             clinicName: 'SaaS Admin'
         }
     }

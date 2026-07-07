@@ -7,7 +7,8 @@ import { AppointmentStatus, ModalityType } from '@prisma/client'
 import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
-import { canCreateAppointment, getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
+import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
+import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -263,68 +264,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar limite de agendamentos do mês atual
-    const now = new Date()
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
-    const appointmentsThisMonth = await prisma.appointment.count({
-      where: {
-        userId: userId,
-        date: {
-          gte: firstDayOfMonth,
-          lte: lastDayOfMonth
-        },
-        status: {
-          notIn: ['CANCELLED', 'NO_SHOW'] // Não conta cancelados e faltas
-        }
-      }
-    })
+    const quota = await checkAppointmentQuota(userId, user.planType)
+    const appointmentsThisMonth = quota.currentCount
 
     // Validar se pode criar mais agendamentos
-    if (!canCreateAppointment(user.planType, appointmentsThisMonth)) {
-      const remaining = getRemainingAppointments(user.planType, appointmentsThisMonth)
+    if (!quota.allowed) {
       return NextResponse.json({
         error: `Limite de agendamentos do mês atingido. Você já utilizou ${appointmentsThisMonth} agendamentos. Faça upgrade do seu plano para continuar.`,
         code: 'APPOINTMENT_LIMIT_REACHED',
         currentCount: appointmentsThisMonth,
-        remaining: remaining
+        remaining: quota.remaining
       }, { status: 403 })
     }
 
     // Validar conflito de horários
     if (scheduleId) {
-      const appointmentDate = new Date(date)
-      const appointmentEnd = new Date(appointmentDate.getTime() + duration * 60000)
-
-      const whereClause: any = {
-        scheduleId: scheduleId,
-        date: {
-          lt: appointmentEnd
-        },
-        status: {
-          notIn: ['CANCELLED', 'NO_SHOW']
-        }
-      }
-
-      // Se profissional específico, verificar apenas conflitos deste profissional
-      if (professionalId) {
-        whereClause.professionalId = professionalId
-      }
-
-      const conflictingAppointments = await prisma.appointment.findMany({
-        where: whereClause,
-        select: {
-          date: true,
-          duration: true
-        }
-      })
-
-      // Verificar sobreposição
-      const hasConflict = conflictingAppointments.some(appointment => {
-        const existingStart = appointment.date
-        const existingEnd = new Date(existingStart.getTime() + appointment.duration * 60000)
-
-        return appointmentDate < existingEnd && appointmentEnd > existingStart
+      const hasConflict = await checkScheduleConflict({
+        scheduleId,
+        professionalId,
+        date: new Date(date),
+        duration,
       })
 
       if (hasConflict) {

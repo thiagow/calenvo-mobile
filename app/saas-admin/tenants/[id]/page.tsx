@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Lock, Unlock, Zap } from 'lucide-react'
+import { ArrowLeft, Lock, Unlock, Zap, Gift } from 'lucide-react'
 import {
     Select,
     SelectContent,
@@ -113,6 +113,50 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
         }
     }
 
+    const handleToggleExempt = async () => {
+        if (!tenant) return
+
+        const nextValue = !tenant.isPaymentExempt
+
+        const confirmed = await confirm({
+            title: nextValue ? 'Isentar de Pagamento' : 'Revogar Isenção',
+            description: nextValue
+                ? 'Esta conta deixará de ser cobrada pelo Stripe e nunca será bloqueada por falta de pagamento.'
+                : 'Esta conta voltará a depender de uma assinatura Stripe ativa para não ser suspensa.',
+            confirmText: nextValue ? 'Isentar' : 'Revogar'
+        })
+
+        if (!confirmed) return
+
+        try {
+            const res = await fetch(`/api/saas-admin/tenants/${params.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    isPaymentExempt: nextValue,
+                    reason: nextValue ? 'Isenção de pagamento concedida pelo admin' : 'Isenção de pagamento revogada pelo admin'
+                })
+            })
+
+            if (res.ok) {
+                fetchTenantDetails()
+            } else {
+                await alert({
+                    title: 'Erro',
+                    description: 'Erro ao atualizar isenção de pagamento',
+                    variant: 'error'
+                })
+            }
+        } catch (error) {
+            console.error('Error toggling payment exemption:', error)
+            await alert({
+                title: 'Erro',
+                description: 'Erro ao atualizar isenção de pagamento',
+                variant: 'error'
+            })
+        }
+    }
+
     if (loading) {
         return <div className="text-center py-8">Carregando...</div>
     }
@@ -132,6 +176,13 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                     <h1 className="text-3xl font-bold">{tenant.businessName || tenant.name}</h1>
                     <p className="text-muted-foreground">{tenant.email}</p>
                 </div>
+                <Button
+                    variant={tenant.isPaymentExempt ? 'outline' : 'secondary'}
+                    onClick={handleToggleExempt}
+                >
+                    <Gift className="h-4 w-4 mr-1" />
+                    {tenant.isPaymentExempt ? 'Revogar Isenção' : 'Isentar de Pagamento'}
+                </Button>
                 <Button
                     variant={tenant.isActive ? 'destructive' : 'default'}
                     onClick={handleToggleStatus}
@@ -163,6 +214,13 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                             </Badge>
                         </div>
 
+                        {tenant.isPaymentExempt && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Pagamento:</span>
+                                <Badge variant="secondary">Isento</Badge>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                                 <Zap className="h-4 w-4 text-primary" />
@@ -177,9 +235,9 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                                     <SelectValue placeholder="Selecione um plano" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="FREEMIUM">Freemium</SelectItem>
-                                    <SelectItem value="STANDARD">Standard</SelectItem>
-                                    <SelectItem value="PREMIUM">Premium</SelectItem>
+                                    <SelectItem value="BASICO">Básico</SelectItem>
+                                    <SelectItem value="PRO">PRO</SelectItem>
+                                    <SelectItem value="BUSINESS">Avançado</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

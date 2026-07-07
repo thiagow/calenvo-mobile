@@ -1,0 +1,242 @@
+{
+  "Landing": {
+    "nav": {
+      "funcionalidades": "Funcionalidades",
+      "planos": "Planos",
+      "depoimentos": "Depoimentos",
+      "faq": "FAQ",
+      "entrar": "Entrar",
+      "contratarPlano": "Contratar plano"
+    },
+    "hero": {
+      "badge": "Agendamento e fidelização completos",
+      "titleLine1": "Agende.",
+      "titleLine2": "Fidelize.",
+      "titleLine3": "Cresça.",
+      "description": "Gestão completa de agendas, equipe multiprofissional, notificações automáticas e muito mais. A solução ideal para o seu negócio crescer.",
+      "ctaPrimary": "Contratar plano",
+      "ctaSecondary": "Ver funcionalidades",
+      "socialProof": "+12.000 negócios confiam no Calenvo"
+    },
+    "mockup": {
+      "pointsNotification": "+50 pontos!",
+      "pointsSubtitle": "Carlos atingiu Gold",
+      "agendaLabel": "AGENDA DO DIA",
+      "agendaDate": "Quinta, 19 de Junho",
+      "agendedCount": "3 agendados",
+      "service1": "Corte + Hidratação · 60 min",
+      "service2": "Barba + Corte · 45 min",
+      "service3": "Massagem relaxante · 90 min",
+      "whatsappConfirmed": "Ana confirmou!",
+      "whatsappSubtitle": "Lembrete via WhatsApp ✓"
+    },
+    "stats": {
+      "negocios": "Negócios",
+      "agendamentos": "Agendamentos",
+      "satisfacao": "Satisfação",
+      "faltas": "Faltas"
+    },
+    "segments": {
+      "title": "Feito para múltiplos segmentos",
+      "beauty": "Salões e Barbearias",
+      "clinics": "Clínicas e Consultórios",
+      "spas": "Spas e Estética",
+      "physio": "Fisioterapia"
+    },
+    "testimonials": {
+      "badge": "Depoimentos",
+      "title": "Quem usa, aprova",
+      "item1": {
+        "role": "Salão de Beleza · São Paulo",
+        "text": "\"Reduzi as faltas em quase 80% com os lembretes automáticos. Meus clientes adoram confirmar pelo WhatsApp. O Calenvo transformou o meu salão completamente.\""
+      },
+      "item2": {
+        "role": "Clínica de Fisioterapia · Campinas",
+        "text": "\"Gerencio 6 fisioterapeutas em uma única tela. Os relatórios mostram os horários mais rentáveis e quais profissionais têm mais demanda. Simplesmente indispensável.\""
+      },
+      "item3": {
+        "role": "Spa e Estética · Rio de Janeiro",
+        "text": "\"O programa de fidelidade foi divisor de águas. Clientes que vinham mensalmente agora retornam toda semana. O retorno aumentou 40% em apenas 3 meses.\""
+      }
+    },
+    "features": {
+      "badge": "Funcionalidades",
+      "title": "Tudo que você precisa,<br/>em um só sistema",
+      "subtitle": "Do agendamento ao programa de fidelidade, o Calenvo cuida de tudo para você focar no que importa.",
+      "card1": {
+        "title": "Agendamento online 24/7",
+        "description": "Seus clientes agendam quando quiserem pelo celular, sem precisar ligar. Link personalizado, cardápio de serviços e confirmação automática.",
+        "bullet1": "Link exclusivo de agendamento",
+        "bullet2": "Equipe multiprofissional",
+        "bullet3": "Confirmação automática por mensagem"
+      },
+      "card2": {
+        "title": "Notificações automáticas",
+        "description": "Reduza faltas em até 70%. Envie lembretes automáticos por WhatsApp, SMS e e-mail. Clientes confirmam ou remarcam com um toque, sem precisar ligar."
+      },
+      "card3": {
+        "title": "Programa de fidelidade e pontos",
+        "description": "Fidelize clientes com um programa de pontos personalizável. Eles acumulam a cada visita e resgatam recompensas — voltando mais vezes e gastando mais.",
+        "categoryLabel": "Categoria atual",
+        "categoryValue": "Bronze → Prata",
+        "categoryBadge": "Prata",
+        "progressLabel": "Progresso para resgate",
+        "impactLabel": "Impacto no negócio",
+        "impactValue": "+40% de retorno"
+      }
+    },
+    "pricing": {
+      "badge": "Planos",
+      "title": "Simples, transparente, sem surpresas",
+      "subtitle": "Cancele quando quiser. Sem multa.",
+      "toggleMonthly": "Mensal",
+      "toggleAnnual": "Anual",
+      "discountBadge": "−20%",
+      "popularBadge": "Mais Popular",
+      "billedMonthly": "Cobrado mensalmente",
+      "billedAnnual": "Cobrado anualmente",
+      "perMonth": "/mês",
+      "basico": {
+        "name": "Básico",
+        "cta": "Contratar Básico",
+        "feature1": "Até 2 profissionais",
+        "feature2": "150 agendamentos/mês",
+        "feature3": "Notificações por e-mail",
+        "feature4": "Link de agendamento próprio",
+        "feature5": "Suporte por chat"
+      },
+      "pro": {
+        "name": "PRO",
+        "cta": "Contratar Pro",
+        "feature1": "Tudo do Básico",
+        "feature2": "Até 8 profissionais",
+        "feature3": "WhatsApp + SMS + E-mail ilimitados",
+        "feature4": "Programa de fidelidade completo",
+        "feature5": "Relatórios e métricas avançadas",
+        "feature6": "Suporte prioritário"
+      },
+      "business": {
+        "name": "Avançado",
+        "cta": "Contratar Avançado",
+        "feature1": "Tudo do Pro",
+        "feature2": "Profissionais ilimitados",
+        "feature3": "Múltiplas unidades",
+        "feature4": "API e integrações avançadas",
+        "feature5": "Account manager dedicado",
+        "feature6": "SLA garantido"
+      }
+    },
+    "faq": {
+      "title": "Perguntas Frequentes",
+      "item1": {
+        "question": "Como funciona o agendamento online?",
+        "answer": "Seus clientes acessam uma página pública personalizada e podem agendar disponibilidades em tempo real, diretamente na sua agenda. Sem intermediários."
+      },
+      "item2": {
+        "question": "Posso usar com múltiplos profissionais?",
+        "answer": "Sim! Calenvo foi construído para gerenciar múltiplas agendas e profissionais em uma única plataforma com sincronização completa."
+      },
+      "item3": {
+        "question": "Como funciona o programa de fidelidade?",
+        "answer": "Configure pacotes, cupons e bônus automáticos que seus clientes acumulam com cada compra. Totalmente integrado ao agendamento."
+      },
+      "item4": {
+        "question": "O WhatsApp é enviado automaticamente?",
+        "answer": "Sim. Confirmações, lembretes e atualizações são enviados automaticamente via WhatsApp para reduzir faltas e melhorar a experiência."
+      },
+      "item5": {
+        "question": "Quais são os prazos de suporte?",
+        "answer": "Oferecemos suporte por email. Planos pagos têm prioridade. Nossa comunidade também ajuda com boas práticas."
+      }
+    },
+    "ctaFooter": {
+      "title": "Pronto para crescer?",
+      "subtitle": "Junte-se a milhares de negócios que já transformaram seu agendamento com Calenvo",
+      "cta": "Escolha Agora Seu Plano"
+    },
+    "footer": {
+      "description": "Plataforma completa de agendamento e fidelização para diversos segmentos",
+      "productTitle": "Produto",
+      "productLink1": "Funcionalidades",
+      "productLink2": "Segmentos",
+      "productLink3": "Planos",
+      "productLink4": "Contato",
+      "contactTitle": "Contato",
+      "copyright": "© 2024 Calenvo. Todos os direitos reservados."
+    }
+  },
+  "Signup": {
+    "alreadyHaveAccount": "Já tenho conta",
+    "canceledTitle": "⚠️ Pagamento cancelado",
+    "canceledSubtitle": "Você pode tentar novamente quando quiser.",
+    "formTitle": "Cadastro - Plano {plan}",
+    "formSubtitle": "Preencha seus dados e prossiga para o pagamento",
+    "fieldName": "Nome completo",
+    "fieldNamePlaceholder": "Seu nome",
+    "fieldEmail": "Email",
+    "fieldEmailPlaceholder": "seu@email.com",
+    "fieldPassword": "Senha",
+    "fieldPasswordPlaceholder": "Mínimo 6 caracteres",
+    "fieldBusinessName": "Nome do Negócio",
+    "fieldBusinessNamePlaceholder": "Nome da sua empresa",
+    "fieldSegment": "Segmento",
+    "fieldPhone": "Telefone",
+    "fieldPhonePlaceholder": "(00) 00000-0000",
+    "submitButton": "Continuar para Pagamento",
+    "processing": "Processando...",
+    "disclaimer": "Ao continuar, você será redirecionado para a página segura do Stripe para processar o pagamento.",
+    "requiredFieldsError": "Preencha todos os campos obrigatórios",
+    "checkoutError": "Erro ao processar pagamento. Tente novamente",
+    "summaryTitle": "Plano {plan}",
+    "billedMonthly": "Cobrado mensalmente",
+    "billedAnnual": "Cobrado anualmente",
+    "perMonth": "/mês",
+    "includedTitle": "Incluso no plano:",
+    "secureBadgeTitle": "🔒 Pagamento 100% seguro via Stripe",
+    "secureBadgeSubtitle": "Seus dados estão protegidos com criptografia de ponta",
+    "cancelAnytime": "Cancele quando quiser, sem multa ou complicação",
+    "footerCopyright": "© {year} Calenvo. Todos os direitos reservados."
+  },
+  "SignupSuccess": {
+    "processing": "Processando pagamento...",
+    "confirmedTitle": "🎉 Pagamento Confirmado!",
+    "confirmedSubtitleWithPlan": "Sua assinatura do Plano {plan} foi ativada com sucesso",
+    "confirmedSubtitleGeneric": "Sua assinatura foi ativada com sucesso",
+    "detailsTitle": "Detalhes da Assinatura",
+    "planLabel": "Plano",
+    "valueLabel": "Valor",
+    "appointmentsLabel": "Agendamentos",
+    "professionalsLabel": "Profissionais",
+    "unlimited": "Ilimitados",
+    "perMonthShort": "/mês",
+    "nextStepsTitle": "🎯 Próximos Passos",
+    "step1Title": "Verifique seu email",
+    "step1Description": "Enviamos um email de boas-vindas com todos os detalhes da sua assinatura",
+    "step2Title": "Faça login na plataforma",
+    "step2Description": "Use o email e senha cadastrados para acessar sua conta",
+    "step3Title": "Configure seu negócio",
+    "step3Description": "Adicione horários, serviços e comece a agendar!",
+    "emailConfirmedTitle": "Email de confirmação enviado",
+    "emailConfirmedSubtitle": "Verifique sua caixa de entrada (e spam) para mais informações sobre sua assinatura",
+    "ctaButton": "Acessar Minha Conta",
+    "helpText": "Precisa de ajuda?",
+    "contactLink": "Entre em contato",
+    "sessionIdLabel": "ID da Sessão",
+    "footerCopyright": "© {year} Calenvo. Todos os direitos reservados."
+  },
+  "LanguageSwitcher": {
+    "pt": "Português",
+    "en": "English"
+  },
+  "Segments": {
+    "BEAUTY_SALON": "Salão de Beleza",
+    "BARBERSHOP": "Barbearia",
+    "AESTHETIC_CLINIC": "Clínica de Estética",
+    "PHYSIOTHERAPY": "Fisioterapia",
+    "EDUCATION": "Educação",
+    "PET_SHOP": "Pet Shop",
+    "PROFESSIONAL_SERVICES": "Consultoria",
+    "TECH_SAAS": "Tecnologia",
+    "OTHER": "Outros"
+  }
+}

@@ -27,7 +27,7 @@ export default function ProfilePage() {
     return null
   }
 
-  const userPlan = (session?.user as any)?.planType || 'FREEMIUM'
+  const userPlan = (session?.user as any)?.planType || 'BASICO'
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
 
   const handleUpgrade = () => {
@@ -114,7 +114,7 @@ export default function ProfilePage() {
                   Plano {planConfig?.name}
                 </h3>
                 <Badge className="bg-blue-600">
-                  {planConfig?.price === 0 ? 'Grátis' : `R$ ${planConfig?.price?.toFixed(2)}/mês`}
+                  {`R$ ${planConfig?.priceMonthly?.toFixed(2)}/mês`}
                 </Badge>
               </div>
 

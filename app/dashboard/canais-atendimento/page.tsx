@@ -23,8 +23,8 @@ export default async function CanaisAtendimentoPage() {
   })
   if (!user) redirect('/auth/signin')
 
-  const isPlanFree = user.planType === 'FREEMIUM'
-  const hasAccess = !isPlanFree
+  const isWhatsappGated = user.planType === 'BASICO'
+  const hasAccess = !isWhatsappGated
 
   let whatsAppConfig = null
   if (hasAccess) {
@@ -33,8 +33,8 @@ export default async function CanaisAtendimentoPage() {
 
   return (
     <div className="space-y-4">
-      {/* Plano gratuito — bloqueio */}
-      {isPlanFree && (
+      {/* Plano Básico — bloqueio */}
+      {isWhatsappGated && (
         <Card className="border border-amber-500/20 bg-amber-500/5">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center gap-2.5">
@@ -42,8 +42,8 @@ export default async function CanaisAtendimentoPage() {
                 <Lock className="h-4 w-4 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold">Recurso Premium</p>
-                <p className="text-xs text-muted-foreground">Disponível nos planos Standard e Premium</p>
+                <p className="text-sm font-semibold">Recurso PRO</p>
+                <p className="text-xs text-muted-foreground">Disponível nos planos PRO e Avançado</p>
               </div>
             </div>
 

@@ -2,8 +2,10 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { canCreateAppointment, getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
+import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { NotificationService } from '@/lib/notification-service'
+import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
+import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 
 export async function POST(
   request: NextRequest,
@@ -31,33 +33,7 @@ export async function POST(
     }
 
     // Buscar usuário pelo ID ou pela publicUrl do businessConfig
-    let user = await prisma.user.findFirst({
-      where: {
-        id: { startsWith: slug }
-      },
-      include: {
-        businessConfig: true
-      }
-    })
-
-    // Se não encontrou pelo ID, buscar pelo publicUrl
-    if (!user) {
-      const businessConfig = await prisma.businessConfig.findFirst({
-        where: {
-          publicUrl: slug
-        },
-        include: {
-          user: true
-        }
-      })
-      
-      if (businessConfig) {
-        user = await prisma.user.findUnique({
-          where: { id: businessConfig.userId },
-          include: { businessConfig: true }
-        })
-      }
-    }
+    const user = await resolveTenantBySlug(slug)
 
     if (!user) {
       return NextResponse.json(
@@ -75,25 +51,11 @@ export async function POST(
     }
 
     // Verificar limite de agendamentos do mês atual
-    const now = new Date()
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
-    const appointmentsThisMonth = await prisma.appointment.count({
-      where: {
-        userId: user.id,
-        date: {
-          gte: firstDayOfMonth,
-          lte: lastDayOfMonth
-        },
-        status: {
-          notIn: ['CANCELLED', 'NO_SHOW'] // Não conta cancelados e faltas
-        }
-      }
-    })
+    const quota = await checkAppointmentQuota(user.id, user.planType)
+    const appointmentsThisMonth = quota.currentCount
 
     // Validar se pode criar mais agendamentos
-    if (!canCreateAppointment(user.planType, appointmentsThisMonth)) {
+    if (!quota.allowed) {
       return NextResponse.json({
         error: 'O estabelecimento atingiu o limite de agendamentos do mês. Por favor, entre em contato diretamente.',
         code: 'APPOINTMENT_LIMIT_REACHED'
@@ -136,18 +98,14 @@ export async function POST(
     const appointmentDate = new Date(date)
     appointmentDate.setHours(hours, minutes, 0, 0)
 
-    // Verificar se já existe agendamento neste horário
-    const existingAppointment = await prisma.appointment.findFirst({
-      where: {
-        scheduleId,
-        date: appointmentDate,
-        status: {
-          notIn: ['CANCELLED', 'NO_SHOW']
-        }
-      }
+    // Verificar se já existe agendamento com sobreposição de horário
+    const hasConflict = await checkScheduleConflict({
+      scheduleId,
+      date: appointmentDate,
+      duration: service.duration,
     })
 
-    if (existingAppointment) {
+    if (hasConflict) {
       return NextResponse.json(
         { error: 'Este horário já está ocupado' },
         { status: 409 }

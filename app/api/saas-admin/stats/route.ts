@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         // Calcular receita mensal estimada
         const monthlyRevenue = tenantsByPlan.reduce((total, group) => {
             const planConfig = PLAN_CONFIGS[group.planType as keyof typeof PLAN_CONFIGS]
-            return total + (planConfig.price * group._count)
+            return total + (planConfig.priceMonthly * group._count)
         }, 0)
 
         return NextResponse.json({

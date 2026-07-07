@@ -28,7 +28,7 @@ async function main() {
         businessName: 'Clínica Teste',
         segmentType: 'BEAUTY_SALON',
         phone: '(11) 99999-9999',
-        planType: 'PREMIUM' // Admin with Premium privileges
+        planType: 'BUSINESS' // Admin with Business privileges
       }
     })
   }

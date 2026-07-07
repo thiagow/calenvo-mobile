@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { CheckCircle, Star, CreditCard, Zap, Users, Calendar, BarChart3, Shield, Loader2 } from 'lucide-react'
+import { CheckCircle, Star, CreditCard, Zap, Loader2 } from 'lucide-react'
 import { PLAN_CONFIGS } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -18,6 +18,14 @@ interface PlanUsageData {
   usagePercentage: number
   planType: string
   userLimit: number
+}
+
+const PLAN_ORDER = ['BASICO', 'PRO', 'BUSINESS']
+
+const PLAN_DESCRIPTIONS: Record<string, string> = {
+  BASICO: 'Perfeito para começar',
+  PRO: 'Para negócios em crescimento',
+  BUSINESS: 'Para negócios estabelecidos',
 }
 
 export default function PlansPage() {
@@ -45,20 +53,16 @@ export default function PlansPage() {
     fetchUsageData()
   }, [])
 
-  const currentPlan = usageData?.planType || 'FREEMIUM'
+  const currentPlan = usageData?.planType || 'BASICO'
 
   const handleUpgrade = async (planId: string) => {
     setLoading(planId)
 
     try {
-      // Simular processo de upgrade
+      // TODO: wire to uma API real de troca de assinatura (stripe.subscriptions.update
+      // com proration), diferente do fluxo de checkout de um novo cadastro.
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      if (planId === 'STANDARD') {
-        toast.success('Redirecionando para o pagamento do Plano Standard...')
-      } else if (planId === 'PREMIUM') {
-        toast.success('Redirecionando para o pagamento do Plano Premium...')
-      }
+      toast.success(`Redirecionando para o pagamento do Plano ${PLAN_CONFIGS[planId as keyof typeof PLAN_CONFIGS]?.name}...`)
     } catch (error) {
       toast.error('Erro ao processar upgrade. Tente novamente.')
     } finally {
@@ -111,8 +115,8 @@ export default function PlansPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900">
-                  {usageData.monthlyLimit === -1 
-                    ? '∞' 
+                  {usageData.monthlyLimit === -1
+                    ? '∞'
                     : usageData.monthlyLimit}
                 </div>
                 <p className="text-sm text-gray-600">Limite mensal</p>
@@ -136,50 +140,37 @@ export default function PlansPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {Object.entries(PLAN_CONFIGS).map(([planId, config]) => {
           const isCurrent = currentPlan === planId
-          const isUpgrade = planId !== 'FREEMIUM' && currentPlan === 'FREEMIUM'
-          
+          const isUpgrade = PLAN_ORDER.indexOf(planId) > PLAN_ORDER.indexOf(currentPlan)
+
           return (
-            <Card key={planId} className={`relative ${isCurrent ? 'border-blue-500 shadow-lg' : ''} ${planId === 'STANDARD' ? 'scale-105' : ''}`}>
+            <Card key={planId} className={`relative ${isCurrent ? 'border-blue-500 shadow-lg' : ''} ${planId === 'PRO' ? 'scale-105' : ''}`}>
               {isCurrent && (
                 <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-500">
                   Plano Atual
                 </Badge>
               )}
-              {planId === 'STANDARD' && (
+              {planId === 'PRO' && (
                 <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-green-500">
                   <Star className="h-3 w-3 mr-1" />
                   Mais Popular
                 </Badge>
               )}
-              
+
               <CardHeader>
                 <CardTitle className="text-xl text-center">
                   {config.name}
                 </CardTitle>
                 <CardDescription className="text-center">
-                  {planId === 'FREEMIUM' && 'Perfeito para começar'}
-                  {planId === 'STANDARD' && 'Para negócios em crescimento'}
-                  {planId === 'PREMIUM' && 'Para negócios estabelecidos'}
+                  {PLAN_DESCRIPTIONS[planId]}
                 </CardDescription>
                 <div className="text-center py-4">
-                  {config.price === 0 ? (
-                    <span className="text-3xl font-bold">Grátis</span>
-                  ) : planId === 'PREMIUM' ? (
-                    <div>
-                      <span className="text-2xl font-bold text-gray-700">Sob Consulta</span>
-                      <p className="text-sm text-gray-500 mt-1">Entre em contato</p>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="text-3xl font-bold">
-                        {formatCurrency(config.price)}
-                      </span>
-                      <p className="text-sm text-gray-600 mt-1">/mês</p>
-                    </>
-                  )}
+                  <span className="text-3xl font-bold">
+                    {formatCurrency(config.priceMonthly)}
+                  </span>
+                  <p className="text-sm text-gray-600 mt-1">/mês</p>
                 </div>
               </CardHeader>
-              
+
               <CardContent>
                 <ul className="space-y-3 mb-6">
                   {config.features.map((feature, index) => (
@@ -189,7 +180,7 @@ export default function PlansPage() {
                     </li>
                   ))}
                 </ul>
-                
+
                 {isCurrent ? (
                   <Button className="w-full" disabled>
                     Plano Atual
@@ -197,18 +188,18 @@ export default function PlansPage() {
                 ) : isUpgrade ? (
                   <Dialog>
                     <DialogTrigger asChild>
-                      <Button 
-                        className={`w-full ${planId === 'STANDARD' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-                        variant={planId === 'STANDARD' ? 'default' : 'outline'}
+                      <Button
+                        className={`w-full ${planId === 'PRO' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                        variant={planId === 'PRO' ? 'default' : 'outline'}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
-                        {planId === 'PREMIUM' ? 'Falar com Vendas' : 'Fazer Upgrade'}
+                        Fazer Upgrade
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>
-                          {planId === 'PREMIUM' ? 'Contatar Equipe de Vendas' : `Confirmar Upgrade - ${config.name}`}
+                          Confirmar Upgrade - {config.name}
                         </DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -216,28 +207,15 @@ export default function PlansPage() {
                           <h3 className="text-lg font-semibold mb-2">
                             {config.name}
                           </h3>
-                          {planId === 'PREMIUM' ? (
-                            <div>
-                              <div className="text-2xl font-bold text-blue-600 mb-2">
-                                Sob Consulta
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                Entre em contato para um plano personalizado
-                              </p>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="text-3xl font-bold text-blue-600 mb-2">
-                                {formatCurrency(config.price)}
-                                <span className="text-sm font-normal text-gray-600">/mês</span>
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                Cobrança recorrente mensal
-                              </p>
-                            </>
-                          )}
+                          <div className="text-3xl font-bold text-blue-600 mb-2">
+                            {formatCurrency(config.priceMonthly)}
+                            <span className="text-sm font-normal text-gray-600">/mês</span>
+                          </div>
+                          <p className="text-sm text-gray-600">
+                            Cobrança recorrente mensal
+                          </p>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <h4 className="font-semibold">Recursos inclusos:</h4>
                           <ul className="space-y-1">
@@ -249,12 +227,12 @@ export default function PlansPage() {
                             ))}
                           </ul>
                         </div>
-                        
+
                         <div className="flex gap-2">
                           <Button variant="outline" className="flex-1">
                             Cancelar
                           </Button>
-                          <Button 
+                          <Button
                             className="flex-1 bg-blue-600 hover:bg-blue-700"
                             onClick={() => handleUpgrade(planId)}
                             disabled={loading === planId}
@@ -264,11 +242,6 @@ export default function PlansPage() {
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Processando...
                               </div>
-                            ) : planId === 'PREMIUM' ? (
-                              <>
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Entrar em Contato
-                              </>
                             ) : (
                               <>
                                 <CreditCard className="h-4 w-4 mr-2" />

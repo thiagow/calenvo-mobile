@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Phone } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { getProfessionalLimit } from '@/lib/plan-limits'
 
 interface Professional {
   id: string; name: string; email: string; whatsapp: string
@@ -25,7 +26,7 @@ export default function ProfessionalsPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [canAddMore, setCanAddMore] = useState(false)
-  const [planType, setPlanType] = useState('FREEMIUM')
+  const [planType, setPlanType] = useState('BASICO')
 
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
@@ -37,8 +38,7 @@ export default function ProfessionalsPage() {
         if (planRes.ok) {
           const d = await planRes.json()
           setPlanType(d.planType)
-          const limits: Record<string, number> = { FREEMIUM: 1, STANDARD: 5, PREMIUM: -1 }
-          const limit = limits[d.planType] || 1
+          const limit = getProfessionalLimit(d.planType)
           setCanAddMore(limit === -1 || professionals.length + 1 < limit)
         }
       })
@@ -86,7 +86,7 @@ export default function ProfessionalsPage() {
       </div>
 
       {/* Aviso de limite */}
-      {!canAddMore && planType !== 'PREMIUM' && (
+      {!canAddMore && planType !== 'BUSINESS' && (
         <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
           <p className="text-xs text-amber-700 flex-1">Limite de profissionais do plano {planType} atingido.</p>
           <Link href="/dashboard/plans">

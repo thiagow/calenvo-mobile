@@ -42,6 +42,13 @@ export function formatCurrency(value: number): string {
   }).format(value)
 }
 
+export function formatCurrencyByCurrency(value: number, currency: 'BRL' | 'USD'): string {
+  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'pt-BR', {
+    style: 'currency',
+    currency,
+  }).format(value)
+}
+
 export function formatPhone(phone: string): string {
   const cleaned = phone.replace(/\D/g, '')
   const match = cleaned.match(/^(\d{2})(\d{4,5})(\d{4})$/)

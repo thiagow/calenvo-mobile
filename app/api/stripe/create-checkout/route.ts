@@ -1,20 +1,40 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe, STRIPE_STANDARD_PRICE_ID } from '@/lib/stripe'
+import { stripe, getStripePriceId, type BillingInterval } from '@/lib/stripe'
 import { prisma } from '@/lib/db'
 import { setTemporaryData } from '@/lib/temporary-storage'
+import { PlanType, Currency } from '@prisma/client'
+import { PLAN_CONFIGS } from '@/lib/types'
+
+const VALID_PLANS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
+const VALID_INTERVALS: BillingInterval[] = ['MONTHLY', 'ANNUAL']
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, name, businessName, segmentType, phone } = body
+    const { email, password, name, businessName, segmentType, phone, plan, interval, locale } = body
+    const currency: Currency = locale === 'en' ? 'USD' : 'BRL'
 
-    console.log('🔑 Iniciando criação de checkout:', { email, name })
+    console.log('🔑 Iniciando criação de checkout:', { email, name, plan, interval, currency })
 
     // Validação de campos obrigatórios
     if (!email || !password || !name || !businessName || !phone || !segmentType) {
       return NextResponse.json(
         { message: 'Todos os campos são obrigatórios' },
+        { status: 400 }
+      )
+    }
+
+    if (!VALID_PLANS.includes(plan)) {
+      return NextResponse.json(
+        { message: 'Plano inválido' },
+        { status: 400 }
+      )
+    }
+
+    if (!VALID_INTERVALS.includes(interval)) {
+      return NextResponse.json(
+        { message: 'Intervalo de cobrança inválido' },
         { status: 400 }
       )
     }
@@ -36,12 +56,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Valida se o priceId está configurado
-    if (!STRIPE_STANDARD_PRICE_ID) {
-      console.error('❌ STRIPE_STANDARD_PRICE_ID não está configurado')
+    // Busca o Price ID configurado para este plano + intervalo + moeda
+    const priceId = getStripePriceId(plan, interval, currency)
+
+    if (!priceId) {
+      console.error(`❌ Price ID não configurado para plano ${plan} (${interval}, ${currency})`)
       return NextResponse.json(
-        { message: 'Configuração de pagamento inválida' },
-        { status: 500 }
+        { message: `O plano ${PLAN_CONFIGS[plan as PlanType].name} (${interval === 'ANNUAL' ? 'anual' : 'mensal'}) ainda não está disponível para contratação em ${currency}. Tente novamente em breve ou escolha outro plano.` },
+        { status: 503 }
       )
     }
 
@@ -61,7 +83,8 @@ export async function POST(req: NextRequest) {
 
     // Criar Checkout Session
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'
-    
+    const localePrefix = locale === 'en' ? '/en' : ''
+
     console.log('📋 Criando Checkout Session...')
     const session = await stripe.checkout.sessions.create({
       customer: customer.id,
@@ -69,12 +92,12 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: STRIPE_STANDARD_PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],
-      success_url: `${appUrl}/signup/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/signup/standard?canceled=true`,
+      success_url: `${appUrl}${localePrefix}/signup/success?session_id={CHECKOUT_SESSION_ID}&plan=${plan}&interval=${interval}`,
+      cancel_url: `${appUrl}${localePrefix}/signup/${plan.toLowerCase()}?interval=${interval.toLowerCase()}&canceled=true`,
       metadata: {
         email,
         name,
@@ -82,6 +105,10 @@ export async function POST(req: NextRequest) {
         segmentType,
         phone,
         customerId: customer.id,
+        plan,
+        interval,
+        currency,
+        locale: locale || 'pt',
       },
     })
 
@@ -96,6 +123,10 @@ export async function POST(req: NextRequest) {
       segmentType,
       phone,
       customerId: customer.id,
+      plan: plan as PlanType,
+      billingInterval: interval as BillingInterval,
+      currency,
+      locale: locale || 'pt',
       timestamp: Date.now(),
     })
 

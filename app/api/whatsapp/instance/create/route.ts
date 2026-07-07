@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
     const userId = (session.user as any).id
     const planType = (session.user as any).planType as PlanType
 
-    // Verifica se o usuário tem plano pago
-    if (planType === PlanType.FREEMIUM) {
+    // WhatsApp é um recurso PRO+ (não disponível no plano Básico)
+    if (planType === PlanType.BASICO) {
       return NextResponse.json(
-        { error: 'Notificações via WhatsApp disponíveis apenas para planos pagos' },
+        { error: 'Notificações via WhatsApp disponíveis apenas nos planos PRO e Avançado' },
         { status: 403 }
       )
     }

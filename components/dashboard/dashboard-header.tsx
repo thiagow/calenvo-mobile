@@ -21,7 +21,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ sessionData }: DashboardHeaderProps) {
-  const userPlan = sessionData?.user?.planType || 'FREEMIUM'
+  const userPlan = sessionData?.user?.planType || 'BASICO'
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
 
   const getInitials = (name?: string | null) => {

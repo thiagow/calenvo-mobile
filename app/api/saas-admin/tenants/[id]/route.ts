@@ -78,12 +78,12 @@ export async function PATCH(
         const session = await requireSaasAdmin()
         const { id } = params
         const body = await req.json()
-        const { isActive, planType, reason } = body
+        const { isActive, planType, isPaymentExempt, reason } = body
 
         // Verificar se o tenant existe
         const tenant = await prisma.user.findUnique({
             where: { id },
-            select: { role: true, email: true, name: true, planType: true, isActive: true }
+            select: { role: true, email: true, name: true, planType: true, isActive: true, isPaymentExempt: true }
         })
 
         if (!tenant || tenant.role !== 'MASTER') {
@@ -106,6 +106,13 @@ export async function PATCH(
         if (planType && planType !== tenant.planType) {
             dataToUpdate.planType = planType
             action = action ? `${action}_AND_PLAN_CHANGED` : 'TENANT_PLAN_CHANGED'
+        }
+
+        // Se estiver alterando a isenção de pagamento
+        if (typeof isPaymentExempt === 'boolean' && isPaymentExempt !== tenant.isPaymentExempt) {
+            dataToUpdate.isPaymentExempt = isPaymentExempt
+            const exemptAction = isPaymentExempt ? 'TENANT_PAYMENT_EXEMPTED' : 'TENANT_PAYMENT_EXEMPTION_REVOKED'
+            action = action ? `${action}_AND_${exemptAction}` : exemptAction
         }
 
         if (Object.keys(dataToUpdate).length === 0) {
@@ -145,7 +152,9 @@ export async function PATCH(
                     oldPlan: tenant.planType,
                     newPlan: planType || tenant.planType,
                     oldStatus: tenant.isActive,
-                    newStatus: typeof isActive === 'boolean' ? isActive : tenant.isActive
+                    newStatus: typeof isActive === 'boolean' ? isActive : tenant.isActive,
+                    oldPaymentExempt: tenant.isPaymentExempt,
+                    newPaymentExempt: typeof isPaymentExempt === 'boolean' ? isPaymentExempt : tenant.isPaymentExempt
                 },
                 ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
             }

@@ -1,65 +1,78 @@
 
 import { PlanType, AppointmentStatus, ModalityType, SegmentType } from '@prisma/client'
 
+export type Currency = 'BRL' | 'USD'
+
 export interface PlanConfig {
   name: string
   monthlyLimit: number
   userLimit: number
-  price: number
-  priceId: string // Stripe Price ID
+  priceMonthly: number // BRL
+  priceAnnual: number // BRL — preço mensal equivalente quando cobrado anualmente
+  priceMonthlyUSD: number
+  priceAnnualUSD: number // preço mensal equivalente quando cobrado anualmente
   features: string[]
 }
 
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
-  FREEMIUM: {
-    name: 'Freemium',
-    monthlyLimit: 60,
-    userLimit: 1,
-    price: 0,
-    priceId: '',
+  BASICO: {
+    name: 'Básico',
+    monthlyLimit: 150,
+    userLimit: 2,
+    priceMonthly: 19.90,
+    priceAnnual: 15.92,
+    priceMonthlyUSD: 9.90,
+    priceAnnualUSD: 7.92,
     features: [
-      '60 agendamentos por mês',
-      '1 usuário',
-      'Agenda básica',
-      'Cadastro de clientes',
-      'Notificações internas',
-      'Suporte por email'
+      'Até 2 profissionais',
+      '150 agendamentos/mês',
+      'Notificações por e-mail',
+      'Link de agendamento próprio',
+      'Suporte por chat'
     ]
   },
-  STANDARD: {
-    name: 'Standard',
-    monthlyLimit: 180,
-    userLimit: 3,
-    price: 49.90,
-    priceId: 'price_1SmKgHEe8DKEFqGiJwa9jy4T', // Stripe Price ID do plano Standard
+  PRO: {
+    name: 'PRO',
+    monthlyLimit: -1, // Ilimitado
+    userLimit: 8,
+    priceMonthly: 39.90,
+    priceAnnual: 31.93,
+    priceMonthlyUSD: 19.90,
+    priceAnnualUSD: 15.93,
     features: [
-      '180 agendamentos por mês',
-      '3 usuários',
-      'Agenda completa',
-      'Teleconsulta',
-      'Notificações internas',
-      'Notificações WhatsApp',
-      'Relatórios básicos',
+      'Tudo do Básico',
+      'Até 8 profissionais',
+      'WhatsApp + SMS + E-mail ilimitados',
+      'Programa de fidelidade completo',
+      'Relatórios e métricas avançadas',
       'Suporte prioritário'
     ]
   },
-  PREMIUM: {
-    name: 'Premium',
+  BUSINESS: {
+    name: 'Avançado',
     monthlyLimit: -1, // Ilimitado
-    userLimit: 15,
-    price: 99.90,
-    priceId: 'price_premium', // Será configurado no Stripe
+    userLimit: -1, // Ilimitado
+    priceMonthly: 69.90,
+    priceAnnual: 55.93,
+    priceMonthlyUSD: 29.90,
+    priceAnnualUSD: 23.92,
     features: [
-      'Agendamentos ilimitados',
-      'Até 15 usuários',
-      'Todas as funcionalidades',
-      'Multiempresa',
-      'Notificações internas',
-      'Notificações WhatsApp',
-      'Relatórios avançados',
-      'API personalizada'
+      'Tudo do Pro',
+      'Profissionais ilimitados',
+      'Múltiplas unidades',
+      'API e integrações avançadas',
+      'Account manager dedicado',
+      'SLA garantido'
     ]
   }
+}
+
+export function getPlanPrice(planType: PlanType, interval: 'MONTHLY' | 'ANNUAL', currency: Currency): number {
+  const config = PLAN_CONFIGS[planType]
+  if (currency === 'USD') {
+    return interval === 'ANNUAL' ? config.priceAnnualUSD : config.priceMonthlyUSD
+  }
+  return interval === 'ANNUAL' ? config.priceAnnual : config.priceMonthly
 }
 
 export interface AppointmentFilters {

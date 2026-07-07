@@ -21,7 +21,9 @@ import {
   UserCog,
   Package,
   MessageSquare,
-  Gift
+  Gift,
+  Key,
+  MessageCircle
 } from 'lucide-react'
 import { useUserPermissions } from '@/hooks/use-user-permissions'
 
@@ -33,10 +35,12 @@ const navigation = [
   { name: 'Profissionais', href: '/dashboard/professionals', icon: UserCog, permission: 'canManageProfessionals' },
   { name: 'Clientes', href: '/dashboard/patients', icon: Users, permission: 'canViewAllClients' },
   { name: 'Canais de Atendimento', href: '/dashboard/canais-atendimento', icon: MessageSquare, permission: 'canViewNotifications' },
+  { name: 'Chat de IA (site)', href: '/dashboard/chat-widget', icon: MessageCircle, permission: 'canManageSettings' },
   { name: 'Relatórios', href: '/dashboard/reports', icon: BarChart3, permission: 'canViewFullReports' },
   { name: 'Pacotes', href: '/dashboard/packages', icon: Package, permission: 'canManageServices' },
   { name: 'Fidelidade', href: '/dashboard/loyalty', icon: Gift, permission: 'canManageServices' },
   { name: 'Configurações', href: '/dashboard/settings', icon: Settings, permission: 'canViewPublicUrl' },
+  { name: 'Chaves de API', href: '/dashboard/api-keys', icon: Key, permission: 'canManageSettings' },
 ]
 
 export function DashboardSidebar() {

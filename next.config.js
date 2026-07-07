@@ -5,6 +5,7 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
 });
+const withNextIntl = require('next-intl/plugin')('./i18n/request.ts');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -19,4 +20,4 @@ const nextConfig = {
   images: { unoptimized: true },
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = withNextIntl(withPWA(nextConfig));

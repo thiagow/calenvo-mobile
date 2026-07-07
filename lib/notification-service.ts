@@ -244,9 +244,9 @@ export class NotificationService {
     remainingAppointments: number
   ) {
     const planNames: Record<string, string> = {
-      'FREEMIUM': 'Freemium',
-      'STANDARD': 'Standard',
-      'PREMIUM': 'Premium'
+      'BASICO': 'Básico',
+      'PRO': 'PRO',
+      'BUSINESS': 'Avançado'
     }
     
     const planName = planNames[planType] || planType

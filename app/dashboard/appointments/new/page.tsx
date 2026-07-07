@@ -54,7 +54,7 @@ export default function NewAppointmentPage() {
     if (status === 'unauthenticated') { router.push('/login'); return }
     if (status !== 'authenticated') return
     fetch('/api/user/plan').then(r => r.ok ? r.json() : null).then(d => {
-      if (d) { const multi = d.planType === 'STANDARD' || d.planType === 'PREMIUM'; setAllowsMultipleProfessionals(multi) }
+      if (d) { const multi = d.planType === 'PRO' || d.planType === 'BUSINESS'; setAllowsMultipleProfessionals(multi) }
     })
     Promise.all([fetch('/api/schedules'), fetch('/api/services'), fetch('/api/professionals')])
       .then(async ([sRes, svRes, pRes]) => {

@@ -6,7 +6,9 @@ import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { sendWelcomeEmail, sendPaymentFailedEmail } from '@/lib/email-templates'
 import { getTemporaryData, deleteTemporaryData, type TemporaryData } from '@/lib/temporary-storage'
-import { SegmentType } from '@prisma/client'
+import { SegmentType, PlanType } from '@prisma/client'
+import { PLAN_CONFIGS, getPlanPrice } from '@/lib/types'
+import { formatCurrencyByCurrency } from '@/lib/utils'
 import Stripe from 'stripe'
 
 export async function POST(req: NextRequest) {
@@ -100,6 +102,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     segmentType: session.metadata!.segmentType as SegmentType,
     phone: session.metadata!.phone,
     customerId,
+    plan: (session.metadata!.plan as PlanType) || 'BASICO',
+    billingInterval: (session.metadata!.interval as 'MONTHLY' | 'ANNUAL') || 'MONTHLY',
+    currency: (session.metadata!.currency as 'BRL' | 'USD') || 'BRL',
+    locale: session.metadata!.locale || 'pt',
     timestamp: Date.now(),
   }
 
@@ -128,7 +134,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       where: { id: existingUser.id },
       data: {
         stripeCustomerId: customerId,
-        planType: 'STANDARD',
+        planType: userData.plan,
+        billingInterval: userData.billingInterval,
+        currency: userData.currency,
+        locale: userData.locale,
       }
     })
 
@@ -150,7 +159,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       businessName: userData.businessName,
       segmentType: userData.segmentType,
       phone: userData.phone,
-      planType: 'STANDARD',
+      planType: userData.plan,
+      billingInterval: userData.billingInterval,
+      currency: userData.currency,
+      locale: userData.locale,
       role: 'MASTER',
       stripeCustomerId: customerId,
     }
@@ -173,7 +185,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       role: 'PROFESSIONAL',
       masterId: user.id,
       isActive: true,
-      planType: 'STANDARD',
+      planType: userData.plan,
+      billingInterval: userData.billingInterval,
+      currency: userData.currency,
+      locale: userData.locale,
     }
   })
 
@@ -202,11 +217,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   // Enviar email de boas-vindas
   console.log('📧 Enviando email de boas-vindas...')
   
+  const planPrice = getPlanPrice(userData.plan, userData.billingInterval, userData.currency)
+  const planConfig = PLAN_CONFIGS[userData.plan]
+
   await sendWelcomeEmail({
     name: userData.name,
     email: userData.email,
-    planName: 'Standard',
-    planPrice: 'R$ 49,90',
+    planName: planConfig.name,
+    planPrice: formatCurrencyByCurrency(planPrice, userData.currency),
+    locale: userData.locale,
+    monthlyLimitLabel: planConfig.monthlyLimit === -1 ? (userData.locale === 'en' ? 'Unlimited' : 'Ilimitado') : `${planConfig.monthlyLimit}/${userData.locale === 'en' ? 'mo' : 'mês'}`,
+    userLimitLabel: planConfig.userLimit === -1 ? (userData.locale === 'en' ? 'Unlimited' : 'Ilimitado') : String(planConfig.userLimit),
   })
 
   // Limpar dados temporários
@@ -229,20 +250,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return
   }
 
-  // Atualizar status do plano baseado no status da assinatura
-  if (subscription.status === 'active') {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { planType: 'STANDARD' }
-    })
-    console.log('✅ Plano do usuário atualizado para STANDARD')
-  } else if (['canceled', 'unpaid', 'past_due'].includes(subscription.status)) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { planType: 'FREEMIUM' }
-    })
-    console.log('⚠️ Plano do usuário revertido para FREEMIUM')
-  }
+  // Apenas o status da assinatura é atualizado aqui — o planType só muda
+  // através de um novo checkout (ver handleCheckoutSessionCompleted), nunca
+  // como efeito colateral de um evento de status da assinatura.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { subscriptionStatus: subscription.status }
+  })
+  console.log(`✅ subscriptionStatus do usuário atualizado para "${subscription.status}"`)
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -259,13 +274,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     return
   }
 
-  // Reverter para plano gratuito
+  // Não há plano gratuito para reverter — a conta fica suspensa mantendo
+  // o último planType contratado, até uma nova assinatura ser ativada.
   await prisma.user.update({
     where: { id: user.id },
-    data: { planType: 'FREEMIUM' }
+    data: { subscriptionStatus: 'canceled' }
   })
 
-  console.log('✅ Usuário revertido para plano FREEMIUM')
+  console.log('⚠️ Assinatura do usuário marcada como cancelada (conta suspensa)')
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
@@ -286,6 +302,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   await sendPaymentFailedEmail({
     name: user.name || 'Usuário',
     email: user.email,
+    locale: user.locale,
   })
 
   console.log('📧 Email de falha no pagamento enviado para:', user.email)

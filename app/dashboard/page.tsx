@@ -15,7 +15,7 @@ export default async function DashboardPage() {
     user: {
       name: session.user?.name,
       email: session.user?.email,
-      planType: (session.user as any)?.planType || 'FREEMIUM',
+      planType: (session.user as any)?.planType || 'BASICO',
       clinicName: (session.user as any)?.clinicName
     }
   }

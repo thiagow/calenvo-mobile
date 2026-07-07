@@ -3,70 +3,35 @@
 import { useState } from 'react'
 import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding, CalendarDays, Bell, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { PLAN_CONFIGS } from '@/lib/types'
-import { formatCurrency } from '@/lib/utils'
+import { Link } from '@/i18n/navigation'
+import { useLocale, useTranslations } from 'next-intl'
+import { PLAN_CONFIGS, getPlanPrice, type Currency } from '@/lib/types'
+import { formatCurrencyByCurrency } from '@/lib/utils'
+import { LogoIcon } from '@/components/brand/logo'
+import { LanguageSwitcher } from '@/components/brand/language-switcher'
 
 export default function LandingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
+  const t = useTranslations('Landing')
+  const locale = useLocale()
+  const currency: Currency = locale === 'en' ? 'USD' : 'BRL'
+  const interval = isAnnual ? 'ANNUAL' : 'MONTHLY'
 
   const testimonials = [
-    {
-      name: 'Claudia Moreira',
-      role: 'Salão de Beleza · São Paulo',
-      text: '"Reduzi as faltas em quase 80% com os lembretes automáticos. Meus clientes adoram confirmar pelo WhatsApp. O Calenvo transformou o meu salão completamente."',
-      rating: 5,
-      initial: 'C',
-      color: 'from-pink-500 to-violet-500',
-    },
-    {
-      name: 'Dr. Rafael Souza',
-      role: 'Clínica de Fisioterapia · Campinas',
-      text: '"Gerencio 6 fisioterapeutas em uma única tela. Os relatórios mostram os horários mais rentáveis e quais profissionais têm mais demanda. Simplesmente indispensável."',
-      rating: 5,
-      initial: 'R',
-      color: 'from-blue-500 to-blue-700',
-    },
-    {
-      name: 'Mariana Teixeira',
-      role: 'Spa e Estética · Rio de Janeiro',
-      text: '"O programa de fidelidade foi divisor de águas. Clientes que vinham mensalmente agora retornam toda semana. O retorno aumentou 40% em apenas 3 meses."',
-      rating: 5,
-      initial: 'M',
-      color: 'from-violet-500 to-blue-600',
-    },
-  ]
+    { key: 'item1', initial: 'C', color: 'from-pink-500 to-violet-500', name: 'Claudia Moreira', rating: 5 },
+    { key: 'item2', initial: 'R', color: 'from-blue-500 to-blue-700', name: 'Dr. Rafael Souza', rating: 5 },
+    { key: 'item3', initial: 'M', color: 'from-violet-500 to-blue-600', name: 'Mariana Teixeira', rating: 5 },
+  ] as const
 
-  const faqItems = [
-    {
-      question: 'Como funciona o agendamento online?',
-      answer: 'Seus clientes acessam uma página pública personalizada e podem agendar disponibilidades em tempo real, diretamente na sua agenda. Sem intermediários.'
-    },
-    {
-      question: 'Posso usar com múltiplos profissionais?',
-      answer: 'Sim! Calenvo foi construído para gerenciar múltiplas agendas e profissionais em uma única plataforma com sincronização completa.'
-    },
-    {
-      question: 'Como funciona o programa de fidelidade?',
-      answer: 'Configure pacotes, cupons e bônus automáticos que seus clientes acumulam com cada compra. Totalmente integrado ao agendamento.'
-    },
-    {
-      question: 'O WhatsApp é enviado automaticamente?',
-      answer: 'Sim. Confirmações, lembretes e atualizações são enviados automaticamente via WhatsApp para reduzir faltas e melhorar a experiência.'
-    },
-    {
-      question: 'Quais são os prazos de suporte?',
-      answer: 'Oferecemos suporte por email. Planos pagos têm prioridade. Nossa comunidade também ajuda com boas práticas.'
-    }
-  ]
+  const faqItems = ['item1', 'item2', 'item3', 'item4', 'item5'] as const
 
   const segments = [
-    { name: 'Salões e Barbearias', icon: Scissors },
-    { name: 'Clínicas e Consultórios', icon: Cross },
-    { name: 'Spas e Estética', icon: Droplets },
-    { name: 'Fisioterapia', icon: PersonStanding },
-  ]
+    { key: 'beauty', icon: Scissors },
+    { key: 'clinics', icon: Cross },
+    { key: 'spas', icon: Droplets },
+    { key: 'physio', icon: PersonStanding },
+  ] as const
 
   return (
     <div className="min-h-screen bg-white">
@@ -76,52 +41,37 @@ export default function LandingPage() {
           <div className="flex justify-between items-center py-4">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2 flex-shrink-0">
-              <svg width="40" height="40" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="52" height="52" rx="13" fill="url(#calenvo_grad)"></rect>
-                <rect x="11" y="14" width="30" height="4" rx="2" fill="white" opacity="0.35"></rect>
-                <circle cx="18" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                <circle cx="26" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                <circle cx="34" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                <circle cx="18" cy="35" r="2.5" fill="white" opacity="0.45"></circle>
-                <circle cx="26" cy="35" r="4" fill="white"></circle>
-                <path d="M23.8 35l1.6 1.7 2.8-3" stroke="#7C3AED" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
-                <circle cx="34" cy="35" r="2.5" fill="white" opacity="0.45"></circle>
-                <defs>
-                  <linearGradient id="calenvo_grad" x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#8B5CF6"></stop>
-                    <stop offset="100%" stopColor="#5B21B6"></stop>
-                  </linearGradient>
-                </defs>
-              </svg>
+              <LogoIcon gradientId="calenvo_grad_header" />
               <span className="text-xl font-bold text-white">Calenvo</span>
             </Link>
 
             {/* Center Navigation */}
             <nav className="hidden md:flex items-center space-x-8 bg-[#7C3AED] rounded-full px-8 py-3">
               <a href="#funcionalidades" className="text-white hover:text-violet-100 font-medium text-sm">
-                Funcionalidades
+                {t('nav.funcionalidades')}
               </a>
               <a href="#pricing" className="text-white hover:text-violet-100 font-medium text-sm">
-                Planos
+                {t('nav.planos')}
               </a>
               <a href="#testimonials" className="text-white hover:text-violet-100 font-medium text-sm">
-                Depoimentos
+                {t('nav.depoimentos')}
               </a>
               <a href="#faq" className="text-white hover:text-violet-100 font-medium text-sm">
-                FAQ
+                {t('nav.faq')}
               </a>
             </nav>
 
             {/* Right Actions */}
             <div className="flex items-center space-x-4">
+              <LanguageSwitcher />
               <Link href="/login">
                 <Button variant="ghost" className="text-white hover:text-violet-100 font-medium">
-                  Entrar
+                  {t('nav.entrar')}
                 </Button>
               </Link>
-              <Link href="/signup">
+              <Link href="#pricing">
                 <Button className="bg-[#EDE9FE] hover:bg-violet-200 text-[#7C3AED] font-semibold px-6">
-                  Contratar plano
+                  {t('nav.contratarPlano')}
                 </Button>
               </Link>
             </div>
@@ -137,25 +87,25 @@ export default function LandingPage() {
             <div>
               <div className="inline-flex items-center gap-2 mb-6 px-4 py-2 bg-violet-100 text-violet-600 rounded-full text-sm font-medium">
                 <span className="w-2 h-2 bg-violet-600 rounded-full"></span>
-                Agendamento e fidelização completos
+                {t('hero.badge')}
               </div>
               <h1 className="text-6xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-                <div>Agende.</div>
-                <div>Fidelize.</div>
-                <div><span className="text-violet-600">Cresça.</span></div>
+                <div>{t('hero.titleLine1')}</div>
+                <div>{t('hero.titleLine2')}</div>
+                <div><span className="text-violet-600">{t('hero.titleLine3')}</span></div>
               </h1>
               <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
-                Gestão completa de agendas, equipe multiprofissional, notificações automáticas e muito mais. A solução ideal para o seu negócio crescer.
+                {t('hero.description')}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="/signup">
+                <Link href="#pricing">
                   <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-8 py-6 rounded-full text-base">
-                    Contratar plano
+                    {t('hero.ctaPrimary')}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Button variant="outline" className="font-semibold px-8 py-6 rounded-full text-base border-gray-300">
-                  Ver funcionalidades
+                  {t('hero.ctaSecondary')}
                 </Button>
               </div>
 
@@ -172,7 +122,7 @@ export default function LandingPage() {
                     <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                   ))}
                 </div>
-                <p className="text-sm text-gray-700 font-medium">+12.000 negócios confiam no Calenvo</p>
+                <p className="text-sm text-gray-700 font-medium">{t('hero.socialProof')}</p>
               </div>
             </div>
 
@@ -186,8 +136,8 @@ export default function LandingPage() {
                       <span className="text-xl">⭐</span>
                     </div>
                     <div>
-                      <p className="font-bold text-gray-900">+50 pontos!</p>
-                      <p className="text-xs text-gray-600">Carlos atingiu Gold</p>
+                      <p className="font-bold text-gray-900">{t('mockup.pointsNotification')}</p>
+                      <p className="text-xs text-gray-600">{t('mockup.pointsSubtitle')}</p>
                     </div>
                   </div>
                 </div>
@@ -196,10 +146,10 @@ export default function LandingPage() {
                 <div className="bg-white rounded-2xl shadow-lg p-6 mt-12">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <p className="text-xs text-gray-500 font-medium">AGENDA DO DIA</p>
-                      <p className="text-lg font-bold text-gray-900">Quinta, 19 de Junho</p>
+                      <p className="text-xs text-gray-500 font-medium">{t('mockup.agendaLabel')}</p>
+                      <p className="text-lg font-bold text-gray-900">{t('mockup.agendaDate')}</p>
                     </div>
-                    <p className="text-sm text-violet-600 font-semibold">3 agendados</p>
+                    <p className="text-sm text-violet-600 font-semibold">{t('mockup.agendedCount')}</p>
                   </div>
 
                   <div className="space-y-4">
@@ -211,7 +161,7 @@ export default function LandingPage() {
                       </div>
                       <div className="flex-1 ml-4">
                         <p className="font-semibold text-gray-900">Ana Beatriz</p>
-                        <p className="text-xs text-gray-600">Corte + Hidratação · 60 min</p>
+                        <p className="text-xs text-gray-600">{t('mockup.service1')}</p>
                       </div>
                       <button className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white">
                         ✓
@@ -226,7 +176,7 @@ export default function LandingPage() {
                       </div>
                       <div className="flex-1 ml-4">
                         <p className="font-semibold text-gray-900">Carlos Mendes</p>
-                        <p className="text-xs text-gray-600">Barba + Corte · 45 min</p>
+                        <p className="text-xs text-gray-600">{t('mockup.service2')}</p>
                       </div>
                       <button className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center text-gray-400">
                         ◎
@@ -241,7 +191,7 @@ export default function LandingPage() {
                       </div>
                       <div className="flex-1 ml-4">
                         <p className="font-semibold text-gray-900">Mariana Souza</p>
-                        <p className="text-xs text-gray-600">Massagem relaxante · 90 min</p>
+                        <p className="text-xs text-gray-600">{t('mockup.service3')}</p>
                       </div>
                       <button className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white">
                         ✓
@@ -257,8 +207,8 @@ export default function LandingPage() {
                       💬
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-900">Ana confirmou!</p>
-                      <p className="text-xs text-gray-600">Lembrete via WhatsApp ✓</p>
+                      <p className="font-semibold text-gray-900">{t('mockup.whatsappConfirmed')}</p>
+                      <p className="text-xs text-gray-600">{t('mockup.whatsappSubtitle')}</p>
                     </div>
                   </div>
                 </div>
@@ -274,19 +224,19 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12 text-center">
             <div>
               <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">12.000+</div>
-              <p className="text-gray-600 text-lg">Negócios</p>
+              <p className="text-gray-600 text-lg">{t('stats.negocios')}</p>
             </div>
             <div>
               <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">4M+</div>
-              <p className="text-gray-600 text-lg">Agendamentos</p>
+              <p className="text-gray-600 text-lg">{t('stats.agendamentos')}</p>
             </div>
             <div>
               <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">98%</div>
-              <p className="text-gray-600 text-lg">Satisfação</p>
+              <p className="text-gray-600 text-lg">{t('stats.satisfacao')}</p>
             </div>
             <div>
               <div className="text-5xl md:text-6xl font-bold text-violet-600 mb-3">−70%</div>
-              <p className="text-gray-600 text-lg">Faltas</p>
+              <p className="text-gray-600 text-lg">{t('stats.faltas')}</p>
             </div>
           </div>
         </div>
@@ -297,7 +247,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-              Feito para múltiplos segmentos
+              {t('segments.title')}
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-4">
@@ -305,11 +255,11 @@ export default function LandingPage() {
               const Icon = segment.icon
               return (
                 <div
-                  key={segment.name}
+                  key={segment.key}
                   className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-full text-gray-700 font-medium hover:border-violet-400 hover:text-violet-600 transition-all text-sm cursor-default"
                 >
                   <Icon className="h-4 w-4 text-violet-500 flex-shrink-0" />
-                  {segment.name}
+                  {t(`segments.${segment.key}`)}
                 </div>
               )
             })}
@@ -322,16 +272,16 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
-              Depoimentos
+              {t('testimonials.badge')}
             </span>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900">
-              Quem usa, aprova
+              {t('testimonials.title')}
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((testimonial, idx) => (
-              <div key={idx} className="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col gap-6 shadow-sm">
+            {testimonials.map((testimonial) => (
+              <div key={testimonial.key} className="bg-white border border-gray-100 rounded-2xl p-8 flex flex-col gap-6 shadow-sm">
                 {/* Stars */}
                 <div className="flex items-center gap-1">
                   {[...Array(testimonial.rating)].map((_, i) => (
@@ -341,7 +291,7 @@ export default function LandingPage() {
 
                 {/* Quote */}
                 <p className="text-gray-700 text-sm leading-relaxed flex-1">
-                  {testimonial.text}
+                  {t(`testimonials.${testimonial.key}.text`)}
                 </p>
 
                 {/* Author */}
@@ -351,7 +301,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm">{testimonial.name}</p>
-                    <p className="text-xs text-gray-500">{testimonial.role}</p>
+                    <p className="text-xs text-gray-500">{t(`testimonials.${testimonial.key}.role`)}</p>
                   </div>
                 </div>
               </div>
@@ -366,13 +316,14 @@ export default function LandingPage() {
           {/* Header */}
           <div className="text-center mb-16">
             <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
-              Funcionalidades
+              {t('features.badge')}
             </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-              Tudo que você precisa,<br />em um só sistema
-            </h2>
+            <h2
+              className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight"
+              dangerouslySetInnerHTML={{ __html: t.raw('features.title') }}
+            />
             <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              Do agendamento ao programa de fidelidade, o Calenvo cuida de tudo para você focar no que importa.
+              {t('features.subtitle')}
             </p>
           </div>
 
@@ -384,16 +335,16 @@ export default function LandingPage() {
                 <CalendarDays className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-white mb-3">Agendamento online 24/7</h3>
+                <h3 className="text-2xl font-bold text-white mb-3">{t('features.card1.title')}</h3>
                 <p className="text-violet-100 text-sm leading-relaxed">
-                  Seus clientes agendam quando quiserem pelo celular, sem precisar ligar. Link personalizado, cardápio de serviços e confirmação automática.
+                  {t('features.card1.description')}
                 </p>
               </div>
               <ul className="space-y-2">
-                {['Link exclusivo de agendamento', 'Equipe multiprofissional', 'Confirmação automática por mensagem'].map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-sm text-violet-100">
+                {['bullet1', 'bullet2', 'bullet3'].map((key) => (
+                  <li key={key} className="flex items-center gap-2 text-sm text-violet-100">
                     <Check className="h-4 w-4 text-violet-300 flex-shrink-0" />
-                    {item}
+                    {t(`features.card1.${key}`)}
                   </li>
                 ))}
               </ul>
@@ -405,9 +356,9 @@ export default function LandingPage() {
                 <Bell className="h-6 w-6 text-violet-500" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Notificações automáticas</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">{t('features.card2.title')}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">
-                  Reduza faltas em até 70%. Envie lembretes automáticos por WhatsApp, SMS e e-mail. Clientes confirmam ou remarcam com um toque, sem precisar ligar.
+                  {t('features.card2.description')}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -433,9 +384,9 @@ export default function LandingPage() {
                 <Star className="h-6 w-6 text-violet-500" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">Programa de fidelidade e pontos</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">{t('features.card3.title')}</h3>
                 <p className="text-gray-500 text-sm leading-relaxed">
-                  Fidelize clientes com um programa de pontos personalizável. Eles acumulam a cada visita e resgatam recompensas — voltando mais vezes e gastando mais.
+                  {t('features.card3.description')}
                 </p>
               </div>
             </div>
@@ -444,16 +395,16 @@ export default function LandingPage() {
             <div className="flex flex-col gap-3">
               {/* Categoria card */}
               <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs text-gray-400 mb-1">Categoria atual</p>
+                <p className="text-xs text-gray-400 mb-1">{t('features.card3.categoryLabel')}</p>
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-gray-900">Bronze → Prata</p>
-                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Prata</span>
+                  <p className="font-bold text-gray-900">{t('features.card3.categoryValue')}</p>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">{t('features.card3.categoryBadge')}</span>
                 </div>
               </div>
 
               {/* Progress card */}
               <div className="bg-white rounded-2xl p-4 shadow-sm">
-                <p className="text-xs text-gray-400 mb-3">Progresso para resgate</p>
+                <p className="text-xs text-gray-400 mb-3">{t('features.card3.progressLabel')}</p>
                 <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
                   <div className="bg-violet-500 h-2 rounded-full" style={{ width: '70%' }} />
                 </div>
@@ -466,8 +417,8 @@ export default function LandingPage() {
               {/* Impact card */}
               <div className="bg-violet-600 rounded-2xl p-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-violet-200 mb-1">Impacto no negócio</p>
-                  <p className="text-xl font-bold text-white">+40% de retorno</p>
+                  <p className="text-xs text-violet-200 mb-1">{t('features.card3.impactLabel')}</p>
+                  <p className="text-xl font-bold text-white">{t('features.card3.impactValue')}</p>
                 </div>
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                   <TrendingUp className="h-5 w-5 text-white" />
@@ -485,12 +436,12 @@ export default function LandingPage() {
           {/* Header */}
           <div className="text-center mb-12">
             <span className="inline-block px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-sm font-medium mb-6">
-              Planos
+              {t('pricing.badge')}
             </span>
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Simples, transparente, sem surpresas
+              {t('pricing.title')}
             </h2>
-            <p className="text-gray-500">14 dias grátis em qualquer plano. Sem cartão de crédito.</p>
+            <p className="text-gray-500">{t('pricing.subtitle')}</p>
           </div>
 
           {/* Toggle */}
@@ -500,14 +451,14 @@ export default function LandingPage() {
                 onClick={() => setIsAnnual(false)}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${!isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
               >
-                Mensal
+                {t('pricing.toggleMonthly')}
               </button>
               <button
                 onClick={() => setIsAnnual(true)}
                 className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-medium transition-all ${isAnnual ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}
               >
-                Anual
-                <span className="bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">−20%</span>
+                {t('pricing.toggleAnnual')}
+                <span className="bg-violet-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{t('pricing.discountBadge')}</span>
               </button>
             </div>
           </div>
@@ -517,23 +468,24 @@ export default function LandingPage() {
 
             {/* Básico */}
             <div className="bg-white border border-gray-200 rounded-3xl p-8">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Básico</p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">{t('pricing.basico.name')}</p>
               <div className="mb-1">
-                <span className="text-sm text-gray-500">R$</span>
-                <span className="text-5xl font-bold text-gray-900">{isAnnual ? '14' : '19'}</span>
-                <span className="text-gray-500">,{isAnnual ? '90' : '90'}/mês</span>
+                <span className="text-5xl font-bold text-gray-900">
+                  {formatCurrencyByCurrency(getPlanPrice('BASICO', interval, currency), currency)}
+                </span>
+                <span className="text-gray-500">{t('pricing.perMonth')}</span>
               </div>
-              <p className="text-xs text-gray-400 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
-              <Link href="/signup" className="w-full block mb-8">
+              <p className="text-xs text-gray-400 mb-8">{isAnnual ? t('pricing.billedAnnual') : t('pricing.billedMonthly')}</p>
+              <Link href={`/signup/basico?interval=${isAnnual ? 'annual' : 'monthly'}`} className="w-full block mb-8">
                 <Button variant="outline" className="w-full font-semibold rounded-xl">
-                  Contratar Básico
+                  {t('pricing.basico.cta')}
                 </Button>
               </Link>
               <ul className="space-y-3">
-                {['Até 2 profissionais', '150 agendamentos/mês', 'Notificações por e-mail', 'Link de agendamento próprio', 'Suporte por chat'].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                {['feature1', 'feature2', 'feature3', 'feature4', 'feature5'].map((key) => (
+                  <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
                     <Check className="h-4 w-4 text-violet-500 flex-shrink-0" />
-                    {f}
+                    {t(`pricing.basico.${key}`)}
                   </li>
                 ))}
               </ul>
@@ -542,25 +494,26 @@ export default function LandingPage() {
             {/* PRO — destaque, maior */}
             <div className="bg-violet-600 rounded-3xl p-8 relative shadow-2xl md:-my-4">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 px-5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap">
-                Mais Popular
+                {t('pricing.popularBadge')}
               </div>
-              <p className="text-xs font-bold text-violet-300 uppercase tracking-widest mb-6">PRO</p>
+              <p className="text-xs font-bold text-violet-300 uppercase tracking-widest mb-6">{t('pricing.pro.name')}</p>
               <div className="mb-1">
-                <span className="text-sm text-violet-200">R$</span>
-                <span className="text-5xl font-bold text-white">{isAnnual ? '27' : '39'}</span>
-                <span className="text-violet-200">,90/mês</span>
+                <span className="text-5xl font-bold text-white">
+                  {formatCurrencyByCurrency(getPlanPrice('PRO', interval, currency), currency)}
+                </span>
+                <span className="text-violet-200">{t('pricing.perMonth')}</span>
               </div>
-              <p className="text-xs text-violet-300 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
-              <Link href="/signup/standard" className="w-full block mb-8">
+              <p className="text-xs text-violet-300 mb-8">{isAnnual ? t('pricing.billedAnnual') : t('pricing.billedMonthly')}</p>
+              <Link href={`/signup/pro?interval=${isAnnual ? 'annual' : 'monthly'}`} className="w-full block mb-8">
                 <Button className="w-full bg-white text-violet-700 hover:bg-gray-100 font-bold rounded-xl">
-                  Contratar Pro
+                  {t('pricing.pro.cta')}
                 </Button>
               </Link>
               <ul className="space-y-3">
-                {['Tudo do Básico', 'Até 8 profissionais', 'WhatsApp + SMS + E-mail ilimitados', 'Programa de fidelidade completo', 'Relatórios e métricas avançadas', 'Suporte prioritário'].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-violet-100">
+                {['feature1', 'feature2', 'feature3', 'feature4', 'feature5', 'feature6'].map((key) => (
+                  <li key={key} className="flex items-center gap-2 text-sm text-violet-100">
                     <Check className="h-4 w-4 text-violet-300 flex-shrink-0" />
-                    {f}
+                    {t(`pricing.pro.${key}`)}
                   </li>
                 ))}
               </ul>
@@ -568,23 +521,24 @@ export default function LandingPage() {
 
             {/* Business */}
             <div className="bg-white border border-gray-200 rounded-3xl p-8">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">Business</p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">{t('pricing.business.name')}</p>
               <div className="mb-1">
-                <span className="text-sm text-gray-500">R$</span>
-                <span className="text-5xl font-bold text-gray-900">{isAnnual ? '49' : '69'}</span>
-                <span className="text-gray-500">,90/mês</span>
+                <span className="text-5xl font-bold text-gray-900">
+                  {formatCurrencyByCurrency(getPlanPrice('BUSINESS', interval, currency), currency)}
+                </span>
+                <span className="text-gray-500">{t('pricing.perMonth')}</span>
               </div>
-              <p className="text-xs text-gray-400 mb-8">Cobrado {isAnnual ? 'anualmente' : 'mensalmente'}</p>
-              <Link href="/signup" className="w-full block mb-8">
+              <p className="text-xs text-gray-400 mb-8">{isAnnual ? t('pricing.billedAnnual') : t('pricing.billedMonthly')}</p>
+              <Link href={`/signup/business?interval=${isAnnual ? 'annual' : 'monthly'}`} className="w-full block mb-8">
                 <Button variant="outline" className="w-full font-semibold rounded-xl">
-                  Contratar Business
+                  {t('pricing.business.cta')}
                 </Button>
               </Link>
               <ul className="space-y-3">
-                {['Tudo do Pro', 'Profissionais ilimitados', 'Múltiplas unidades', 'API e integrações avançadas', 'Account manager dedicado', 'SLA garantido'].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
+                {['feature1', 'feature2', 'feature3', 'feature4', 'feature5', 'feature6'].map((key) => (
+                  <li key={key} className="flex items-center gap-2 text-sm text-gray-700">
                     <Check className="h-4 w-4 text-violet-500 flex-shrink-0" />
-                    {f}
+                    {t(`pricing.business.${key}`)}
                   </li>
                 ))}
               </ul>
@@ -598,18 +552,18 @@ export default function LandingPage() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Perguntas Frequentes
+              {t('faq.title')}
             </h2>
           </div>
 
           <div className="space-y-4">
-            {faqItems.map((item, idx) => (
-              <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
+            {faqItems.map((key, idx) => (
+              <div key={key} className="border border-gray-200 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
                   className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors"
                 >
-                  <h3 className="font-semibold text-gray-900 text-left">{item.question}</h3>
+                  <h3 className="font-semibold text-gray-900 text-left">{t(`faq.${key}.question`)}</h3>
                   <ChevronDown
                     className="h-5 w-5 text-gray-600 flex-shrink-0 transition-transform"
                     style={{
@@ -619,7 +573,7 @@ export default function LandingPage() {
                 </button>
                 {faqOpen === idx && (
                   <div className="px-6 pb-6 text-gray-600 border-t border-gray-200">
-                    {item.answer}
+                    {t(`faq.${key}.answer`)}
                   </div>
                 )}
               </div>
@@ -632,14 +586,14 @@ export default function LandingPage() {
       <section className="bg-gradient-to-r from-violet-600 to-purple-600 text-white py-16">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Pronto para crescer?
+            {t('ctaFooter.title')}
           </h2>
           <p className="text-lg text-violet-100 mb-8">
-            Junte-se a milhares de negócios que já transformaram seu agendamento com Calenvo
+            {t('ctaFooter.subtitle')}
           </p>
           <Link href="#pricing">
             <Button size="lg" className="bg-white text-violet-600 hover:bg-gray-100 font-semibold px-8 py-6 text-lg">
-              Escolha Agora Seu Plano
+              {t('ctaFooter.cta')}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
@@ -652,45 +606,29 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <svg width="40" height="40" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="52" height="52" rx="13" fill="url(#calenvo_grad_footer)"></rect>
-                  <rect x="11" y="14" width="30" height="4" rx="2" fill="white" opacity="0.35"></rect>
-                  <circle cx="18" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                  <circle cx="26" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                  <circle cx="34" cy="27" r="2.5" fill="white" opacity="0.45"></circle>
-                  <circle cx="18" cy="35" r="2.5" fill="white" opacity="0.45"></circle>
-                  <circle cx="26" cy="35" r="4" fill="white"></circle>
-                  <path d="M23.8 35l1.6 1.7 2.8-3" stroke="#7C3AED" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"></path>
-                  <circle cx="34" cy="35" r="2.5" fill="white" opacity="0.45"></circle>
-                  <defs>
-                    <linearGradient id="calenvo_grad_footer" x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#8B5CF6"></stop>
-                      <stop offset="100%" stopColor="#5B21B6"></stop>
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <LogoIcon gradientId="calenvo_grad_footer" />
                 <span className="text-lg font-bold text-white">Calenvo</span>
               </div>
               <p className="text-sm">
-                Plataforma completa de agendamento e fidelização para diversos segmentos
+                {t('footer.description')}
               </p>
             </div>
             <div>
-              <h3 className="font-semibold text-white mb-4">Produto</h3>
+              <h3 className="font-semibold text-white mb-4">{t('footer.productTitle')}</h3>
               <ul className="space-y-2 text-sm">
-                <li>Funcionalidades</li>
-                <li>Segmentos</li>
-                <li>Preços</li>
-                <li>Suporte</li>
+                <li>{t('footer.productLink1')}</li>
+                <li>{t('footer.productLink2')}</li>
+                <li>{t('footer.productLink3')}</li>
+                <li>{t('footer.productLink4')}</li>
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-white mb-4">Contato</h3>
+              <h3 className="font-semibold text-white mb-4">{t('footer.contactTitle')}</h3>
               <p className="text-sm">contato@calenvo.com.br</p>
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; 2024 Calenvo. Todos os direitos reservados.</p>
+            <p>{t('footer.copyright')}</p>
           </div>
         </div>
       </footer>

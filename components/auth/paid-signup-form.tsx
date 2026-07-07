@@ -1,19 +1,25 @@
-
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import toast from 'react-hot-toast'
 import { AVAILABLE_SEGMENTS } from '@/lib/types'
-import { SegmentType } from '@prisma/client'
-import { Loader2, User, Mail, Lock, Building, Phone, Briefcase } from 'lucide-react'
+import { PlanType, SegmentType } from '@prisma/client'
+import { Loader2, User, Mail, Lock, Building, Phone, Briefcase, CreditCard } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 
-export function SignupForm() {
+interface PaidSignupFormProps {
+  plan: PlanType
+  interval: 'MONTHLY' | 'ANNUAL'
+}
+
+export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
+  const t = useTranslations('Signup')
+  const tSegments = useTranslations('Segments')
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -23,8 +29,6 @@ export function SignupForm() {
     segmentType: 'BEAUTY_SALON' as SegmentType,
     phone: ''
   })
-  
-  const router = useRouter()
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -34,59 +38,28 @@ export function SignupForm() {
     e.preventDefault()
     setLoading(true)
 
-    console.log('Form data before validation:', formData)
-
-    // Validação adicional
     if (!formData.name || !formData.email || !formData.password || !formData.businessName || !formData.phone || !formData.segmentType) {
-      console.log('Missing required fields:', {
-        name: !formData.name,
-        email: !formData.email,
-        password: !formData.password,
-        businessName: !formData.businessName,
-        phone: !formData.phone,
-        segmentType: !formData.segmentType
-      })
-      toast.error('Preencha todos os campos obrigatórios')
+      toast.error(t('requiredFieldsError'))
       setLoading(false)
       return
     }
 
     try {
-      console.log('Sending signup data:', formData)
-      
-      const response = await fetch('/api/signup', {
+      const response = await fetch('/api/stripe/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, plan, interval, locale })
       })
 
       const data = await response.json()
-      console.log('Signup response:', { status: response.status, data })
 
       if (!response.ok) {
-        throw new Error(data.message || 'Erro ao criar conta')
+        throw new Error(data.message || t('checkoutError'))
       }
 
-      // Auto login after successful signup
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false
-      })
-
-      console.log('Auto login result:', result)
-
-      if (result?.ok) {
-        toast.success('Conta criada com sucesso! Bem-vindo ao Calenvo')
-        router.replace('/dashboard')
-      } else {
-        toast.success('Conta criada! Faça login para continuar')
-        router.push('/login')
-      }
+      window.location.href = data.url
     } catch (error) {
-      console.error('Signup error:', error)
-      toast.error(error instanceof Error ? error.message : 'Erro ao criar conta. Tente novamente')
-    } finally {
+      toast.error(error instanceof Error ? error.message : t('checkoutError'))
       setLoading(false)
     }
   }
@@ -94,12 +67,13 @@ export function SignupForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Nome completo</Label>
+        <Label htmlFor="name">{t('fieldName')}</Label>
         <div className="relative">
           <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             id="name"
-            placeholder="Dr. João Silva"
+            type="text"
+            placeholder={t('fieldNamePlaceholder')}
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
             className="pl-10"
@@ -109,13 +83,13 @@ export function SignupForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">E-mail</Label>
+        <Label htmlFor="email">{t('fieldEmail')}</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             id="email"
             type="email"
-            placeholder="joao@clinica.com"
+            placeholder={t('fieldEmailPlaceholder')}
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
             className="pl-10"
@@ -125,29 +99,30 @@ export function SignupForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Senha</Label>
+        <Label htmlFor="password">{t('fieldPassword')}</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             id="password"
             type="password"
-            placeholder="Mínimo 6 caracteres"
+            placeholder={t('fieldPasswordPlaceholder')}
             value={formData.password}
             onChange={(e) => handleChange('password', e.target.value)}
             className="pl-10"
-            minLength={6}
             required
+            minLength={6}
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="businessName">Nome do negócio</Label>
+        <Label htmlFor="businessName">{t('fieldBusinessName')}</Label>
         <div className="relative">
           <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             id="businessName"
-            placeholder="Ex: Studio Beleza, Tech Solutions..."
+            type="text"
+            placeholder={t('fieldBusinessNamePlaceholder')}
             value={formData.businessName}
             onChange={(e) => handleChange('businessName', e.target.value)}
             className="pl-10"
@@ -157,35 +132,35 @@ export function SignupForm() {
       </div>
 
       <div className="space-y-2">
-        <Label>Segmento do negócio</Label>
-        <Select 
-          value={formData.segmentType} 
-          onValueChange={(value) => handleChange('segmentType', value)}
-        >
-          <SelectTrigger className="pl-10">
-            <Briefcase className="absolute left-3 h-4 w-4 text-gray-400" />
-            <SelectValue placeholder="Selecione o segmento" />
-          </SelectTrigger>
-          <SelectContent>
-            {AVAILABLE_SEGMENTS.map(segment => (
-              <SelectItem key={segment.value} value={segment.value}>
-                <span className="flex items-center gap-2">
-                  <span>{segment.icon}</span>
-                  <span>{segment.label}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label htmlFor="segmentType">{t('fieldSegment')}</Label>
+        <div className="relative">
+          <Briefcase className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+          <Select
+            value={formData.segmentType}
+            onValueChange={(value) => handleChange('segmentType', value)}
+          >
+            <SelectTrigger className="pl-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AVAILABLE_SEGMENTS.map((segment) => (
+                <SelectItem key={segment.value} value={segment.value}>
+                  {tSegments(segment.value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phone">Telefone</Label>
+        <Label htmlFor="phone">{t('fieldPhone')}</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
             id="phone"
-            placeholder="(11) 99999-9999"
+            type="tel"
+            placeholder={t('fieldPhonePlaceholder')}
             value={formData.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
             className="pl-10"
@@ -194,16 +169,27 @@ export function SignupForm() {
         </div>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
+      <Button
+        type="submit"
+        className="w-full bg-[#7C3AED] hover:bg-violet-700 text-white text-lg py-6"
+        disabled={loading}
+      >
         {loading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Criando conta...
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            {t('processing')}
           </>
         ) : (
-          'Criar conta gratuita'
+          <>
+            <CreditCard className="mr-2 h-5 w-5" />
+            {t('submitButton')}
+          </>
         )}
       </Button>
+
+      <p className="text-xs text-center text-gray-500 mt-4">
+        {t('disclaimer')}
+      </p>
     </form>
   )
 }

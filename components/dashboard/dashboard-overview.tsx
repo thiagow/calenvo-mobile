@@ -31,7 +31,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 }
 
 export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
-  const userPlan = sessionData?.user?.planType || 'FREEMIUM'
+  const userPlan = sessionData?.user?.planType || 'BASICO'
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
   const firstName = sessionData?.user?.name?.split(' ')[0]
 
@@ -102,7 +102,7 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
                 {stats.monthAppointments}/{planConfig?.monthlyLimit}
               </span>
             </div>
-            {userPlan === 'FREEMIUM' && (
+            {userPlan === 'BASICO' && (
               <Link href="/dashboard/plans" className="block mt-3">
                 <Button size="sm" className="w-full h-8 text-xs">Fazer Upgrade</Button>
               </Link>

@@ -1,0 +1,242 @@
+{
+  "Landing": {
+    "nav": {
+      "funcionalidades": "Features",
+      "planos": "Pricing",
+      "depoimentos": "Testimonials",
+      "faq": "FAQ",
+      "entrar": "Log in",
+      "contratarPlano": "Get started"
+    },
+    "hero": {
+      "badge": "Complete scheduling and loyalty platform",
+      "titleLine1": "Book.",
+      "titleLine2": "Retain.",
+      "titleLine3": "Grow.",
+      "description": "Full scheduling management, multi-professional teams, automatic notifications and much more. The ideal solution to grow your business.",
+      "ctaPrimary": "Get started",
+      "ctaSecondary": "See features",
+      "socialProof": "+12,000 businesses trust Calenvo"
+    },
+    "mockup": {
+      "pointsNotification": "+50 points!",
+      "pointsSubtitle": "Carlos reached Gold",
+      "agendaLabel": "TODAY'S SCHEDULE",
+      "agendaDate": "Thursday, June 19",
+      "agendedCount": "3 booked",
+      "service1": "Haircut + Treatment · 60 min",
+      "service2": "Beard + Haircut · 45 min",
+      "service3": "Relaxing massage · 90 min",
+      "whatsappConfirmed": "Ana confirmed!",
+      "whatsappSubtitle": "WhatsApp reminder ✓"
+    },
+    "stats": {
+      "negocios": "Businesses",
+      "agendamentos": "Appointments",
+      "satisfacao": "Satisfaction",
+      "faltas": "No-shows"
+    },
+    "segments": {
+      "title": "Built for multiple industries",
+      "beauty": "Salons & Barbershops",
+      "clinics": "Clinics & Practices",
+      "spas": "Spas & Aesthetics",
+      "physio": "Physical Therapy"
+    },
+    "testimonials": {
+      "badge": "Testimonials",
+      "title": "Loved by our customers",
+      "item1": {
+        "role": "Beauty Salon · São Paulo",
+        "text": "\"I cut no-shows by almost 80% with automatic reminders. My clients love confirming via WhatsApp. Calenvo completely transformed my salon.\""
+      },
+      "item2": {
+        "role": "Physical Therapy Clinic · Campinas",
+        "text": "\"I manage 6 physical therapists on a single screen. The reports show the most profitable time slots and which professionals are in higher demand. Simply indispensable.\""
+      },
+      "item3": {
+        "role": "Spa & Aesthetics · Rio de Janeiro",
+        "text": "\"The loyalty program was a game changer. Clients who used to come monthly now return every week. Repeat visits grew 40% in just 3 months.\""
+      }
+    },
+    "features": {
+      "badge": "Features",
+      "title": "Everything you need,<br/>in one system",
+      "subtitle": "From scheduling to loyalty programs, Calenvo takes care of everything so you can focus on what matters.",
+      "card1": {
+        "title": "Online booking 24/7",
+        "description": "Your clients book whenever they want from their phone, no calls needed. Custom link, service menu and automatic confirmation.",
+        "bullet1": "Exclusive booking link",
+        "bullet2": "Multi-professional team",
+        "bullet3": "Automatic message confirmation"
+      },
+      "card2": {
+        "title": "Automatic notifications",
+        "description": "Cut no-shows by up to 70%. Send automatic reminders via WhatsApp, SMS and email. Clients confirm or reschedule with one tap, no calls needed."
+      },
+      "card3": {
+        "title": "Loyalty and points program",
+        "description": "Retain clients with a customizable points program. They earn points on every visit and redeem rewards — coming back more often and spending more.",
+        "categoryLabel": "Current tier",
+        "categoryValue": "Bronze → Silver",
+        "categoryBadge": "Silver",
+        "progressLabel": "Progress to next reward",
+        "impactLabel": "Business impact",
+        "impactValue": "+40% repeat visits"
+      }
+    },
+    "pricing": {
+      "badge": "Pricing",
+      "title": "Simple, transparent, no surprises",
+      "subtitle": "Cancel anytime. No penalties.",
+      "toggleMonthly": "Monthly",
+      "toggleAnnual": "Annual",
+      "discountBadge": "−20%",
+      "popularBadge": "Most Popular",
+      "billedMonthly": "Billed monthly",
+      "billedAnnual": "Billed annually",
+      "perMonth": "/mo",
+      "basico": {
+        "name": "Basic",
+        "cta": "Get Basic",
+        "feature1": "Up to 2 professionals",
+        "feature2": "150 appointments/month",
+        "feature3": "Email notifications",
+        "feature4": "Your own booking link",
+        "feature5": "Chat support"
+      },
+      "pro": {
+        "name": "PRO",
+        "cta": "Get Pro",
+        "feature1": "Everything in Basic",
+        "feature2": "Up to 8 professionals",
+        "feature3": "Unlimited WhatsApp + SMS + Email",
+        "feature4": "Full loyalty program",
+        "feature5": "Advanced reports & analytics",
+        "feature6": "Priority support"
+      },
+      "business": {
+        "name": "Advanced",
+        "cta": "Get Advanced",
+        "feature1": "Everything in Pro",
+        "feature2": "Unlimited professionals",
+        "feature3": "Multiple locations",
+        "feature4": "Advanced API & integrations",
+        "feature5": "Dedicated account manager",
+        "feature6": "Guaranteed SLA"
+      }
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "item1": {
+        "question": "How does online booking work?",
+        "answer": "Your clients access a personalized public page and can book available slots in real time, directly on your calendar. No middlemen."
+      },
+      "item2": {
+        "question": "Can I use it with multiple professionals?",
+        "answer": "Yes! Calenvo was built to manage multiple schedules and professionals on a single platform with full synchronization."
+      },
+      "item3": {
+        "question": "How does the loyalty program work?",
+        "answer": "Set up packages, coupons and automatic bonuses that your clients accumulate with every purchase. Fully integrated with scheduling."
+      },
+      "item4": {
+        "question": "Are WhatsApp messages sent automatically?",
+        "answer": "Yes. Confirmations, reminders and updates are sent automatically via WhatsApp to reduce no-shows and improve the experience."
+      },
+      "item5": {
+        "question": "What are the support response times?",
+        "answer": "We offer email support. Paid plans get priority. Our community also helps with best practices."
+      }
+    },
+    "ctaFooter": {
+      "title": "Ready to grow?",
+      "subtitle": "Join thousands of businesses that already transformed their scheduling with Calenvo",
+      "cta": "Choose Your Plan Now"
+    },
+    "footer": {
+      "description": "The complete scheduling and loyalty platform for every industry",
+      "productTitle": "Product",
+      "productLink1": "Features",
+      "productLink2": "Industries",
+      "productLink3": "Pricing",
+      "productLink4": "Contact",
+      "contactTitle": "Contact",
+      "copyright": "© 2024 Calenvo. All rights reserved."
+    }
+  },
+  "Signup": {
+    "alreadyHaveAccount": "I already have an account",
+    "canceledTitle": "⚠️ Payment canceled",
+    "canceledSubtitle": "You can try again whenever you'd like.",
+    "formTitle": "Sign up - {plan} Plan",
+    "formSubtitle": "Fill in your details and proceed to payment",
+    "fieldName": "Full name",
+    "fieldNamePlaceholder": "Your name",
+    "fieldEmail": "Email",
+    "fieldEmailPlaceholder": "you@email.com",
+    "fieldPassword": "Password",
+    "fieldPasswordPlaceholder": "At least 6 characters",
+    "fieldBusinessName": "Business name",
+    "fieldBusinessNamePlaceholder": "Your company's name",
+    "fieldSegment": "Industry",
+    "fieldPhone": "Phone",
+    "fieldPhonePlaceholder": "(000) 000-0000",
+    "submitButton": "Continue to Payment",
+    "processing": "Processing...",
+    "disclaimer": "By continuing, you'll be redirected to Stripe's secure page to process your payment.",
+    "requiredFieldsError": "Please fill in all required fields",
+    "checkoutError": "Error processing payment. Please try again",
+    "summaryTitle": "{plan} Plan",
+    "billedMonthly": "Billed monthly",
+    "billedAnnual": "Billed annually",
+    "perMonth": "/mo",
+    "includedTitle": "Included in this plan:",
+    "secureBadgeTitle": "🔒 100% secure payment via Stripe",
+    "secureBadgeSubtitle": "Your data is protected with end-to-end encryption",
+    "cancelAnytime": "Cancel anytime, no penalties or hassle",
+    "footerCopyright": "© {year} Calenvo. All rights reserved."
+  },
+  "SignupSuccess": {
+    "processing": "Processing payment...",
+    "confirmedTitle": "🎉 Payment Confirmed!",
+    "confirmedSubtitleWithPlan": "Your {plan} Plan subscription has been successfully activated",
+    "confirmedSubtitleGeneric": "Your subscription has been successfully activated",
+    "detailsTitle": "Subscription Details",
+    "planLabel": "Plan",
+    "valueLabel": "Price",
+    "appointmentsLabel": "Appointments",
+    "professionalsLabel": "Professionals",
+    "unlimited": "Unlimited",
+    "perMonthShort": "/mo",
+    "nextStepsTitle": "🎯 Next Steps",
+    "step1Title": "Check your email",
+    "step1Description": "We sent a welcome email with all the details of your subscription",
+    "step2Title": "Log in to the platform",
+    "step2Description": "Use the email and password you signed up with to access your account",
+    "step3Title": "Set up your business",
+    "step3Description": "Add hours, services and start booking!",
+    "emailConfirmedTitle": "Confirmation email sent",
+    "emailConfirmedSubtitle": "Check your inbox (and spam folder) for more details about your subscription",
+    "ctaButton": "Access My Account",
+    "helpText": "Need help?",
+    "contactLink": "Contact us",
+    "sessionIdLabel": "Session ID",
+    "footerCopyright": "© {year} Calenvo. All rights reserved."
+  },
+  "LanguageSwitcher": {
+    "pt": "Português",
+    "en": "English"
+  },
+  "Segments": {
+    "BEAUTY_SALON": "Beauty Salon",
+    "BARBERSHOP": "Barbershop",
+    "AESTHETIC_CLINIC": "Aesthetic Clinic",
+    "PHYSIOTHERAPY": "Physical Therapy",
+    "EDUCATION": "Education",
+    "PET_SHOP": "Pet Shop",
+    "PROFESSIONAL_SERVICES": "Consulting",
+    "TECH_SAAS": "Technology",
+    "OTHER": "Other"
+  }
+}

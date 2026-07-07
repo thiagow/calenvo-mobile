@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Sliders,
   Star,
+  Key,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -39,6 +40,7 @@ const menuGroups = [
     label: 'Comunicação',
     items: [
       { name: 'WhatsApp / Notificações', href: '/dashboard/canais-atendimento', icon: MessageSquare, permission: 'canViewNotifications' as const },
+      { name: 'Chat de IA (site)', href: '/dashboard/chat-widget', icon: MessageSquare, permission: 'canManageSettings' as const },
     ],
   },
   {
@@ -48,6 +50,7 @@ const menuGroups = [
       { name: 'Configurações', href: '/dashboard/settings', icon: Settings },
       { name: 'Segmento', href: '/dashboard/segment-settings', icon: Sliders },
       { name: 'Planos', href: '/dashboard/plans', icon: CreditCard },
+      { name: 'Chaves de API', href: '/dashboard/api-keys', icon: Key, permission: 'canManageSettings' as const },
     ],
   },
 ]
@@ -72,7 +75,7 @@ function MenuItem({ name, href, icon: Icon }: { name: string; href: string; icon
 export default function MaisPage() {
   const { data: session } = useSession()
   const permissions = useUserPermissions()
-  const userPlan = (session?.user as any)?.planType || 'FREEMIUM'
+  const userPlan = (session?.user as any)?.planType || 'BASICO'
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
 
   const getInitials = (name?: string | null) => {

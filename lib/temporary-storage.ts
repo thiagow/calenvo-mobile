@@ -1,7 +1,8 @@
 // Armazenamento temporário em memória para dados do checkout
 // Em produção, usar Redis ou similar
 
-import { SegmentType } from '@prisma/client'
+import { SegmentType, PlanType, Currency } from '@prisma/client'
+import type { BillingInterval } from '@/lib/stripe'
 
 export interface TemporaryData {
   email: string
@@ -11,6 +12,10 @@ export interface TemporaryData {
   segmentType: SegmentType
   phone: string
   customerId: string
+  plan: PlanType
+  billingInterval: BillingInterval
+  currency: Currency
+  locale: string
   timestamp: number
 }
 

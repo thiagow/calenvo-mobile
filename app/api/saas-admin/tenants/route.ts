@@ -2,6 +2,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireSaasAdmin } from '@/lib/saas-admin-guard'
+import bcrypt from 'bcryptjs'
+import { PlanType, SegmentType } from '@prisma/client'
+
+const VALID_PLANS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
+const VALID_INTERVALS = ['MONTHLY', 'ANNUAL']
 
 /**
  * GET /api/saas-admin/tenants
@@ -61,6 +66,7 @@ export async function GET(req: NextRequest) {
                     segmentType: true,
                     planType: true,
                     isActive: true,
+                    isPaymentExempt: true,
                     createdAt: true,
                     stripeCustomerId: true,
                     _count: {
@@ -100,6 +106,131 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json(
             { error: 'Erro ao buscar tenants' },
+            { status: 500 }
+        )
+    }
+}
+
+/**
+ * POST /api/saas-admin/tenants
+ * Cria manualmente um novo tenant (MASTER + profissional master + BusinessConfig)
+ * com isenção de pagamento, sem passar pelo Stripe. Uso: cortesias, parcerias, contas de teste.
+ */
+export async function POST(req: NextRequest) {
+    try {
+        const session = await requireSaasAdmin()
+        const body = await req.json()
+        const { name, email, password, businessName, segmentType, phone, planType, billingInterval } = body
+
+        if (!name || !email || !password || !businessName || !phone || !segmentType) {
+            return NextResponse.json(
+                { error: 'Todos os campos são obrigatórios' },
+                { status: 400 }
+            )
+        }
+
+        if (!VALID_PLANS.includes(planType)) {
+            return NextResponse.json({ error: 'Plano inválido' }, { status: 400 })
+        }
+
+        if (!VALID_INTERVALS.includes(billingInterval)) {
+            return NextResponse.json({ error: 'Intervalo de cobrança inválido' }, { status: 400 })
+        }
+
+        const existingUser = await prisma.user.findUnique({
+            where: { email_role: { email, role: 'MASTER' } }
+        })
+
+        if (existingUser) {
+            return NextResponse.json(
+                { error: 'Este e-mail já está cadastrado' },
+                { status: 400 }
+            )
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12)
+
+        const { user, professional } = await prisma.$transaction(async (tx) => {
+            const user = await tx.user.create({
+                data: {
+                    email,
+                    password: hashedPassword,
+                    name,
+                    businessName,
+                    segmentType: segmentType as SegmentType,
+                    phone,
+                    planType: planType as PlanType,
+                    billingInterval,
+                    isPaymentExempt: true,
+                    role: 'MASTER',
+                }
+            })
+
+            const professional = await tx.user.create({
+                data: {
+                    email,
+                    password: hashedPassword,
+                    name,
+                    businessName,
+                    segmentType: segmentType as SegmentType,
+                    phone,
+                    whatsapp: phone,
+                    role: 'PROFESSIONAL',
+                    masterId: user.id,
+                    isActive: true,
+                    planType: planType as PlanType,
+                    billingInterval,
+                    isPaymentExempt: true,
+                }
+            })
+
+            await tx.businessConfig.create({
+                data: {
+                    userId: user.id,
+                    workingDays: [1, 2, 3, 4, 5],
+                    startTime: '08:00',
+                    endTime: '18:00',
+                    defaultDuration: 30,
+                    lunchStart: '12:00',
+                    lunchEnd: '13:00',
+                    multipleServices: false,
+                    requiresDeposit: false,
+                    cancellationHours: 24
+                }
+            })
+
+            return { user, professional }
+        })
+
+        await prisma.adminAuditLog.create({
+            data: {
+                action: 'TENANT_CREATED_PAYMENT_EXEMPT',
+                adminId: (session.user as any).id,
+                targetId: user.id,
+                details: {
+                    tenantEmail: user.email,
+                    tenantName: user.name,
+                    planType,
+                    billingInterval
+                },
+                ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
+            }
+        })
+
+        return NextResponse.json({ success: true, tenant: { id: user.id, professionalId: professional.id } }, { status: 201 })
+    } catch (error: any) {
+        console.error('Error creating exempt tenant:', error)
+
+        if (error.message === 'UNAUTHORIZED') {
+            return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+        }
+
+        if (error.message === 'FORBIDDEN') {
+            return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
+        }
+
+        return NextResponse.json(
+            { error: 'Erro ao criar tenant' },
             { status: 500 }
         )
     }
