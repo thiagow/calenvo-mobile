@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding, CalendarDays, Bell, TrendingUp } from 'lucide-react'
+import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding, CalendarDays, Bell, TrendingUp, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -9,10 +9,12 @@ import { PLAN_CONFIGS, getPlanPrice, type Currency } from '@/lib/types'
 import { formatCurrencyByCurrency } from '@/lib/utils'
 import { LogoIcon } from '@/components/brand/logo'
 import { LanguageSwitcher } from '@/components/brand/language-switcher'
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetTitle } from '@/components/ui/sheet'
 
 export default function LandingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const t = useTranslations('Landing')
   const locale = useLocale()
   const currency: Currency = locale === 'en' ? 'USD' : 'BRL'
@@ -61,8 +63,8 @@ export default function LandingPage() {
               </a>
             </nav>
 
-            {/* Right Actions */}
-            <div className="flex items-center space-x-4">
+            {/* Right Actions — desktop */}
+            <div className="hidden md:flex items-center space-x-4">
               <LanguageSwitcher />
               <Link href="/login">
                 <Button variant="ghost" className="text-white hover:text-violet-100 font-medium">
@@ -74,6 +76,77 @@ export default function LandingPage() {
                   {t('nav.contratarPlano')}
                 </Button>
               </Link>
+            </div>
+
+            {/* Right Actions — mobile */}
+            <div className="flex md:hidden items-center gap-2 flex-shrink-0">
+              <Link href="#pricing">
+                <Button size="sm" className="bg-[#EDE9FE] hover:bg-violet-200 text-[#7C3AED] font-semibold px-4">
+                  {t('nav.contratarPlano')}
+                </Button>
+              </Link>
+              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Abrir menu"
+                    className="flex items-center justify-center h-10 w-10 rounded-full text-white hover:bg-white/10 transition-colors flex-shrink-0"
+                  >
+                    <Menu className="h-6 w-6" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="flex flex-col gap-6">
+                  <SheetTitle className="flex items-center gap-2">
+                    <LogoIcon size={32} gradientId="calenvo_grad_mobile_menu" />
+                    <span className="text-lg font-bold text-gray-900">Calenvo</span>
+                  </SheetTitle>
+
+                  <nav className="flex flex-col gap-1">
+                    <SheetClose asChild>
+                      <a href="#funcionalidades" className="px-2 py-3 text-gray-700 hover:text-violet-600 font-medium border-b border-gray-100">
+                        {t('nav.funcionalidades')}
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#pricing" className="px-2 py-3 text-gray-700 hover:text-violet-600 font-medium border-b border-gray-100">
+                        {t('nav.planos')}
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#testimonials" className="px-2 py-3 text-gray-700 hover:text-violet-600 font-medium border-b border-gray-100">
+                        {t('nav.depoimentos')}
+                      </a>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <a href="#faq" className="px-2 py-3 text-gray-700 hover:text-violet-600 font-medium border-b border-gray-100">
+                        {t('nav.faq')}
+                      </a>
+                    </SheetClose>
+                  </nav>
+
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-sm text-gray-500">Idioma</span>
+                    <LanguageSwitcher buttonClassName="text-gray-700 hover:text-violet-600" />
+                  </div>
+
+                  <div className="flex flex-col gap-3 mt-auto">
+                    <SheetClose asChild>
+                      <Link href="/login" className="w-full">
+                        <Button variant="outline" className="w-full border-gray-200 text-gray-900 hover:bg-gray-50 font-medium">
+                          {t('nav.entrar')}
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                    <SheetClose asChild>
+                      <Link href="#pricing" className="w-full">
+                        <Button className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold">
+                          {t('nav.contratarPlano')}
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>

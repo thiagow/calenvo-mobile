@@ -9,9 +9,10 @@ const LOCALES = ['pt', 'en'] as const
 
 interface LanguageSwitcherProps {
   className?: string
+  buttonClassName?: string
 }
 
-export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({ className, buttonClassName }: LanguageSwitcherProps) {
   const t = useTranslations('LanguageSwitcher')
   const locale = useLocale()
   const pathname = usePathname()
@@ -28,7 +29,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-1.5 text-sm font-medium text-white hover:text-violet-100"
+        className={`flex items-center gap-1.5 text-sm font-medium ${buttonClassName || 'text-white hover:text-violet-100'}`}
       >
         <Globe className="h-4 w-4" />
         {locale === 'en' ? 'EN' : 'PT'}
