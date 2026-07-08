@@ -29,12 +29,6 @@ export default function LoginPage() {
             </CardHeader>
             <CardContent>
               <LoginForm />
-              <div className="mt-6 text-center text-sm text-gray-600">
-                Não tem uma conta?{' '}
-                <Link href="/signup" className="text-violet-600 hover:text-violet-700 font-medium">
-                  Cadastre-se gratuitamente
-                </Link>
-              </div>
             </CardContent>
           </Card>
         </div>
