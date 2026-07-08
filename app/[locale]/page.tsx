@@ -243,7 +243,7 @@ export default function LandingPage() {
       </section>
 
       {/* Segments */}
-      <section className="py-14 bg-white">
+      <section id="segmentos" className="py-14 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
@@ -603,7 +603,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12 border-t border-gray-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <LogoIcon gradientId="calenvo_grad_footer" />
@@ -616,15 +616,22 @@ export default function LandingPage() {
             <div>
               <h3 className="font-semibold text-white mb-4">{t('footer.productTitle')}</h3>
               <ul className="space-y-2 text-sm">
-                <li>{t('footer.productLink1')}</li>
-                <li>{t('footer.productLink2')}</li>
-                <li>{t('footer.productLink3')}</li>
-                <li>{t('footer.productLink4')}</li>
+                <li>
+                  <a href="#funcionalidades" className="hover:text-white transition-colors">
+                    {t('footer.productLink1')}
+                  </a>
+                </li>
+                <li>
+                  <a href="#segmentos" className="hover:text-white transition-colors">
+                    {t('footer.productLink2')}
+                  </a>
+                </li>
+                <li>
+                  <a href="#pricing" className="hover:text-white transition-colors">
+                    {t('footer.productLink3')}
+                  </a>
+                </li>
               </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-white mb-4">{t('footer.contactTitle')}</h3>
-              <p className="text-sm">contato@calenvo.com.br</p>
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
