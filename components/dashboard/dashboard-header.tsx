@@ -1,11 +1,11 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { NotificationBell } from '@/components/notifications/notification-bell'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { LogoIcon } from '@/components/brand/logo'
 import { PLAN_CONFIGS } from '@/lib/types'
 
 interface DashboardHeaderProps {
@@ -35,8 +35,8 @@ export function DashboardHeader({ sessionData }: DashboardHeaderProps) {
       <div className="flex items-center justify-between px-4 h-14">
         {/* Logo + nome do negócio */}
         <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
-          <div className="relative h-7 w-7 flex-shrink-0">
-            <Image src="/calenvo-logo.png" alt="Calenvo" fill className="object-contain" />
+          <div className="flex-shrink-0">
+            <LogoIcon size={28} gradientId="dashboard-header-logo" />
           </div>
           <span className="font-semibold text-sm truncate max-w-[140px]">
             {sessionData?.user?.businessName || 'Calenvo'}

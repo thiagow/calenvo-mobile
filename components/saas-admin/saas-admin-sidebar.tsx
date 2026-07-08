@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { LogoIcon } from '@/components/brand/logo'
 import {
     Home,
     Users,
@@ -61,14 +61,7 @@ export function SaasAdminSidebar() {
                     {/* Logo */}
                     <div className="flex h-16 items-center justify-center border-b border-border">
                         <Link href="/saas-admin" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-                            <div className="relative h-10 w-10">
-                                <Image
-                                    src="/calenvo-logo.png"
-                                    alt="Calenvo"
-                                    fill
-                                    className="object-contain"
-                                />
-                            </div>
+                            <LogoIcon size={40} gradientId="saas-admin-sidebar-logo" />
                             <div>
                                 <span className="text-xl calenvo-gradient">Calenvo</span>
                                 <span className="block text-xs text-muted-foreground">SaaS Admin</span>
