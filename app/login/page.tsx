@@ -3,7 +3,7 @@ import { LoginForm } from '@/components/auth/login-form'
 import { CookieCleaner } from '@/components/auth/cookie-cleaner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import Image from 'next/image'
+import { LogoIcon } from '@/components/brand/logo'
 
 export default function LoginPage() {
   return (
@@ -13,15 +13,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <Link href="/" className="inline-flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <div className="relative h-10 w-10">
-                <Image
-                  src="/calenvo-logo.png"
-                  alt="Calenvo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
+              <LogoIcon size={40} gradientId="login-logo" />
               <span className="text-2xl calenvo-gradient">Calenvo</span>
             </Link>
             <h1 className="text-2xl font-bold text-gray-900 mt-4">Bem-vindo de volta</h1>
