@@ -79,12 +79,8 @@ export default function LandingPage() {
             </div>
 
             {/* Right Actions — mobile */}
-            <div className="flex md:hidden items-center gap-2 flex-shrink-0">
-              <Link href="#pricing">
-                <Button size="sm" className="bg-[#EDE9FE] hover:bg-violet-200 text-[#7C3AED] font-semibold px-4">
-                  {t('nav.contratarPlano')}
-                </Button>
-              </Link>
+            <div className="flex md:hidden items-center gap-3 flex-shrink-0">
+              <LanguageSwitcher />
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <button
@@ -123,11 +119,6 @@ export default function LandingPage() {
                       </a>
                     </SheetClose>
                   </nav>
-
-                  <div className="flex items-center justify-between px-2">
-                    <span className="text-sm text-gray-500">Idioma</span>
-                    <LanguageSwitcher buttonClassName="text-gray-700 hover:text-violet-600" />
-                  </div>
 
                   <div className="flex flex-col gap-3 mt-auto">
                     <SheetClose asChild>
@@ -172,7 +163,7 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link href="#pricing">
-                  <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-8 py-6 rounded-full text-base">
+                  <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-10 py-7 rounded-full text-lg">
                     {t('hero.ctaPrimary')}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
