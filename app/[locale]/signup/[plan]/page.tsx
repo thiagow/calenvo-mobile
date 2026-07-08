@@ -56,7 +56,9 @@ export default async function SignupPlanPage({ params, searchParams }: SignupPla
             <Logo />
           </Link>
           <Link href="/login">
-            <Button variant="outline">{t('alreadyHaveAccount')}</Button>
+            <Button variant="outline" className="border-gray-200 bg-white text-gray-900 hover:bg-gray-50">
+              {t('alreadyHaveAccount')}
+            </Button>
           </Link>
         </div>
       </header>
@@ -65,7 +67,7 @@ export default async function SignupPlanPage({ params, searchParams }: SignupPla
       <main className="flex-1 container mx-auto px-4 py-8">
         {canceled && (
           <div className="max-w-2xl mx-auto mb-6">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-yellow-800">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-yellow-800">
               <p className="font-medium">{t('canceledTitle')}</p>
               <p className="text-sm mt-1">{t('canceledSubtitle')}</p>
             </div>
@@ -75,10 +77,13 @@ export default async function SignupPlanPage({ params, searchParams }: SignupPla
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
           {/* Formulário */}
           <div>
-            <Card>
+            <Card className="bg-white border border-gray-200 rounded-3xl shadow-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">{t('formTitle', { plan: planName })}</CardTitle>
-                <CardDescription>
+                <span className="inline-flex items-center gap-2 mb-2 px-4 py-1.5 bg-violet-100 text-violet-600 rounded-full text-xs font-medium w-fit">
+                  {planName}
+                </span>
+                <CardTitle className="text-2xl font-bold text-gray-900">{t('formTitle', { plan: planName })}</CardTitle>
+                <CardDescription className="text-gray-600">
                   {t('formSubtitle')}
                 </CardDescription>
               </CardHeader>
@@ -90,14 +95,14 @@ export default async function SignupPlanPage({ params, searchParams }: SignupPla
 
           {/* Resumo do Plano */}
           <div>
-            <Card className="sticky top-24">
+            <Card className="sticky top-24 bg-white border border-gray-200 rounded-3xl shadow-sm">
               <CardHeader>
-                <CardTitle className="text-2xl">{t('summaryTitle', { plan: planName })}</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-2xl font-bold text-gray-900">{t('summaryTitle', { plan: planName })}</CardTitle>
+                <CardDescription className="text-gray-600">
                   {interval === 'ANNUAL' ? t('billedAnnual') : t('billedMonthly')}
                 </CardDescription>
                 <div className="pt-4">
-                  <div className="text-4xl font-bold text-[#7C3AED]">{formatCurrencyByCurrency(price, currency)}</div>
+                  <div className="text-4xl font-bold text-violet-600">{formatCurrencyByCurrency(price, currency)}</div>
                   <p className="text-sm text-gray-600 mt-1">{t('perMonth')}</p>
                 </div>
               </CardHeader>
@@ -113,8 +118,8 @@ export default async function SignupPlanPage({ params, searchParams }: SignupPla
                     ))}
                   </ul>
 
-                  <div className="pt-6 border-t">
-                    <div className="bg-violet-50 rounded-lg p-4">
+                  <div className="pt-6 border-t border-gray-200">
+                    <div className="bg-violet-50 rounded-2xl p-4">
                       <p className="text-sm text-violet-900 font-medium">
                         {t('secureBadgeTitle')}
                       </p>

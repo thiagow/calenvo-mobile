@@ -67,7 +67,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">{t('fieldName')}</Label>
+        <Label htmlFor="name" className="text-gray-700">{t('fieldName')}</Label>
         <div className="relative">
           <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -76,14 +76,14 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             placeholder={t('fieldNamePlaceholder')}
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">{t('fieldEmail')}</Label>
+        <Label htmlFor="email" className="text-gray-700">{t('fieldEmail')}</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -92,14 +92,14 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             placeholder={t('fieldEmailPlaceholder')}
             value={formData.email}
             onChange={(e) => handleChange('email', e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">{t('fieldPassword')}</Label>
+        <Label htmlFor="password" className="text-gray-700">{t('fieldPassword')}</Label>
         <div className="relative">
           <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -108,7 +108,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             placeholder={t('fieldPasswordPlaceholder')}
             value={formData.password}
             onChange={(e) => handleChange('password', e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
             minLength={6}
           />
@@ -116,7 +116,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="businessName">{t('fieldBusinessName')}</Label>
+        <Label htmlFor="businessName" className="text-gray-700">{t('fieldBusinessName')}</Label>
         <div className="relative">
           <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -125,26 +125,30 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             placeholder={t('fieldBusinessNamePlaceholder')}
             value={formData.businessName}
             onChange={(e) => handleChange('businessName', e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="segmentType">{t('fieldSegment')}</Label>
+        <Label htmlFor="segmentType" className="text-gray-700">{t('fieldSegment')}</Label>
         <div className="relative">
           <Briefcase className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
           <Select
             value={formData.segmentType}
             onValueChange={(value) => handleChange('segmentType', value)}
           >
-            <SelectTrigger className="pl-10">
+            <SelectTrigger className="pl-10 bg-white border-gray-200 text-gray-900">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white border-gray-200">
               {AVAILABLE_SEGMENTS.map((segment) => (
-                <SelectItem key={segment.value} value={segment.value}>
+                <SelectItem
+                  key={segment.value}
+                  value={segment.value}
+                  className="text-gray-900 focus:bg-violet-50 focus:text-violet-900"
+                >
                   {tSegments(segment.value)}
                 </SelectItem>
               ))}
@@ -154,7 +158,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phone">{t('fieldPhone')}</Label>
+        <Label htmlFor="phone" className="text-gray-700">{t('fieldPhone')}</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
           <Input
@@ -163,7 +167,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             placeholder={t('fieldPhonePlaceholder')}
             value={formData.phone}
             onChange={(e) => handleChange('phone', e.target.value)}
-            className="pl-10"
+            className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
           />
         </div>
@@ -171,7 +175,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
 
       <Button
         type="submit"
-        className="w-full bg-[#7C3AED] hover:bg-violet-700 text-white text-lg py-6"
+        className="w-full bg-violet-600 hover:bg-violet-700 text-white text-lg py-6 rounded-xl"
         disabled={loading}
       >
         {loading ? (
