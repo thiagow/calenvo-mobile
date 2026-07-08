@@ -162,13 +162,13 @@ export default function LandingPage() {
                 {t('hero.description')}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Link href="#pricing">
-                  <Button className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-10 py-7 rounded-full text-lg">
+                <Link href="#pricing" className="w-full sm:w-auto">
+                  <Button className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold px-10 py-7 rounded-full text-lg">
                     {t('hero.ctaPrimary')}
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Button variant="outline" className="font-semibold px-8 py-6 rounded-full text-base border-gray-300">
+                <Button variant="outline" className="w-full sm:w-auto font-semibold px-8 py-6 rounded-full text-base border-gray-300">
                   {t('hero.ctaSecondary')}
                 </Button>
               </div>
