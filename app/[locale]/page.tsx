@@ -67,7 +67,7 @@ export default function LandingPage() {
             <div className="hidden md:flex items-center space-x-4">
               <LanguageSwitcher />
               <Link href="/login">
-                <Button variant="ghost" className="text-white hover:text-violet-100 font-medium">
+                <Button variant="ghost" className="text-white hover:text-white hover:bg-white/10 font-medium">
                   {t('nav.entrar')}
                 </Button>
               </Link>
