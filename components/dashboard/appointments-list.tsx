@@ -275,8 +275,8 @@ export function AppointmentsList() {
                   >
                     <div className="flex items-center space-x-4">
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <User className="h-5 w-5 text-blue-600" />
+                        <div className="w-10 h-10 bg-violet-100 rounded-full flex items-center justify-center">
+                          <User className="h-5 w-5 text-violet-600" />
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">

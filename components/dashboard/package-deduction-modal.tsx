@@ -34,7 +34,7 @@ export function PackageDeductionModal({ isOpen, onOpenChange, onConfirm }: Packa
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Package className="h-5 w-5 text-blue-600" />
+                        <Package className="h-5 w-5 text-violet-600" />
                         Confirmar Presença
                     </DialogTitle>
                     <DialogDescription>
@@ -43,8 +43,8 @@ export function PackageDeductionModal({ isOpen, onOpenChange, onConfirm }: Packa
                 </DialogHeader>
 
                 <div className="py-4">
-                    <p className="text-sm text-gray-700 bg-blue-50 p-4 rounded-md border border-blue-100">
-                        <strong className="block mb-1 text-blue-800">Detecção Automática de Pacotes</strong>
+                    <p className="text-sm text-gray-700 bg-violet-50 p-4 rounded-md border border-violet-100">
+                        <strong className="block mb-1 text-violet-800">Detecção Automática de Pacotes</strong>
                         Se o cliente possuir um pacote ativo que englobe este serviço, a sessão será abatida automaticamente de forma transparente.
                     </p>
                 </div>

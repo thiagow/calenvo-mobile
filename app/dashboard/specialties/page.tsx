@@ -205,7 +205,7 @@ export default function SpecialtiesPage() {
             Gerencie as especialidades médicas da sua clínica
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => handleOpenDialog()} className="bg-violet-600 hover:bg-violet-700">
           <Plus className="mr-2 h-4 w-4" />
           Nova Especialidade
         </Button>
@@ -301,7 +301,7 @@ export default function SpecialtiesPage() {
                 : 'Comece adicionando uma nova especialidade'}
             </p>
             {!searchTerm && (
-              <Button onClick={() => handleOpenDialog()} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => handleOpenDialog()} className="bg-violet-600 hover:bg-violet-700">
                 <Plus className="mr-2 h-4 w-4" />
                 Adicionar Especialidade
               </Button>
@@ -374,7 +374,7 @@ export default function SpecialtiesPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSave} className="bg-violet-600 hover:bg-violet-700">
               {editingSpecialty ? 'Atualizar' : 'Cadastrar'}
             </Button>
           </DialogFooter>

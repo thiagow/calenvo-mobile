@@ -164,7 +164,7 @@ export default function ClientHistoryPage() {
         return (
             <div className="p-6">
                 <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
                 </div>
             </div>
         )
@@ -242,7 +242,7 @@ export default function ClientHistoryPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
                     <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold text-blue-600">{total}</div>
+                        <div className="text-2xl font-bold text-violet-600">{total}</div>
                         <div className="text-xs text-gray-500">Total</div>
                     </CardContent>
                 </Card>

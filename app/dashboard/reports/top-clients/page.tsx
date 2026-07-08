@@ -141,7 +141,7 @@ export default function TopClientsPage() {
 
                         {/* Badge do período */}
                         {periodInfo && (
-                            <Badge className="bg-blue-600 text-white px-4 py-2">
+                            <Badge className="bg-violet-600 text-white px-4 py-2">
                                 <Calendar className="mr-2 h-4 w-4" />
                                 {periodInfo.label}
                             </Badge>
@@ -154,7 +154,7 @@ export default function TopClientsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center">
-                        <TrendingUp className="mr-2 h-5 w-5 text-blue-600" />
+                        <TrendingUp className="mr-2 h-5 w-5 text-violet-600" />
                         Ranking de Clientes
                     </CardTitle>
                     <CardDescription>
@@ -164,7 +164,7 @@ export default function TopClientsPage() {
                 <CardContent>
                     {loading ? (
                         <div className="flex items-center justify-center py-12">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
                         </div>
                     ) : topClients.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">
@@ -206,7 +206,7 @@ export default function TopClientsPage() {
                                                         ? 'bg-gray-100 text-gray-700 border-gray-300'
                                                         : index === 2
                                                             ? 'bg-orange-50 text-orange-700 border-orange-300'
-                                                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                            : 'bg-violet-50 text-violet-700 border-violet-200'
                                             }
                                         >
                                             {index + 1}º

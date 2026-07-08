@@ -63,16 +63,16 @@ export default async function PackagesReport() {
         <div className="space-y-6">
             {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="border-blue-100 bg-blue-50/50">
+                <Card className="border-violet-100 bg-violet-50/50">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-blue-800">
+                        <CardTitle className="text-sm font-medium text-violet-800">
                             Pacotes Ativos
                         </CardTitle>
-                        <Package className="h-4 w-4 text-blue-600" />
+                        <Package className="h-4 w-4 text-violet-600" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-blue-900">{totalPackages}</div>
-                        <p className="text-xs text-blue-600 mt-1">Vendidos em andamento</p>
+                        <div className="text-2xl font-bold text-violet-900">{totalPackages}</div>
+                        <p className="text-xs text-violet-600 mt-1">Vendidos em andamento</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -152,7 +152,7 @@ export default async function PackagesReport() {
                                                     <div className="text-xs text-gray-500">{pkg.client.phone}</div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium text-blue-700">{pkg.name}</div>
+                                                    <div className="font-medium text-violet-700">{pkg.name}</div>
                                                     {pkg.price !== null && (
                                                         <div className="text-xs text-green-600 font-medium">R$ {parseFloat(pkg.price.toString()).toFixed(2)}</div>
                                                     )}
@@ -164,7 +164,7 @@ export default async function PackagesReport() {
                                                             <span className="text-gray-500">{pkgUsed} de {pkgTotal}</span>
                                                         </div>
                                                         <div className="w-full bg-gray-200 rounded-full h-1.5">
-                                                            <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${pkgPct}%` }}></div>
+                                                            <div className="bg-violet-600 h-1.5 rounded-full" style={{ width: `${pkgPct}%` }}></div>
                                                         </div>
                                                     </div>
                                                 </td>

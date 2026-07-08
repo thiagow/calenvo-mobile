@@ -29,7 +29,7 @@ export default function ReportsLayout({
                         Análise detalhada do desempenho dos seus agendamentos e clientes
                     </p>
                 </div>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                <Badge variant="outline" className="bg-violet-100 text-violet-600 border-violet-200">
                     <BarChart3 className="mr-1 h-3 w-3" />
                     Métricas
                 </Badge>

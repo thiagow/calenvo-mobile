@@ -68,7 +68,7 @@ export default function SegmentSettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
       </div>
     )
   }
@@ -93,10 +93,10 @@ export default function SegmentSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-blue-900">Tipo Atual:</span>
-              <Badge className="bg-blue-600">
+              <span className="text-sm font-medium text-violet-900">Tipo Atual:</span>
+              <Badge className="bg-violet-600">
                 {availableSegments.find(s => s.value === currentSegmentType)?.label || 'Não definido'}
               </Badge>
             </div>
@@ -120,8 +120,8 @@ export default function SegmentSettingsPage() {
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-blue-200">
-              <span className="text-xs font-medium text-blue-900 mb-2 block">Campos Visíveis:</span>
+            <div className="mt-4 pt-3 border-t border-violet-200">
+              <span className="text-xs font-medium text-violet-900 mb-2 block">Campos Visíveis:</span>
               <div className="flex flex-wrap gap-2">
                 {currentConfig.fields.showInsurance && (
                   <Badge variant="outline" className="text-xs">Convênio</Badge>
@@ -209,7 +209,7 @@ export default function SegmentSettingsPage() {
             <Button 
               onClick={handleSave}
               disabled={saving || !selectedSegment || selectedSegment === currentSegmentType}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-violet-600 hover:bg-violet-700"
             >
               {saving ? (
                 <>

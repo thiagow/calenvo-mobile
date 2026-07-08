@@ -88,17 +88,17 @@ export default function PlansPage() {
       </div>
 
       {/* Current Plan Status */}
-      <Card className="border-blue-200 bg-blue-50">
+      <Card className="border-violet-200 bg-violet-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-900">
-            <Zap className="h-5 w-5 text-blue-600 mr-2" />
+            <Zap className="h-5 w-5 text-violet-600 mr-2" />
             Status do Plano Atual
           </CardTitle>
         </CardHeader>
         <CardContent>
           {usageLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
             </div>
           ) : usageData ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -143,9 +143,9 @@ export default function PlansPage() {
           const isUpgrade = PLAN_ORDER.indexOf(planId) > PLAN_ORDER.indexOf(currentPlan)
 
           return (
-            <Card key={planId} className={`relative ${isCurrent ? 'border-blue-500 shadow-lg' : ''} ${planId === 'PRO' ? 'scale-105' : ''}`}>
+            <Card key={planId} className={`relative ${isCurrent ? 'border-violet-500 shadow-lg' : ''} ${planId === 'PRO' ? 'scale-105' : ''}`}>
               {isCurrent && (
-                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-500">
+                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-violet-500">
                   Plano Atual
                 </Badge>
               )}
@@ -189,7 +189,7 @@ export default function PlansPage() {
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button
-                        className={`w-full ${planId === 'PRO' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                        className={`w-full ${planId === 'PRO' ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
                         variant={planId === 'PRO' ? 'default' : 'outline'}
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
@@ -203,11 +203,11 @@ export default function PlansPage() {
                         </DialogTitle>
                       </DialogHeader>
                       <div className="space-y-4">
-                        <div className="text-center p-6 bg-blue-50 rounded-lg">
+                        <div className="text-center p-6 bg-violet-50 rounded-lg">
                           <h3 className="text-lg font-semibold mb-2">
                             {config.name}
                           </h3>
-                          <div className="text-3xl font-bold text-blue-600 mb-2">
+                          <div className="text-3xl font-bold text-violet-600 mb-2">
                             {formatCurrency(config.priceMonthly)}
                             <span className="text-sm font-normal text-gray-600">/mês</span>
                           </div>
@@ -233,7 +233,7 @@ export default function PlansPage() {
                             Cancelar
                           </Button>
                           <Button
-                            className="flex-1 bg-blue-600 hover:bg-blue-700"
+                            className="flex-1 bg-violet-600 hover:bg-violet-700"
                             onClick={() => handleUpgrade(planId)}
                             disabled={loading === planId}
                           >

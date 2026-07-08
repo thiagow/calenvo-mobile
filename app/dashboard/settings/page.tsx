@@ -154,8 +154,8 @@ export default function SettingsPage() {
 
   if (isProfessional) return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-        <Info className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+      <div className="flex items-start gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
+        <Info className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
         <div>
           <p className="text-sm font-medium">Visualização limitada</p>
           <p className="text-xs text-muted-foreground mt-0.5">Apenas o admin pode alterar configurações do negócio.</p>

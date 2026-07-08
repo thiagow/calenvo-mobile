@@ -198,7 +198,7 @@ export default function EditSchedulePage() {
   if (status === 'loading' || loadingData) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
       </div>
     )
   }
@@ -326,7 +326,7 @@ export default function EditSchedulePage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
+                  <Users className="h-5 w-5 text-violet-600" />
                   <div>
                     <CardTitle>Profissionais</CardTitle>
                     <CardDescription>Selecione os profissionais que terão acesso a esta agenda</CardDescription>
@@ -431,7 +431,7 @@ export default function EditSchedulePage() {
               <Button type="button" variant="outline" onClick={() => router.back()}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
+              <Button type="submit" disabled={loading} className="bg-violet-600 hover:bg-violet-700">
                 {loading ? 'Salvando...' : (
                   <>
                     <Save className="h-4 w-4 mr-2" />

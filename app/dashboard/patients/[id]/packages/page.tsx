@@ -176,7 +176,7 @@ export default function ClientPackagesPage() {
     if (loading && !client) {
         return (
             <div className="p-6 flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
             </div>
         )
     }
@@ -217,7 +217,7 @@ export default function ClientPackagesPage() {
                     }
                 }}>
                     <DialogTrigger asChild>
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button className="bg-violet-600 hover:bg-violet-700 text-white">
                             <Plus className="h-4 w-4 mr-2" />
                             Vincular Pacote
                         </Button>
@@ -264,7 +264,7 @@ export default function ClientPackagesPage() {
                                                     {tmpl.items.map(i => (
                                                         <li key={i.id} className="flex justify-between text-gray-700">
                                                             <span>{i.service.name}</span>
-                                                            <span className="font-semibold text-blue-600">{i.totalSessions}x</span>
+                                                            <span className="font-semibold text-violet-600">{i.totalSessions}x</span>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -286,7 +286,7 @@ export default function ClientPackagesPage() {
                         )}
                         <div className="flex justify-end gap-3 pt-2">
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreatePackage} disabled={isSubmitting || templates.length === 0 || !selectedTemplateId}>
+                            <Button className="bg-violet-600 hover:bg-violet-700 text-white" onClick={handleCreatePackage} disabled={isSubmitting || templates.length === 0 || !selectedTemplateId}>
                                 {isSubmitting ? 'Processando venda...' : 'Confirmar Venda'}
                             </Button>
                         </div>
@@ -303,7 +303,7 @@ export default function ClientPackagesPage() {
                     </div>
                 )}
                 {packages.map(pkg => (
-                    <Card key={pkg.id} className={`transition-all hover:shadow-md ${pkg.status !== 'ACTIVE' ? 'opacity-80 bg-gray-50/50' : 'border-blue-100'}`}>
+                    <Card key={pkg.id} className={`transition-all hover:shadow-md ${pkg.status !== 'ACTIVE' ? 'opacity-80 bg-gray-50/50' : 'border-violet-100'}`}>
                         <CardHeader className="pb-3 border-b bg-gray-50/50">
                             <div className="flex justify-between items-start gap-2">
                                 <div>

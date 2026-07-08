@@ -109,15 +109,15 @@ export default function LTVPage() {
                             </CardContent>
                         </Card>
 
-                        <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-blue-600">
+                        <Card className="hover:shadow-lg transition-shadow duration-200 border-l-4 border-l-violet-600">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium text-gray-600">
                                     Ticket Médio
                                 </CardTitle>
-                                <ShoppingCart className="h-4 w-4 text-blue-600" />
+                                <ShoppingCart className="h-4 w-4 text-violet-600" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-blue-600">
+                                <div className="text-2xl font-bold text-violet-600">
                                     {formatCurrency(globalStats.averageTicket)}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
@@ -198,7 +198,7 @@ export default function LTVPage() {
                                                             ? 'bg-gray-100 text-gray-700 border-gray-300'
                                                             : index === 2
                                                                 ? 'bg-orange-50 text-orange-700 border-orange-300'
-                                                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                : 'bg-violet-50 text-violet-700 border-violet-200'
                                                         }`}
                                                 >
                                                     {index + 1}º
@@ -221,7 +221,7 @@ export default function LTVPage() {
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-600 mb-1">Ticket Médio</p>
-                                                    <p className="text-sm font-bold text-blue-600">
+                                                    <p className="text-sm font-bold text-violet-600">
                                                         {formatCurrency(client.averageTicket)}
                                                     </p>
                                                 </div>

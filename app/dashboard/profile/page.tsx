@@ -17,7 +17,7 @@ export default function ProfilePage() {
   if (status === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
       </div>
     )
   }
@@ -43,7 +43,7 @@ export default function ProfilePage() {
             Informações da sua conta e configurações pessoais
           </p>
         </div>
-        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+        <Badge variant="outline" className="bg-violet-100 text-violet-600 border-violet-200">
           <Crown className="mr-1 h-3 w-3" />
           {planConfig?.name}
         </Badge>
@@ -54,7 +54,7 @@ export default function ProfilePage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <User className="mr-2 h-5 w-5 text-blue-600" />
+              <User className="mr-2 h-5 w-5 text-violet-600" />
               Informações Pessoais
             </CardTitle>
             <CardDescription>
@@ -108,12 +108,12 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+            <div className="p-4 rounded-lg bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-semibold text-gray-900">
                   Plano {planConfig?.name}
                 </h3>
-                <Badge className="bg-blue-600">
+                <Badge className="bg-violet-600">
                   {`R$ ${planConfig?.priceMonthly?.toFixed(2)}/mês`}
                 </Badge>
               </div>
@@ -121,7 +121,7 @@ export default function ProfilePage() {
               <ul className="space-y-2 text-sm text-gray-700">
                 {planConfig?.features.map((feature, index) => (
                   <li key={index} className="flex items-center">
-                    <span className="w-1 h-1 bg-blue-600 rounded-full mr-2"></span>
+                    <span className="w-1 h-1 bg-violet-600 rounded-full mr-2"></span>
                     {feature}
                   </li>
                 ))}

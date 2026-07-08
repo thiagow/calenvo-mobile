@@ -229,7 +229,7 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
       <NotificationCard
         title="Confirmação de Presença"
         description="Enviada alguns dias antes do agendamento"
-        icon={<Bell className="h-5 w-5 text-blue-600" />}
+        icon={<Bell className="h-5 w-5 text-violet-600" />}
         enabled={notifyConfirmation}
         onEnabledChange={setNotifyConfirmation}
         message={confirmationMessage}

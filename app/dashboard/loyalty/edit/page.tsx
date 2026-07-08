@@ -196,9 +196,9 @@ export default function LoyaltyEditPage() {
                         </div>
 
                         {/* Preview da Regra */}
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                            <p className="text-sm font-medium text-blue-800">📋 Resumo da Regra:</p>
-                            <p className="text-sm text-blue-700 mt-1">
+                        <div className="p-4 bg-violet-50 rounded-lg border border-violet-200">
+                            <p className="text-sm font-medium text-violet-800">📋 Resumo da Regra:</p>
+                            <p className="text-sm text-violet-700 mt-1">
                                 {form.mode === 'FREQUENCY'
                                     ? `A cada agendamento concluído, o cliente ganha 1 ponto. Ao acumular ${form.pointsToReward} pontos, poderá resgatar um desconto de R$ ${form.rewardValue.toFixed(2)}.`
                                     : `A cada R$ 1,00 gasto, o cliente ganha ${form.pointsPerCurrency} ponto(s). Ao acumular ${form.pointsToReward} pontos, poderá resgatar um desconto de R$ ${form.rewardValue.toFixed(2)}.`
