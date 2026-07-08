@@ -4,8 +4,8 @@
   "description": "Sistema de agendamento para pequenos empreendedores",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#FAFAFF",
+  "theme_color": "#FAFAFF",
   "orientation": "portrait",
   "icons": [
     {
