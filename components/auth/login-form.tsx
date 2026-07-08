@@ -74,7 +74,7 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-2xl">
           {error}
           {error.includes('inválidos') && (
             <div className="mt-2 text-xs">
@@ -87,34 +87,36 @@ export function LoginForm() {
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email" className="text-gray-700">Email</Label>
         <Input
           id="email"
           type="email"
           placeholder="seu@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
           required
           disabled={isLoading}
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Senha</Label>
+        <Label htmlFor="password" className="text-gray-700">Senha</Label>
         <Input
           id="password"
           type="password"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
           required
           disabled={isLoading}
         />
       </div>
 
-      <Button 
-        type="submit" 
-        className="w-full"
+      <Button
+        type="submit"
+        className="w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl"
         disabled={isLoading}
       >
         {isLoading ? (

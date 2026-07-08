@@ -28,10 +28,10 @@ export default function LoginPage() {
             <p className="text-gray-600 mt-2">Faça login em sua conta</p>
           </div>
 
-          <Card>
+          <Card className="bg-white border border-gray-200 rounded-3xl shadow-sm">
             <CardHeader>
-              <CardTitle>Login</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-2xl font-bold text-gray-900">Login</CardTitle>
+              <CardDescription className="text-gray-600">
                 Digite suas credenciais para acessar seu negócio
               </CardDescription>
             </CardHeader>
