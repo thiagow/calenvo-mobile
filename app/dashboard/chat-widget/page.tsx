@@ -15,6 +15,7 @@ interface ChatWidgetConfig {
   welcomeMessage: string
   primaryColor: string
   position: 'bottom-right' | 'bottom-left'
+  showLauncherText: boolean
   slug: string
 }
 
@@ -89,6 +90,18 @@ export default function ChatWidgetPage() {
               id="enabled"
               checked={config.enabled}
               onCheckedChange={(checked) => setConfig({ ...config, enabled: checked })}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="showLauncherText">Mostrar texto ao lado do ícone</Label>
+              <p className="text-sm text-muted-foreground">Exibe uma frase de convite ("Faça seu agendamento aqui.") ao lado do ícone flutuante quando o chat está minimizado</p>
+            </div>
+            <Switch
+              id="showLauncherText"
+              checked={config.showLauncherText}
+              onCheckedChange={(checked) => setConfig({ ...config, showLauncherText: checked })}
             />
           </div>
 

@@ -44,7 +44,7 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { enabled, welcomeMessage, primaryColor, position } = body
+  const { enabled, welcomeMessage, primaryColor, position, showLauncherText } = body
 
   const config = await prisma.chatWidgetConfig.upsert({
     where: { userId: user.id },
@@ -53,6 +53,7 @@ export async function PUT(request: NextRequest) {
       ...(welcomeMessage && { welcomeMessage }),
       ...(primaryColor && { primaryColor }),
       ...(position && { position }),
+      ...(typeof showLauncherText === 'boolean' && { showLauncherText }),
     },
     create: {
       userId: user.id,
@@ -60,6 +61,7 @@ export async function PUT(request: NextRequest) {
       welcomeMessage: welcomeMessage || undefined,
       primaryColor: primaryColor || undefined,
       position: position || undefined,
+      showLauncherText: showLauncherText ?? true,
     },
   })
 

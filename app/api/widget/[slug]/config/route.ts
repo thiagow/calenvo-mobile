@@ -26,6 +26,7 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
       welcomeMessage: widgetConfig?.welcomeMessage ?? 'Olá! Como posso ajudar a agendar seu horário?',
       primaryColor: widgetConfig?.primaryColor ?? '#7C3AED',
       position: widgetConfig?.position ?? 'bottom-right',
+      showLauncherText: widgetConfig?.showLauncherText ?? true,
     },
     { headers: CORS_HEADERS }
   )

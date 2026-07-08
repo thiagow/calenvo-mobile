@@ -628,10 +628,11 @@ model ChatWidgetConfig {
   id             String   @id @default(cuid())
   userId         String   @unique
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enabled        Boolean  @default(false)
-  welcomeMessage String   @default("Olá! Como posso ajudar a agendar seu horário?")
-  primaryColor   String   @default("#7C3AED")
-  position       String   @default("bottom-right") // bottom-right | bottom-left
+  enabled          Boolean  @default(false)
+  welcomeMessage   String   @default("Olá! Como posso ajudar a agendar seu horário?")
+  primaryColor     String   @default("#7C3AED")
+  position         String   @default("bottom-right") // bottom-right | bottom-left
+  showLauncherText Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

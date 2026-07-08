@@ -47,9 +47,9 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     // Limita o tamanho do histórico enviado pelo cliente (evita payloads abusivos)
     const trimmedMessages = messages.slice(-30)
 
-    const reply = await runChatAgent(tenant, trimmedMessages)
+    const { text, quickReplies } = await runChatAgent(tenant, trimmedMessages)
 
-    return NextResponse.json({ reply }, { headers: CORS_HEADERS })
+    return NextResponse.json({ reply: text, quickReplies }, { headers: CORS_HEADERS })
   } catch (error) {
     console.error('Erro no chat do widget:', error)
     return NextResponse.json({ error: 'Erro ao processar mensagem' }, { status: 500, headers: CORS_HEADERS })

@@ -46,8 +46,10 @@
         container.style[position === 'bottom-left' ? 'left' : 'right'] = '0';
       }
     } else {
-      container.style.width = '64px';
-      container.style.height = '64px';
+      var closedWidth = event.data.width || 64;
+      var closedHeight = event.data.height || 64;
+      container.style.width = closedWidth + 'px';
+      container.style.height = closedHeight + 'px';
       container.style.bottom = '20px';
       container.style[position === 'bottom-left' ? 'left' : 'right'] = '20px';
     }

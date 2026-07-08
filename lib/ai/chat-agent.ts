@@ -179,15 +179,58 @@ Seu objetivo é ajudar o visitante a marcar um horário. Fluxo recomendado:
 4. Só chame create_appointment depois que o cliente confirmar explicitamente o horário e informar nome e telefone.
 5. Depois de criar, confirme o agendamento de forma clara (data, horário, serviço).
 
-Nunca invente serviços, horários ou disponibilidade — sempre use as ferramentas. Se não conseguir ajudar, sugira que a pessoa entre em contato diretamente.`
+Nunca invente serviços, horários ou disponibilidade — sempre use as ferramentas. Se não conseguir ajudar, sugira que a pessoa entre em contato diretamente.
+
+Formato da resposta:
+- Use markdown simples quando ajudar a leitura: **negrito** para destacar, listas numeradas ou com marcadores ao apresentar múltiplos serviços ou horários.
+- Preencha "quickReplies" com até 4 opções curtas quando a resposta apresentar um conjunto pequeno de escolhas que a pessoa normalmente tocaria em vez de digitar (ex: nomes de serviços, horários disponíveis, confirmações sim/não). Deixe "quickReplies" vazio quando não houver opções discretas nesse momento.`
+}
+
+interface ChatAgentReply {
+  text: string
+  quickReplies: string[]
+}
+
+const REPLY_SCHEMA = {
+  type: 'json_schema' as const,
+  json_schema: {
+    name: 'chat_reply',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Resposta em texto para o usuário, pode conter markdown simples (negrito, listas).' },
+        quickReplies: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Até 4 opções curtas que o usuário pode escolher com um toque. Vazio se não houver.',
+        },
+      },
+      required: ['text', 'quickReplies'],
+      additionalProperties: false,
+    },
+  },
+}
+
+function parseReply(content: string | null): ChatAgentReply {
+  if (!content) return { text: 'Desculpe, não consegui processar sua mensagem.', quickReplies: [] }
+  try {
+    const parsed = JSON.parse(content)
+    return {
+      text: typeof parsed.text === 'string' ? parsed.text : content,
+      quickReplies: Array.isArray(parsed.quickReplies) ? parsed.quickReplies.filter((q: unknown) => typeof q === 'string') : [],
+    }
+  } catch {
+    return { text: content, quickReplies: [] }
+  }
 }
 
 export async function runChatAgent(
   tenant: User & { businessConfig: BusinessConfig | null },
   messages: ChatMessage[]
-): Promise<string> {
+): Promise<ChatAgentReply> {
   if (!client) {
-    return 'Desculpe, o assistente de agendamento está temporariamente indisponível. Tente novamente mais tarde.'
+    return { text: 'Desculpe, o assistente de agendamento está temporariamente indisponível. Tente novamente mais tarde.', quickReplies: [] }
   }
 
   const conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -200,13 +243,14 @@ export async function runChatAgent(
       model: MODEL,
       messages: conversation,
       tools: TOOLS,
+      response_format: REPLY_SCHEMA,
     })
 
     const choice = response.choices[0]
     const message = choice.message
 
     if (!message.tool_calls || message.tool_calls.length === 0) {
-      return message.content || 'Desculpe, não consegui processar sua mensagem.'
+      return parseReply(message.content)
     }
 
     conversation.push(message)
@@ -228,5 +272,5 @@ export async function runChatAgent(
     }
   }
 
-  return 'Desculpe, não consegui concluir sua solicitação agora. Tente novamente ou entre em contato diretamente.'
+  return { text: 'Desculpe, não consegui concluir sua solicitação agora. Tente novamente ou entre em contato diretamente.', quickReplies: [] }
 }
