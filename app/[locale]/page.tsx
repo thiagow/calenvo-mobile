@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ChevronDown, ArrowRight, Star, Check, Scissors, Cross, Droplets, PersonStanding, CalendarDays, Bell, TrendingUp, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
+import NextLink from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import { PLAN_CONFIGS, getPlanPrice, type Currency } from '@/lib/types'
 import { formatCurrencyByCurrency } from '@/lib/utils'
@@ -66,11 +67,11 @@ export default function LandingPage() {
             {/* Right Actions — desktop */}
             <div className="hidden md:flex items-center space-x-4">
               <LanguageSwitcher />
-              <Link href="/login">
+              <NextLink href="/login">
                 <Button variant="ghost" className="text-white hover:text-white hover:bg-white/10 font-medium">
                   {t('nav.entrar')}
                 </Button>
-              </Link>
+              </NextLink>
               <Link href="#pricing">
                 <Button className="bg-[#EDE9FE] hover:bg-violet-200 text-[#7C3AED] font-semibold px-6">
                   {t('nav.contratarPlano')}
@@ -122,11 +123,11 @@ export default function LandingPage() {
 
                   <div className="flex flex-col gap-3 mt-auto">
                     <SheetClose asChild>
-                      <Link href="/login" className="w-full">
+                      <NextLink href="/login" className="w-full">
                         <Button variant="outline" className="w-full border-gray-200 text-gray-900 hover:bg-gray-50 font-medium">
                           {t('nav.entrar')}
                         </Button>
-                      </Link>
+                      </NextLink>
                     </SheetClose>
                     <SheetClose asChild>
                       <Link href="#pricing" className="w-full">
