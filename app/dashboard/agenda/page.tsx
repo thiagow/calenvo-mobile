@@ -119,29 +119,30 @@ export default function AgendaPage() {
         </Alert>
       )}
 
-      {/* Toolbar compacta para mobile */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <DateNavigation
-            currentDate={currentDate}
-            onDateChange={setCurrentDate}
-            navigationType={getNavigationType(currentView)}
-          />
+      {/* Toolbar compacta para mobile — navegação de data e seleção de vista em linhas separadas para não espremer */}
+      <div className="space-y-2">
+        <DateNavigation
+          currentDate={currentDate}
+          onDateChange={setCurrentDate}
+          navigationType={getNavigationType(currentView)}
+          appointmentCount={viewFilteredAppointments.length}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <AgendaViewSelector currentView={currentView} onViewChange={setCurrentView} />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowFilters(!showFilters)}
+            className="relative h-9 w-9 flex-shrink-0"
+          >
+            <Filter className="h-4 w-4" />
+            {activeFiltersCount > 0 && (
+              <Badge className="absolute -top-1.5 -right-1.5 h-4 w-4 p-0 text-[10px] flex items-center justify-center">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
         </div>
-        <AgendaViewSelector currentView={currentView} onViewChange={setCurrentView} />
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowFilters(!showFilters)}
-          className="relative h-9 w-9 flex-shrink-0"
-        >
-          <Filter className="h-4 w-4" />
-          {activeFiltersCount > 0 && (
-            <Badge className="absolute -top-1.5 -right-1.5 h-4 w-4 p-0 text-[10px] flex items-center justify-center">
-              {activeFiltersCount}
-            </Badge>
-          )}
-        </Button>
       </div>
 
       {/* Filtros */}
@@ -159,9 +160,9 @@ export default function AgendaPage() {
         </div>
       ) : (
         <>
-          {currentView === 'day' && <AgendaDayView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} onDateChange={setCurrentDate} />}
-          {currentView === 'week' && <AgendaWeekView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} onDateChange={setCurrentDate} />}
-          {currentView === 'month' && <AgendaMonthView date={currentDate} appointments={viewFilteredAppointments} onDayClick={(d) => { setCurrentDate(d); setCurrentView('day') }} onAppointmentClick={(apt) => { setEditingAppointment(apt); setShowEditDialog(true) }} onDateChange={setCurrentDate} />}
+          {currentView === 'day' && <AgendaDayView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
+          {currentView === 'week' && <AgendaWeekView date={currentDate} appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
+          {currentView === 'month' && <AgendaMonthView date={currentDate} appointments={viewFilteredAppointments} onDayClick={(d) => { setCurrentDate(d); setCurrentView('day') }} onAppointmentClick={(apt) => { setEditingAppointment(apt); setShowEditDialog(true) }} />}
           {currentView === 'list' && <AgendaListView appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
           {currentView === 'timeline' && <AgendaTimelineView appointments={viewFilteredAppointments} onEditAppointment={handleEditAppointment} onDeleteAppointment={handleDeleteAppointment} />}
         </>

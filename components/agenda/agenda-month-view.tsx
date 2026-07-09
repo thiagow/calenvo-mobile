@@ -1,15 +1,11 @@
 
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Calendar,
+import {
   Clock,
-  Eye,
-  ChevronRight,
-  ChevronLeft
+  Eye
 } from 'lucide-react'
 import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types'
 import { AppointmentStatus, ModalityType } from '@prisma/client'
@@ -34,15 +30,13 @@ interface AgendaMonthViewProps {
   appointments: MonthAppointment[]
   onDayClick?: (date: Date) => void
   onAppointmentClick?: (appointment: MonthAppointment) => void
-  onDateChange?: (date: Date) => void
 }
 
-export function AgendaMonthView({ 
-  date, 
-  appointments, 
+export function AgendaMonthView({
+  date,
+  appointments,
   onDayClick,
-  onAppointmentClick,
-  onDateChange
+  onAppointmentClick
 }: AgendaMonthViewProps) {
   
   const today = new Date()
@@ -89,87 +83,8 @@ export function AgendaMonthView({
   const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
   const weekdaysMobile = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 
-  // Navigation handlers
-  const goToPrevious = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setMonth(date.getMonth() - 1)
-    onDateChange(newDate)
-  }
-
-  const goToNext = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setMonth(date.getMonth() + 1)
-    onDateChange(newDate)
-  }
-
-  const goToToday = () => {
-    if (!onDateChange) return
-    onDateChange(new Date())
-  }
-
-  const isTodayMonth = () => {
-    const todayDate = new Date()
-    return date.getMonth() === todayDate.getMonth() && 
-           date.getFullYear() === todayDate.getFullYear()
-  }
-
   return (
     <div className="space-y-3 sm:space-y-4">
-      {/* Header */}
-      <Card>
-        <CardHeader className="pb-3">
-          {/* Navigation Controls */}
-          {onDateChange && (
-            <div className="flex items-center space-x-1 mb-3">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={goToPrevious}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={goToToday}
-                disabled={isTodayMonth()}
-                className={`
-                  px-2 sm:px-3 hover:bg-gray-100 h-8 text-xs sm:text-sm
-                  ${isTodayMonth() ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                Hoje
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={goToNext}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-          
-          {/* Month Title */}
-          <CardTitle className="flex items-center text-lg">
-            <Calendar className="mr-2 h-5 w-5 text-blue-600" />
-            {date.toLocaleDateString('pt-BR', { 
-              month: 'long', 
-              year: 'numeric' 
-            })}
-          </CardTitle>
-          <p className="text-sm text-gray-600">
-            {appointments.length} consultas agendadas este mês
-          </p>
-        </CardHeader>
-      </Card>
-      
       {/* Calendar Grid */}
       <Card>
         <CardContent className="p-0 overflow-x-hidden">

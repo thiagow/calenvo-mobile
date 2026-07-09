@@ -1,16 +1,12 @@
 
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Clock,
-  Calendar,
   Eye,
-  Trash2,
-  ChevronLeft,
-  ChevronRight
+  Trash2
 } from 'lucide-react'
 import { STATUS_COLORS, STATUS_LABELS, MODALITY_LABELS } from '@/lib/types'
 import { AppointmentStatus, ModalityType } from '@prisma/client'
@@ -35,15 +31,13 @@ interface AgendaWeekViewProps {
   appointments: WeekAppointment[]
   onEditAppointment?: (id: string) => void
   onDeleteAppointment?: (id: string) => void
-  onDateChange?: (date: Date) => void
 }
 
 export function AgendaWeekView({
   date,
   appointments,
   onEditAppointment,
-  onDeleteAppointment,
-  onDateChange
+  onDeleteAppointment
 }: AgendaWeekViewProps) {
 
   // Calcular início e fim da semana
@@ -87,96 +81,8 @@ export function AgendaWeekView({
     )
   }
 
-  // Navigation handlers
-  const goToPrevious = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setDate(date.getDate() - 7)
-    onDateChange(newDate)
-  }
-
-  const goToNext = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setDate(date.getDate() + 7)
-    onDateChange(newDate)
-  }
-
-  const goToToday = () => {
-    if (!onDateChange) return
-    onDateChange(new Date())
-  }
-
-  const isToday = () => {
-    const today = new Date()
-    const startOfWeekDate = new Date(date)
-    const day = startOfWeekDate.getDay()
-    const diff = startOfWeekDate.getDate() - day + (day === 0 ? -6 : 1)
-    startOfWeekDate.setDate(diff)
-    const endOfWeekDate = new Date(startOfWeekDate)
-    endOfWeekDate.setDate(startOfWeekDate.getDate() + 6)
-    return today >= startOfWeekDate && today <= endOfWeekDate
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <Card>
-        <CardHeader className="pb-3">
-          {/* Navigation Controls */}
-          {onDateChange && (
-            <div className="flex items-center space-x-1 mb-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPrevious}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToToday}
-                disabled={isToday()}
-                className={`
-                  px-2 sm:px-3 hover:bg-gray-100 h-8 text-xs sm:text-sm
-                  ${isToday() ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                Hoje
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNext}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Week Title */}
-          <CardTitle className="flex items-center text-lg text-foreground">
-            <Calendar className="mr-2 h-5 w-5 text-primary" />
-            Semana de {startOfWeek.toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit'
-            })} a {weekDays[6].toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric'
-            })}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {appointments.length} consultas agendadas esta semana
-          </p>
-        </CardHeader>
-      </Card>
-
       {/* Week Grid */}
       <Card>
         <CardContent className="p-0 overflow-hidden">

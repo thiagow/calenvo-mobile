@@ -185,19 +185,19 @@ export function DateNavigation({
         </div>
 
         {/* Date Display with Appointment Count */}
-        <div className="flex-1 flex flex-col items-end">
-          <div className="flex items-center space-x-2">
+        <div className="flex-1 flex flex-col items-end min-w-0">
+          <div className="flex items-center space-x-2 max-w-full">
             <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
             {/* Mobile view */}
-            <h2 className="block sm:hidden text-sm font-semibold text-gray-900 capitalize">
+            <h2 className="block sm:hidden text-sm font-semibold text-gray-900 capitalize whitespace-nowrap truncate">
               {formatCurrentDateMobile()}
             </h2>
             {/* Desktop view */}
-            <h2 className="hidden sm:block text-base md:text-lg font-semibold text-gray-900 capitalize">
+            <h2 className="hidden sm:block text-base md:text-lg font-semibold text-gray-900 capitalize whitespace-nowrap truncate">
               {formatCurrentDate()}
             </h2>
           </div>
-          <p className="text-xs text-gray-600 mt-0.5">
+          <p className="text-xs text-gray-600 mt-0.5 whitespace-nowrap">
             {appointmentCount} consulta{appointmentCount !== 1 ? 's' : ''} agendada{appointmentCount !== 1 ? 's' : ''}
           </p>
         </div>

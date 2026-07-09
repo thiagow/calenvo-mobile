@@ -1,8 +1,7 @@
 
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
   Clock,
@@ -10,10 +9,7 @@ import {
   Phone,
   Mail,
   Eye,
-  Trash2,
-  Calendar,
-  ChevronLeft,
-  ChevronRight
+  Trash2
 } from 'lucide-react'
 import { formatDateTime, formatPhone } from '@/lib/utils'
 import { STATUS_COLORS, STATUS_LABELS, MODALITY_LABELS } from '@/lib/types'
@@ -41,15 +37,13 @@ interface AgendaDayViewProps {
   appointments: DayAppointment[]
   onEditAppointment?: (id: string) => void
   onDeleteAppointment?: (id: string) => void
-  onDateChange?: (date: Date) => void
 }
 
 export function AgendaDayView({
   date,
   appointments,
   onEditAppointment,
-  onDeleteAppointment,
-  onDateChange
+  onDeleteAppointment
 }: AgendaDayViewProps) {
 
   const timeSlots = []
@@ -76,88 +70,8 @@ export function AgendaDayView({
     })
   }
 
-  // Navigation handlers
-  const goToPrevious = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setDate(date.getDate() - 1)
-    onDateChange(newDate)
-  }
-
-  const goToNext = () => {
-    if (!onDateChange) return
-    const newDate = new Date(date)
-    newDate.setDate(date.getDate() + 1)
-    onDateChange(newDate)
-  }
-
-  const goToToday = () => {
-    if (!onDateChange) return
-    onDateChange(new Date())
-  }
-
-  const isToday = () => {
-    const today = new Date()
-    return date.toDateString() === today.toDateString()
-  }
-
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <Card>
-        <CardHeader className="pb-3">
-          {/* Navigation Controls */}
-          {onDateChange && (
-            <div className="flex items-center space-x-1 mb-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPrevious}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToToday}
-                disabled={isToday()}
-                className={`
-                  px-2 sm:px-3 hover:bg-gray-100 h-8 text-xs sm:text-sm
-                  ${isToday() ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                Hoje
-              </Button>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNext}
-                className="hover:bg-gray-100 h-8 w-8 p-0"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {/* Day Title */}
-          <CardTitle className="flex items-center text-lg text-foreground">
-            <Calendar className="mr-2 h-5 w-5 text-primary" />
-            {date.toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {appointments.length} consultas agendadas
-          </p>
-        </CardHeader>
-      </Card>
-
       {/* Time Slots */}
       <Card>
         <CardContent className="p-0">
