@@ -17,7 +17,6 @@ interface DashboardOverviewProps {
       name?: string | null
       email?: string | null
       planType?: string
-      clinicName?: string | null
     }
   }
 }

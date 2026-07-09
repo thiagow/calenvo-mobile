@@ -81,8 +81,8 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50">
               <Building className="h-5 w-5 text-gray-400" />
               <div>
-                <p className="text-sm font-medium text-gray-900">Clínica</p>
-                <p className="text-sm text-gray-600">{(session?.user as any)?.clinicName}</p>
+                <p className="text-sm font-medium text-gray-900">Negócio</p>
+                <p className="text-sm text-gray-600">{(session?.user as any)?.businessName}</p>
               </div>
             </div>
 

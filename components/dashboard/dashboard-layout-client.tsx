@@ -12,7 +12,7 @@ interface DashboardLayoutClientProps {
       name?: string | null
       email?: string | null
       planType?: string
-      clinicName?: string | null
+      businessName?: string | null
     }
   }
 }
