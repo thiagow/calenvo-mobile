@@ -93,11 +93,14 @@ export default function ChatWidgetPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
+  useEffect(() => {
+    if (config && messages.length === 0) {
+      setMessages([{ role: 'assistant', content: config.welcomeMessage || 'Olá! Como posso ajudar?' }])
+    }
+  }, [config])
+
   const handleOpen = () => {
     setOpen(true)
-    if (config && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: config.welcomeMessage }])
-    }
   }
 
   const handleSend = async (overrideText?: string) => {
