@@ -142,7 +142,7 @@ export default function LoyaltyPage() {
         </CardContent>
       </Card>
 
-      <Button variant="outline" className="w-full" onClick={() => router.push('/dashboard/patients')}>
+      <Button variant="outline" className="w-full" onClick={() => router.push('/dashboard/clients')}>
         <Users className="h-4 w-4 mr-2" />
         Ver Clientes com Pontos
       </Button>

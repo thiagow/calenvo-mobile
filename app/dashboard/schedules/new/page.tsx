@@ -10,12 +10,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Save, Calendar, Info, Settings, Ban } from 'lucide-react'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { ArrowLeft, Save, Calendar, Info, Ban } from 'lucide-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { CustomDayConfig } from '@/components/schedule/custom-day-config'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CustomDayConfig, type DayConfig } from '@/components/schedule/custom-day-config'
 import { ScheduleBlocks } from '@/components/schedule/schedule-blocks'
+import { ScheduleTabsList } from '@/components/schedule/schedule-tabs-list'
 
 const WEEK_DAYS = [
   { value: 0, label: 'Domingo' },
@@ -58,6 +60,9 @@ export default function NewSchedulePage() {
   const [useCustomDayConfig, setUseCustomDayConfig] = useState(false)
   const [customDayConfigs, setCustomDayConfigs] = useState<any[]>([])
   const [createdScheduleId, setCreatedScheduleId] = useState<string | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [activeTab, setActiveTab] = useState('basic')
+  const [businessDefaults, setBusinessDefaults] = useState<{ startTime: string; endTime: string } | null>(null)
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -179,17 +184,28 @@ export default function NewSchedulePage() {
 
       // Armazenar o ID da agenda criada
       setCreatedScheduleId(result.id)
-
-      toast.success('Agenda criada com sucesso! Agora você pode configurar horários personalizados e bloqueios.')
-
-      // Scroll suave para o topo
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setShowSuccessModal(true)
     } catch (error) {
       console.error('Error creating schedule:', error)
       toast.error(error instanceof Error ? error.message : 'Erro ao criar agenda')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleConfigureHoursClick = async () => {
+    setShowSuccessModal(false)
+    if (!businessDefaults) {
+      try {
+        const res = await fetch('/api/settings/business-config')
+        const data = await res.json()
+        setBusinessDefaults({ startTime: data.startTime, endTime: data.endTime })
+      } catch (error) {
+        console.error('Error fetching business config defaults:', error)
+        setBusinessDefaults({ startTime: '08:00', endTime: '18:00' })
+      }
+    }
+    setActiveTab('custom-hours')
   }
 
   if (status === 'loading') {
@@ -214,21 +230,27 @@ export default function NewSchedulePage() {
         </div>
       </div>
 
-      <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="basic" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Configurações Básicas
-          </TabsTrigger>
-          <TabsTrigger value="custom-hours" className="flex items-center gap-2" disabled={!createdScheduleId}>
-            <Calendar className="h-4 w-4" />
-            Horários por Dia
-          </TabsTrigger>
-          <TabsTrigger value="blocks" className="flex items-center gap-2" disabled={!createdScheduleId}>
-            <Ban className="h-4 w-4" />
-            Bloqueios
-          </TabsTrigger>
-        </TabsList>
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Agenda criada com sucesso!</DialogTitle>
+            <DialogDescription>
+              Agora você pode personalizar os horários de atendimento por dia da semana e configurar bloqueios, ou fazer isso depois.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowSuccessModal(false)}>
+              Concluir depois
+            </Button>
+            <Button onClick={handleConfigureHoursClick}>
+              Configurar horários
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <ScheduleTabsList disableExtraTabs={!createdScheduleId} />
 
         <TabsContent value="basic">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -437,6 +459,9 @@ export default function NewSchedulePage() {
             <div className="flex justify-end gap-4 sticky bottom-0 bg-white py-4 border-t">
               {createdScheduleId ? (
                 <>
+                  <p className="flex-1 text-sm text-gray-500 self-center">
+                    Agenda criada. Use as abas acima para configurar horários e bloqueios quando quiser.
+                  </p>
                   <Button
                     type="button"
                     variant="outline"
@@ -444,12 +469,6 @@ export default function NewSchedulePage() {
                   >
                     Voltar para Agendas
                   </Button>
-                  <Alert className="flex-1 max-w-md">
-                    <Info className="h-4 w-4" />
-                    <AlertDescription className="text-sm">
-                      Agenda criada! Use as abas acima para configurar horários personalizados e bloqueios.
-                    </AlertDescription>
-                  </Alert>
                 </>
               ) : (
                 <>
@@ -478,7 +497,18 @@ export default function NewSchedulePage() {
         {/* Custom Hours Tab */}
         <TabsContent value="custom-hours">
           {createdScheduleId ? (
-            <CustomDayConfig scheduleId={createdScheduleId} />
+            <CustomDayConfig
+              scheduleId={createdScheduleId}
+              initialConfigs={
+                businessDefaults
+                  ? WEEK_DAYS.map((day): DayConfig => ({
+                      dayOfWeek: day.value,
+                      isActive: formData.workingDays.includes(day.value),
+                      timeSlots: [{ startTime: businessDefaults.startTime, endTime: businessDefaults.endTime }]
+                    }))
+                  : []
+              }
+            />
           ) : (
             <Card>
               <CardContent className="py-12 text-center">

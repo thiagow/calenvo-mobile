@@ -99,7 +99,7 @@ export interface DashboardStats {
   todayAppointments: number
   weekAppointments: number
   monthAppointments: number
-  totalPatients: number
+  totalClients: number
   pendingAppointments: number
   completedAppointments: number
 }

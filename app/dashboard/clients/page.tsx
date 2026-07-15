@@ -17,7 +17,7 @@ import { formatDate } from '@/lib/utils'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { BRAZILIAN_STATES } from '@/lib/brazilian-states'
 
-interface Patient {
+interface Client {
   id: string
   name: string
   email: string | null
@@ -35,13 +35,13 @@ interface Patient {
 
 const emptyForm = { name: '', email: '', phone: '', cpf: '', birthDate: '', address: '', city: '', state: '', gender: '', notes: '' }
 
-export default function PatientsPage() {
+export default function ClientsPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const { config: segmentConfig } = useSegmentConfig()
   const t = segmentConfig.terminology
 
-  const [patients, setPatients] = useState<Patient[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [stats, setStats] = useState({ totalClients: 0, newClientsThisMonth: 0, totalAppointments: 0 })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -49,7 +49,7 @@ export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [formData, setFormData] = useState(emptyForm)
 
   const fetchClients = async () => {
@@ -57,7 +57,7 @@ export default function PatientsPage() {
       const res = await fetch('/api/clients/stats')
       if (res.ok) {
         const data = await res.json()
-        setPatients(data.clients || [])
+        setClients(data.clients || [])
         setStats(data.stats)
         setLoyaltyActive(data.loyaltyActive || false)
       }
@@ -70,17 +70,17 @@ export default function PatientsPage() {
 
   useEffect(() => { fetchClients() }, [])
 
-  const openNew = () => { setFormData(emptyForm); setIsEditMode(false); setSelectedPatient(null); setSheetOpen(true) }
-  const openEdit = (p: Patient) => {
+  const openNew = () => { setFormData(emptyForm); setIsEditMode(false); setSelectedClient(null); setSheetOpen(true) }
+  const openEdit = (p: Client) => {
     setFormData({ name: p.name, email: p.email || '', phone: p.phone, cpf: p.cpf || '', birthDate: p.birthDate ? new Date(p.birthDate).toISOString().split('T')[0] : '', address: p.address || '', city: p.city || '', state: p.state || '', gender: '', notes: p.notes || '' })
-    setSelectedPatient(p); setIsEditMode(true); setSheetOpen(true)
+    setSelectedClient(p); setIsEditMode(true); setSheetOpen(true)
   }
 
   const handleSave = async () => {
     if (!formData.name || !formData.phone) { toast.error('Nome e WhatsApp são obrigatórios'); return }
     setSaving(true)
     try {
-      const url = isEditMode && selectedPatient ? `/api/clients/${selectedPatient.id}` : '/api/clients'
+      const url = isEditMode && selectedClient ? `/api/clients/${selectedClient.id}` : '/api/clients'
       const res = await fetch(url, {
         method: isEditMode ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,7 +99,7 @@ export default function PatientsPage() {
 
   const set = (field: string, value: string) => setFormData(f => ({ ...f, [field]: value }))
 
-  const filtered = patients.filter(p =>
+  const filtered = clients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.email && p.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
     p.phone.includes(searchTerm)
@@ -146,44 +146,44 @@ export default function PatientsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(patient => (
-            <Card key={patient.id} className="border border-border active:bg-muted/50 transition-colors">
+          {filtered.map(client => (
+            <Card key={client.id} className="border border-border active:bg-muted/50 transition-colors">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm truncate">{patient.name}</p>
+                    <p className="font-semibold text-sm truncate">{client.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      <span className="text-xs text-muted-foreground">{patient.phone}</span>
+                      <span className="text-xs text-muted-foreground">{client.phone}</span>
                     </div>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {patient.appointmentsCount} {patient.appointmentsCount === 1 ? t.appointment.toLowerCase() : t.appointments.toLowerCase()}
+                        {client.appointmentsCount} {client.appointmentsCount === 1 ? t.appointment.toLowerCase() : t.appointments.toLowerCase()}
                       </Badge>
-                      {loyaltyActive && patient.loyaltyPoints != null && patient.loyaltyPoints > 0 && (
+                      {loyaltyActive && client.loyaltyPoints != null && client.loyaltyPoints > 0 && (
                         <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0">
-                          ⭐ {patient.loyaltyPoints} pts
+                          ⭐ {client.loyaltyPoints} pts
                         </Badge>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/patients/${patient.id}/packages`)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/clients/${client.id}/packages`)}>
                       <Package className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/patients/${patient.id}/history`)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/clients/${client.id}/history`)}>
                       <History className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(patient)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(client)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
 
-                {patient.notes && (
+                {client.notes && (
                   <p className="mt-2 text-xs text-muted-foreground bg-muted rounded px-2 py-1 truncate">
-                    {patient.notes}
+                    {client.notes}
                   </p>
                 )}
               </CardContent>

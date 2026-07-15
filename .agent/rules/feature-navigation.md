@@ -164,7 +164,7 @@ REQUEST RECEBIDO
 ### Mapeamento Prático
 - **Agendamentos**: `app/dashboard/appointments/`, `app/api/appointments/`
 - **Agendas**: `app/dashboard/schedules/`, `app/api/schedules/`, `components/agenda/`
-- **Clientes**: `app/dashboard/patients/`, `app/api/clients/`
+- **Clientes**: `app/dashboard/clients/`, `app/api/clients/`
 - **Notificações**: `app/dashboard/notifications/`, `app/api/notifications/`
 - **Relatórios**: `app/dashboard/reports/`, `app/api/reports/`
 - **Planos**: `app/dashboard/plans/`, `app/api/stripe/`

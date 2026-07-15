@@ -42,7 +42,7 @@ O Dashboard é a página inicial após o login, fornecendo uma visão consolidad
 ```typescript
 // Botões de ação rápida
 - Novo Agendamento → /dashboard/appointments/new
-- Novo Cliente → /dashboard/patients
+- Novo Cliente → /dashboard/clients
 - Ver Agenda → /dashboard/agenda
 - Notificações → /dashboard/notifications
 ```
@@ -244,7 +244,7 @@ useEffect(() => {
 - `/dashboard/agenda` - Ver agenda completa
 - `/dashboard/appointments` - Gerenciar todos os agendamentos
 - `/dashboard/appointments/new` - Criar novo agendamento
-- `/dashboard/patients` - Gerenciar clientes
+- `/dashboard/clients` - Gerenciar clientes
 - `/dashboard/reports` - Ver relatórios detalhados
 - `/dashboard/notifications` - Central de notificações
 - `/dashboard/settings` - Configurações do sistema

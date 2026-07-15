@@ -9,7 +9,7 @@ Este documento mapeia termos e conceitos para as funcionalidades e arquivos do s
 |------------------|-------------------|--------------|----------------|
 | Agendamento, Appointment, Consulta, Atendimento | Agendamento | [agendamento.md](./features/agendamento.md) | `app/dashboard/appointments/`, `app/api/appointments/` |
 | Agenda, Schedule, Calendário, Disponibilidade | Agenda | [agenda.md](./features/agenda.md) | `app/dashboard/schedules/`, `app/api/schedules/`, `components/agenda/` |
-| Cliente, Paciente, Patient | Cliente | [cliente.md](./features/cliente.md) | `app/dashboard/patients/`, `app/api/clients/` |
+| Cliente, Paciente, Patient | Cliente | [cliente.md](./features/cliente.md) | `app/dashboard/clients/`, `app/api/clients/` |
 | Notificação, Sino, WhatsApp | Notificações | [notificacoes.md](./features/notificacoes.md) | `app/dashboard/notifications/`, `app/api/notifications/`, `app/api/whatsapp/` |
 | Relatório, Analytics, Estatísticas, Métricas | Relatórios | [relatorios.md](./features/relatorios.md) | `app/dashboard/reports/`, `app/api/reports/` |
 | Plano, Assinatura, Stripe, Pagamento | Planos | [planos.md](./features/planos.md) | `app/dashboard/plans/`, `app/api/stripe/` |

@@ -10,11 +10,12 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Save, Settings, Calendar, Ban, Users } from 'lucide-react'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { ArrowLeft, Save, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomDayConfig } from '@/components/schedule/custom-day-config'
 import { ScheduleBlocks } from '@/components/schedule/schedule-blocks'
+import { ScheduleTabsList } from '@/components/schedule/schedule-tabs-list'
 
 const WEEK_DAYS = [
   { value: 0, label: 'Domingo' },
@@ -217,20 +218,7 @@ export default function EditSchedulePage() {
       </div>
 
       <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 h-auto">
-          <TabsTrigger value="basic" className="flex items-center gap-1 px-2 py-2 text-xs sm:text-sm">
-            <Settings className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className="truncate">Config. Básicas</span>
-          </TabsTrigger>
-          <TabsTrigger value="custom-hours" className="flex items-center gap-1 px-2 py-2 text-xs sm:text-sm">
-            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className="truncate">Horários</span>
-          </TabsTrigger>
-          <TabsTrigger value="blocks" className="flex items-center gap-1 px-2 py-2 text-xs sm:text-sm">
-            <Ban className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-            <span className="truncate">Bloqueios</span>
-          </TabsTrigger>
-        </TabsList>
+        <ScheduleTabsList />
 
         <TabsContent value="basic">
           <form onSubmit={handleSubmit} className="space-y-6">

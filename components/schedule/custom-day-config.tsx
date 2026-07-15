@@ -10,12 +10,12 @@ import { Switch } from '@/components/ui/switch'
 import { Plus, Trash2, Clock } from 'lucide-react'
 import { toast } from 'sonner'
 
-interface TimeSlot {
+export interface TimeSlot {
   startTime: string
   endTime: string
 }
 
-interface DayConfig {
+export interface DayConfig {
   dayOfWeek: number
   isActive: boolean
   timeSlots: TimeSlot[]
@@ -80,7 +80,12 @@ export function CustomDayConfig({
       if (!response.ok) throw new Error('Erro ao buscar configurações')
       
       const configs = await response.json()
-      
+
+      // Só sobrescreve se já existirem configs salvas no banco — isso é o que
+      // permite o `initialConfigs` vindo do fluxo de criação (herança dos dias
+      // escolhidos na aba Básica + horário padrão de Configurações gerais)
+      // sobreviver intacto quando a agenda acabou de ser criada e ainda não
+      // tem day-configs persistidas.
       if (configs.length > 0) {
         setDayConfigs(configs)
         setEnabled(true)

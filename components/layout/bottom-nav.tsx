@@ -14,8 +14,8 @@ import { useUserPermissions } from '@/hooks/use-user-permissions'
 
 const mainNav = [
   { name: 'Hoje', href: '/dashboard', icon: CalendarCheck, exact: true },
-  { name: 'Agenda', href: '/dashboard/agenda', icon: Calendar },
-  { name: 'Clientes', href: '/dashboard/patients', icon: Users },
+  { name: 'Agendar', href: '/dashboard/agenda', icon: Calendar },
+  { name: 'Clientes', href: '/dashboard/clients', icon: Users },
   { name: 'Relatórios', href: '/dashboard/reports', icon: BarChart2, permission: 'canViewFullReports' as const },
   { name: 'Mais', href: '/dashboard/mais', icon: MoreHorizontal },
 ]

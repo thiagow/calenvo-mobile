@@ -55,7 +55,7 @@ calenvoapp/
 │   │   ├── agenda/                  # Visualização de agenda
 │   │   ├── appointments/            # Gerenciamento de agendamentos
 │   │   ├── notifications/           # Central de notificações
-│   │   ├── patients/                # Gestão de clientes (legado: patients)
+│   │   ├── clients/                 # Gestão de clientes
 │   │   ├── plans/                   # Planos e assinaturas
 │   │   ├── professionals/           # Gestão de equipe
 │   │   ├── profile/                 # Perfil do usuário

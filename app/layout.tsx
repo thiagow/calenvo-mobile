@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Providers } from '@/components/providers/session-provider'
 import { DialogProvider } from '@/components/providers/dialog-provider'
 import { Toaster as ShadcnToaster } from '@/components/ui/toaster'
+import { Toaster as SonnerToaster } from '@/components/ui/sonner'
 import { Toaster } from 'react-hot-toast'
 
 const dmSans = DM_Sans({
@@ -53,6 +54,7 @@ export default function RootLayout({
               {children}
               <Toaster />
               <ShadcnToaster />
+              <SonnerToaster />
             </DialogProvider>
           </ThemeProvider>
         </Providers>

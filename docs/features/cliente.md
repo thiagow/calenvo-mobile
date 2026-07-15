@@ -7,7 +7,7 @@ Sistema de gerenciamento de clientes (anteriormente chamados de "patients"), per
 ## 📍 Localização no Código
 
 ### Páginas
-- **Listagem**: `/dashboard/patients` → `app/dashboard/patients/page.tsx`
+- **Listagem**: `/dashboard/clients` → `app/dashboard/clients/page.tsx`
 
 ### APIs
 - `GET /api/clients` - Listar clientes

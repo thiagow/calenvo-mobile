@@ -47,7 +47,7 @@ export async function createClientPackage(data: z.infer<typeof createPackageSche
             }
         })
 
-        revalidatePath(`/dashboard/patients/${validatedData.clientId}`)
+        revalidatePath(`/dashboard/clients/${validatedData.clientId}`)
         return { success: true, data: newPackage }
     } catch (error) {
         if (error instanceof z.ZodError) {

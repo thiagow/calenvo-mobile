@@ -169,7 +169,7 @@ export default async function PackagesReport() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
-                                                    <Link href={`/dashboard/patients/${pkg.client.id}/packages`}>
+                                                    <Link href={`/dashboard/clients/${pkg.client.id}/packages`}>
                                                         <Button size="sm" variant="outline" className="text-xs">
                                                             <Users className="h-3 w-3 mr-1" />
                                                             Gerenciar
