@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { generateSlug } from '@/lib/utils'
+import { resolveUniqueSlug } from '@/lib/tenant-resolver'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,21 +94,33 @@ export async function PATCH(request: NextRequest) {
       }
     })
 
-    // Update BusinessConfig with generated slug if businessName changed
+    // Gera o link público (publicUrl) só na primeira vez que o negócio tem um
+    // nome — depois disso, mudar o nome NUNCA sobrescreve o slug existente.
+    // Antes, qualquer edição de businessName regenerava o publicUrl e quebrava
+    // silenciosamente qualquer link já divulgado (cartão de visita, bio do
+    // Instagram etc.) com a URL antiga.
     if (body.businessName) {
-      const slug = generateSlug(body.businessName)
-      
-      await prisma.businessConfig.upsert({
+      const existingConfig = await prisma.businessConfig.findUnique({
         where: { userId },
-        create: {
-          userId,
-          publicUrl: slug,
-          workingDays: [1, 2, 3, 4, 5], // Default Monday to Friday
-        },
-        update: {
-          publicUrl: slug
-        }
+        select: { publicUrl: true },
       })
+
+      if (!existingConfig?.publicUrl) {
+        const baseSlug = generateSlug(body.businessName)
+        const slug = await resolveUniqueSlug(baseSlug, userId)
+
+        await prisma.businessConfig.upsert({
+          where: { userId },
+          create: {
+            userId,
+            publicUrl: slug,
+            workingDays: [1, 2, 3, 4, 5], // Default Monday to Friday
+          },
+          update: {
+            publicUrl: slug
+          }
+        })
+      }
     }
 
     return NextResponse.json(updatedUser)

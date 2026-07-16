@@ -27,3 +27,29 @@ export async function resolveTenantBySlug(slug: string) {
 
   return user
 }
+
+/**
+ * Garante um slug único para o link público de agendamento — `publicUrl` tem
+ * `@unique` no schema, mas nada verificava isso antes de tentar salvar, então
+ * duas empresas com nomes iguais (ex.: "Clínica Teste") colidiam e o `upsert`
+ * só falharia na hora H com um 500 genérico. Se `baseSlug` já pertence a OUTRA
+ * conta, tenta "baseSlug-2", "baseSlug-3"... até achar um livre.
+ */
+export async function resolveUniqueSlug(baseSlug: string, userId: string): Promise<string> {
+  if (!baseSlug) return baseSlug
+
+  let candidate = baseSlug
+  let suffix = 2
+
+  while (true) {
+    const existing = await prisma.businessConfig.findFirst({
+      where: { publicUrl: candidate, NOT: { userId } },
+      select: { userId: true },
+    })
+
+    if (!existing) return candidate
+
+    candidate = `${baseSlug}-${suffix}`
+    suffix++
+  }
+}
