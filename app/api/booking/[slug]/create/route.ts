@@ -51,7 +51,7 @@ export async function POST(
     }
 
     // Verificar limite de agendamentos do mês atual
-    const quota = await checkAppointmentQuota(user.id, user.planType)
+    const quota = await checkAppointmentQuota(user.id, user.planType ?? 'BASICO')
     const appointmentsThisMonth = quota.currentCount
 
     // Validar se pode criar mais agendamentos
@@ -81,14 +81,26 @@ export async function POST(
       })
     }
 
-    // Buscar serviço
-    const service = await prisma.service.findUnique({
-      where: { id: serviceId }
+    // Buscar serviço (escopado ao tenant resolvido pelo slug)
+    const service = await prisma.service.findFirst({
+      where: { id: serviceId, userId: user.id }
     })
 
     if (!service) {
       return NextResponse.json(
         { error: 'Serviço não encontrado' },
+        { status: 404 }
+      )
+    }
+
+    // Confirmar que a agenda também pertence a este tenant
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: scheduleId, userId: user.id }
+    })
+
+    if (!schedule) {
+      return NextResponse.json(
+        { error: 'Agenda não encontrada' },
         { status: 404 }
       )
     }
@@ -132,11 +144,11 @@ export async function POST(
     // Verificar se deve notificar sobre limite de agendamentos
     try {
       const currentCount = appointmentsThisMonth + 1
-      if (shouldNotifyLimitApproaching(user.planType, currentCount)) {
-        const remaining = getRemainingAppointments(user.planType, currentCount)
+      if (shouldNotifyLimitApproaching(user.planType ?? 'BASICO', currentCount)) {
+        const remaining = getRemainingAppointments(user.planType ?? 'BASICO', currentCount)
         await NotificationService.notifyPlanLimitApproaching(
           user.id,
-          user.planType,
+          user.planType ?? 'BASICO',
           remaining
         )
       }

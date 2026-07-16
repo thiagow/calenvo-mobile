@@ -58,14 +58,15 @@ export class NotificationService {
   /**
    * Marca notificação como lida
    */
-  static async markAsRead(notificationId: string) {
-    return await prisma.notification.update({
-      where: { id: notificationId },
+  static async markAsRead(notificationId: string, userId: string) {
+    const { count } = await prisma.notification.updateMany({
+      where: { id: notificationId, userId },
       data: {
         isRead: true,
         readAt: new Date(),
       },
     })
+    return count > 0
   }
 
   /**

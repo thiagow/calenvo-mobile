@@ -26,9 +26,12 @@ export interface RateLimitResult {
   reset: number
 }
 
-export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
+// `failClosed: true` bloqueia a requisição quando o Upstash não está configurado, em vez
+// de deixar passar. Usar em rotas públicas e não autenticadas onde tráfego sem limite vira
+// custo direto da plataforma (ex.: chat do widget, que chama a OpenAI a cada request).
+export async function checkRateLimit(identifier: string, options?: { failClosed?: boolean }): Promise<RateLimitResult> {
   if (!ratelimit) {
-    return { success: true, limit: 0, remaining: 0, reset: 0 }
+    return { success: !options?.failClosed, limit: 0, remaining: 0, reset: 0 }
   }
 
   const result = await ratelimit.limit(identifier)

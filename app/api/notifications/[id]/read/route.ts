@@ -16,9 +16,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const notification = await NotificationService.markAsRead(params.id)
+    const userId = (session.user as any).id
+    const updated = await NotificationService.markAsRead(params.id, userId)
 
-    return NextResponse.json(notification)
+    if (!updated) {
+      return NextResponse.json({ error: 'Notificação não encontrada' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao marcar notificação como lida:', error)
     return NextResponse.json(

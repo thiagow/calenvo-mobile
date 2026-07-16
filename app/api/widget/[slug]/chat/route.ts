@@ -12,6 +12,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+const MAX_MESSAGE_LENGTH = 2000
+const MAX_PAYLOAD_LENGTH = 20000
+
+function getVisitorId(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0].trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown'
+}
+
 // O widget é embedado em domínios de terceiros — CORS liberado apenas
 // nesta rota (não afeta o resto da API, que continua same-origin only).
 export async function OPTIONS() {
@@ -32,16 +41,30 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
       return NextResponse.json({ error: 'Chat não está disponível para este negócio' }, { status: 403, headers: CORS_HEADERS })
     }
 
-    const rate = await checkRateLimit(`widget:${tenant.id}`)
-    if (!rate.success) {
+    const visitorId = getVisitorId(request)
+
+    const [tenantRate, visitorRate] = await Promise.all([
+      checkRateLimit(`widget:${tenant.id}`, { failClosed: true }),
+      checkRateLimit(`widget:${tenant.id}:${visitorId}`, { failClosed: true }),
+    ])
+    if (!tenantRate.success || !visitorRate.success) {
       return NextResponse.json({ error: 'Muitas mensagens em pouco tempo. Aguarde um instante.' }, { status: 429, headers: CORS_HEADERS })
     }
 
-    const body = await request.json()
+    const rawBody = await request.text()
+    if (rawBody.length > MAX_PAYLOAD_LENGTH) {
+      return NextResponse.json({ error: 'Mensagem muito grande' }, { status: 413, headers: CORS_HEADERS })
+    }
+
+    const body = JSON.parse(rawBody)
     const messages: ChatMessage[] = Array.isArray(body?.messages) ? body.messages : []
 
     if (messages.length === 0) {
       return NextResponse.json({ error: 'Nenhuma mensagem enviada' }, { status: 400, headers: CORS_HEADERS })
+    }
+
+    if (messages.some((m) => typeof m?.content !== 'string' || m.content.length > MAX_MESSAGE_LENGTH)) {
+      return NextResponse.json({ error: 'Mensagem excede o tamanho máximo permitido' }, { status: 413, headers: CORS_HEADERS })
     }
 
     // Limita o tamanho do histórico enviado pelo cliente (evita payloads abusivos)
