@@ -6,6 +6,21 @@ export interface AvailabilitySlot {
 }
 
 /**
+ * Constrói uma Date à meia-noite local a partir de "YYYY-MM-DD".
+ *
+ * `new Date(dateStr)` parseia a string como meia-noite UTC; combinar isso com
+ * métodos locais (`getDay`, `setHours`) desalinha o dia sempre que o processo
+ * roda fora de UTC — ex.: "2026-07-21" virava terça (dia real) só em servidor
+ * UTC, mas segunda-feira num servidor em GMT-3, porque meia-noite UTC de dia
+ * 21 já é 21h do dia 20 em Brasília. Construir a partir dos componentes
+ * locais evita o problema, independente do timezone do processo.
+ */
+export function parseCalendarDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+/**
  * Calcula os horários disponíveis de uma agenda/serviço num dia específico,
  * considerando dias de trabalho, bloqueios, horário de almoço e agendamentos
  * já existentes. Compartilhado entre a página pública de agendamento e as
@@ -15,11 +30,12 @@ export async function getAvailableSlots(params: {
   scheduleId: string
   serviceId: string
   date: string
+  userId: string
 }): Promise<AvailabilitySlot[] | null> {
-  const { scheduleId, serviceId, date: dateStr } = params
+  const { scheduleId, serviceId, date: dateStr, userId } = params
 
-  const schedule = await prisma.schedule.findUnique({
-    where: { id: scheduleId },
+  const schedule = await prisma.schedule.findFirst({
+    where: { id: scheduleId, userId },
     include: {
       dayConfigs: true,
       blocks: true,
@@ -32,7 +48,7 @@ export async function getAvailableSlots(params: {
   const service = schedule.services[0]?.service
   if (!service) return null
 
-  const date = new Date(dateStr)
+  const date = parseCalendarDate(dateStr)
   const dayOfWeek = date.getDay()
 
   if (!schedule.workingDays.includes(dayOfWeek)) return []

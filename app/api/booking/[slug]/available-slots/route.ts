@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAvailableSlots } from '@/lib/availability-service'
+import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 
 export const dynamic = 'force-dynamic'
 export async function GET(
@@ -7,6 +8,7 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
+    const { slug } = params
     const searchParams = request.nextUrl.searchParams
     const scheduleId = searchParams.get('scheduleId')
     const serviceId = searchParams.get('serviceId')
@@ -19,7 +21,12 @@ export async function GET(
       )
     }
 
-    const slots = await getAvailableSlots({ scheduleId, serviceId, date })
+    const tenant = await resolveTenantBySlug(slug)
+    if (!tenant) {
+      return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
+    }
+
+    const slots = await getAvailableSlots({ scheduleId, serviceId, date, userId: tenant.id })
 
     if (slots === null) {
       return NextResponse.json(

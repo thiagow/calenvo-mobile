@@ -6,6 +6,7 @@ import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/pl
 import { NotificationService } from '@/lib/notification-service'
 import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
+import { parseCalendarDate } from '@/lib/availability-service'
 
 export async function POST(
   request: NextRequest,
@@ -107,7 +108,7 @@ export async function POST(
 
     // Criar data/hora do agendamento
     const [hours, minutes] = time.split(':').map(Number)
-    const appointmentDate = new Date(date)
+    const appointmentDate = parseCalendarDate(date)
     appointmentDate.setHours(hours, minutes, 0, 0)
 
     // Verificar se já existe agendamento com sobreposição de horário
