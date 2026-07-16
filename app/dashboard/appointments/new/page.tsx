@@ -39,7 +39,6 @@ export default function NewAppointmentPage() {
   const [schedules, setSchedules] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
   const [availableServices, setAvailableServices] = useState<any[]>([])
-  const [professionals, setProfessionals] = useState<any[]>([])
   const [availableProfessionals, setAvailableProfessionals] = useState<any[]>([])
   const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -56,11 +55,10 @@ export default function NewAppointmentPage() {
     fetch('/api/user/plan').then(r => r.ok ? r.json() : null).then(d => {
       if (d) { const multi = d.planType === 'PRO' || d.planType === 'BUSINESS'; setAllowsMultipleProfessionals(multi) }
     })
-    Promise.all([fetch('/api/schedules'), fetch('/api/services'), fetch('/api/professionals')])
-      .then(async ([sRes, svRes, pRes]) => {
+    Promise.all([fetch('/api/schedules'), fetch('/api/services')])
+      .then(async ([sRes, svRes]) => {
         if (sRes.ok) setSchedules((await sRes.json()).filter((s: any) => s.isActive))
         if (svRes.ok) setServices((await svRes.json()).filter((s: any) => s.isActive))
-        if (pRes.ok) setProfessionals((await pRes.json()).filter((p: any) => p.isActive))
       })
   }, [status])
 
@@ -75,13 +73,16 @@ export default function NewAppointmentPage() {
       else setFormData(p => ({ ...p, serviceId: '', duration: schedule.slotDuration?.toString() || '30' }))
     } else { setAvailableServices([]) }
     if (allowsMultipleProfessionals && schedule?.professionals) {
-      const ids = schedule.professionals.map((sp: any) => sp.professionalId)
-      setAvailableProfessionals(professionals.filter(p => ids.includes(p.id)))
+      // Usa os profissionais vinculados na própria agenda (schedule.professionals já
+      // traz o objeto `professional` completo) em vez de cruzar com a lista de
+      // /api/professionals (só equipe) — essa lista nunca inclui o próprio MASTER,
+      // então "Eu mesmo atendo" ficava invisível aqui mesmo estando vinculado à agenda.
+      setAvailableProfessionals(schedule.professionals.map((sp: any) => sp.professional).filter((p: any) => p.isActive))
       setFormData(p => ({ ...p, professionalId: '' }))
     } else { setAvailableProfessionals([]) }
     setAvailableTimeSlots([])
     setFormData(p => ({ ...p, time: '' }))
-  }, [formData.scheduleId, schedules, services, professionals, allowsMultipleProfessionals])
+  }, [formData.scheduleId, schedules, services, allowsMultipleProfessionals])
 
   useEffect(() => {
     if (formData.serviceId) {
