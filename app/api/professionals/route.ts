@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar limite do plano
     const currentProfessionalCount = masterUser.professionals.length
-    if (!canAddProfessional(masterUser.planType, currentProfessionalCount)) {
+    if (!canAddProfessional(masterUser.planType ?? 'BASICO', currentProfessionalCount)) {
       return NextResponse.json(
         { error: 'Limite de profissionais atingido para o seu plano. Faça upgrade para adicionar mais profissionais.' },
         { status: 403 }

@@ -102,7 +102,7 @@ async function executeTool(
         return { error: 'Agendamento online não está disponível para este negócio no momento.' }
       }
 
-      const quota = await checkAppointmentQuota(tenant.id, tenant.planType)
+      const quota = await checkAppointmentQuota(tenant.id, tenant.planType ?? 'BASICO')
       if (!quota.allowed) {
         return { error: 'O estabelecimento atingiu o limite de agendamentos do mês. Peça para o cliente entrar em contato diretamente.' }
       }

@@ -50,3 +50,23 @@ export function getStripePriceId(plan: PlanType, interval: BillingInterval, curr
   const priceId = STRIPE_PRICE_IDS[currency]?.[plan]?.[interval]
   return priceId || null
 }
+
+// Mapa reverso: priceId -> { plan, interval, currency }. Construído uma vez a
+// partir de STRIPE_PRICE_IDS, usado para sincronizar o plano do tenant a
+// partir do price ID vindo de eventos de subscription da Stripe.
+const PRICE_ID_TO_PLAN = new Map<string, { plan: PlanType; interval: BillingInterval; currency: Currency }>()
+
+for (const currency of Object.keys(STRIPE_PRICE_IDS) as Currency[]) {
+  for (const plan of Object.keys(STRIPE_PRICE_IDS[currency]) as PlanType[]) {
+    for (const interval of Object.keys(STRIPE_PRICE_IDS[currency][plan]) as BillingInterval[]) {
+      const priceId = STRIPE_PRICE_IDS[currency][plan][interval]
+      if (priceId) {
+        PRICE_ID_TO_PLAN.set(priceId, { plan, interval, currency })
+      }
+    }
+  }
+}
+
+export function getPlanFromPriceId(priceId: string): { plan: PlanType; interval: BillingInterval; currency: Currency } | null {
+  return PRICE_ID_TO_PLAN.get(priceId) || null
+}

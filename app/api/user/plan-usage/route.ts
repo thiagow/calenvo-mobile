@@ -49,8 +49,8 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const limit = getAppointmentLimit(user.planType)
-    const remaining = getRemainingAppointments(user.planType, appointmentsThisMonth)
+    const limit = getAppointmentLimit(user.planType ?? 'BASICO')
+    const remaining = getRemainingAppointments(user.planType ?? 'BASICO', appointmentsThisMonth)
 
     return NextResponse.json({
       planType: user.planType,

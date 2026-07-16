@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import { stripe } from '@/lib/stripe'
+import { stripe, getPlanFromPriceId } from '@/lib/stripe'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { sendWelcomeEmail, sendPaymentFailedEmail } from '@/lib/email-templates'
@@ -134,6 +134,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       where: { id: existingUser.id },
       data: {
         stripeCustomerId: customerId,
+        subscriptionId,
         planType: userData.plan,
         billingInterval: userData.billingInterval,
         currency: userData.currency,
@@ -165,6 +166,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       locale: userData.locale,
       role: 'MASTER',
       stripeCustomerId: customerId,
+      subscriptionId,
     }
   })
 
@@ -250,14 +252,39 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return
   }
 
-  // Apenas o status da assinatura é atualizado aqui — o planType só muda
-  // através de um novo checkout (ver handleCheckoutSessionCompleted), nunca
-  // como efeito colateral de um evento de status da assinatura.
+  // O plano é derivado do price ID atual da assinatura, cobrindo tanto o
+  // checkout inicial quanto trocas de plano feitas via Stripe Billing Portal
+  // (upgrade/downgrade de self-service), que não passam pelo nosso checkout.
+  const currentPriceId = subscription.items.data[0]?.price?.id
+  const planInfo = currentPriceId ? getPlanFromPriceId(currentPriceId) : null
+
   await prisma.user.update({
     where: { id: user.id },
-    data: { subscriptionStatus: subscription.status }
+    data: {
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      ...(planInfo && {
+        planType: planInfo.plan,
+        billingInterval: planInfo.interval,
+        currency: planInfo.currency,
+      }),
+    }
   })
-  console.log(`✅ subscriptionStatus do usuário atualizado para "${subscription.status}"`)
+
+  if (planInfo) {
+    // Propaga o novo plano para os profissionais da equipe (herdam o plano do master).
+    await prisma.user.updateMany({
+      where: { masterId: user.id, role: 'PROFESSIONAL' },
+      data: {
+        planType: planInfo.plan,
+        billingInterval: planInfo.interval,
+        currency: planInfo.currency,
+      }
+    })
+    console.log(`✅ Assinatura sincronizada: status="${subscription.status}", plano=${planInfo.plan} (${planInfo.interval}/${planInfo.currency})`)
+  } else {
+    console.warn(`⚠️ Price ID "${currentPriceId}" não mapeado para nenhum plano — apenas status atualizado ("${subscription.status}")`)
+  }
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {

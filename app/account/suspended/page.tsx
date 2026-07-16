@@ -30,7 +30,7 @@ export default async function AccountSuspendedPage() {
     redirect('/dashboard')
   }
 
-  const planName = PLAN_CONFIGS[user.planType]?.name || user.planType
+  const planName = (user.planType && PLAN_CONFIGS[user.planType]?.name) || user.planType
 
   return (
     <div className="min-h-screen bg-[#FAFAFF] flex flex-col">

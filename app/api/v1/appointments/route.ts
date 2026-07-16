@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tenant não encontrado' }, { status: 404 })
   }
 
-  const quota = await checkAppointmentQuota(user.id, user.planType)
+  const quota = await checkAppointmentQuota(user.id, user.planType ?? 'BASICO')
   if (!quota.allowed) {
     return NextResponse.json(
       {

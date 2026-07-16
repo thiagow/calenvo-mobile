@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar limite de agendamentos do mês atual
-    const quota = await checkAppointmentQuota(userId, user.planType)
+    const quota = await checkAppointmentQuota(userId, user.planType ?? 'BASICO')
     const appointmentsThisMonth = quota.currentCount
 
     // Validar se pode criar mais agendamentos
@@ -361,11 +361,11 @@ export async function POST(request: NextRequest) {
       // Verificar se deve notificar sobre limite de agendamentos
       // Conta agendamentos após a criação (appointmentsThisMonth + 1)
       const currentCount = appointmentsThisMonth + 1
-      if (shouldNotifyLimitApproaching(user.planType, currentCount)) {
-        const remaining = getRemainingAppointments(user.planType, currentCount)
+      if (shouldNotifyLimitApproaching(user.planType ?? 'BASICO', currentCount)) {
+        const remaining = getRemainingAppointments(user.planType ?? 'BASICO', currentCount)
         await NotificationService.notifyPlanLimitApproaching(
           userId,
-          user.planType,
+          user.planType ?? 'BASICO',
           remaining
         )
       }

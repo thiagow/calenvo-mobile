@@ -2,38 +2,59 @@
 
 ## 📋 Descrição
 
-Sistema de gerenciamento de planos de assinatura com integração ao Stripe, controle de limites e upgrade/downgrade.
+Sistema de gerenciamento de planos de assinatura com integração ao Stripe, controle de limites e sincronização automática de plano/status via webhook.
+
+> ⚠️ Esta página foi reescrita em 2026-07-15 para refletir o código real. A versão anterior descrevia um modelo fictício (FREEMIUM/STANDARD/PREMIUM) que nunca existiu na implementação.
 
 ## 📍 Localização no Código
 
 ### Páginas
 - **Planos**: `/dashboard/plans` → `app/dashboard/plans/page.tsx`
+- **Conta suspensa**: `/account/suspended` → `app/account/suspended/page.tsx`
+- **Signup por plano**: `/[locale]/signup/[plan]` → `app/[locale]/signup/[plan]/page.tsx`
 
 ### APIs
-- `GET /api/stripe/plans` - Listar planos disponíveis
-- `POST /api/stripe/checkout` - Criar sessão de checkout
-- `POST /api/stripe/portal` - Portal de gerenciamento
-- `POST /api/stripe/webhook` - Webhook do Stripe
-- `GET /api/user/plan` - Plano atual do usuário
-- `PATCH /api/user/plan` - Atualizar plano
+- `POST /api/stripe/create-checkout` — cria Stripe Customer + Checkout Session (novo tenant)
+- `POST /api/stripe/portal` — cria sessão do Stripe Billing Portal (self-service)
+- `POST /api/stripe/webhook` — recebe e processa eventos do Stripe (fonte da verdade)
+- `GET /api/user/plan` — plano atual do usuário autenticado
+- `GET /api/user/plan-usage` / `GET /api/plans/usage` — uso corrente vs. limites do plano
+- `POST /api/saas-admin/tenants` — criação manual de tenant isento de pagamento (sem Stripe)
+
+### Lógica de domínio
+- `lib/types.ts` — `PLAN_CONFIGS` (preços e features exibidas na UI)
+- `lib/plan-limits.ts` — `PLAN_LIMITS` (limites reais aplicados: profissionais, agendamentos, agendas, serviços)
+- `lib/stripe.ts` — `STRIPE_PRICE_IDS`, `getStripePriceId()`, `getPlanFromPriceId()`
 
 ## 🗄️ Modelo de Dados
 
 ```prisma
 enum PlanType {
-  FREEMIUM
-  STANDARD
-  PREMIUM
+  BASICO
+  PRO
+  BUSINESS
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum Currency {
+  BRL
+  USD
 }
 
 model User {
   // ... outros campos
-  planType      PlanType  @default(FREEMIUM)
-  stripeCustomerId String?
-  subscriptionId String?
+  planType           PlanType?         // null para SAAS_ADMIN; sempre setado explicitamente para MASTER/PROFESSIONAL
+  billingInterval    BillingInterval?  @default(MONTHLY)
+  currency           Currency          @default(BRL)
+  isPaymentExempt    Boolean           @default(false)
+  stripeCustomerId   String?
+  subscriptionId     String?
   subscriptionStatus String?
-  // ... 
-  planUsage     PlanUsage?
+  planUsage          PlanUsage?
 }
 
 model PlanUsage {
@@ -42,367 +63,155 @@ model PlanUsage {
   currentPeriodStart DateTime @default(now())
   currentPeriodEnd   DateTime
   resetAt            DateTime
-  
+
   userId             String   @unique
   user               User     @relation(fields: [userId], references: [id])
 }
 ```
 
-## 🎯 Planos Disponíveis
+`planType` é opcional no schema porque o `SAAS_ADMIN` não deve carregar um plano (não é um tenant). Todo caminho de criação de usuário `MASTER`/`PROFESSIONAL` (webhook de checkout, criação manual pelo admin, herança pelo profissional) define `planType` explicitamente — nunca fica nulo na prática para essas roles.
 
-### FREEMIUM (Gratuito)
+## 🎯 Planos Disponíveis (`lib/types.ts` → `PLAN_CONFIGS`)
+
+| Plano | Nome exibido | Profissionais | Agendamentos/mês | R$/mês | R$/mês (anual) | US$/mês | US$/mês (anual) |
+|-------|-------------|:-:|:-:|:-:|:-:|:-:|:-:|
+| `BASICO` | Básico | 2 | 150 | 19,90 | 15,92 | 9,90 | 7,92 |
+| `PRO` | PRO | 8 | Ilimitado | 39,90 | 31,93 | 19,90 | 15,93 |
+| `BUSINESS` | Avançado | Ilimitado | Ilimitado | 69,90 | 55,93 | 29,90 | 23,92 |
+
+Limites de agendas e serviços (`lib/plan-limits.ts` → `PLAN_LIMITS`, não exibidos em `PLAN_CONFIGS`):
+
+| Plano | Agendas | Serviços |
+|-------|:-:|:-:|
+| `BASICO` | 2 | 10 |
+| `PRO` | 8 | 50 |
+| `BUSINESS` | Ilimitado | Ilimitado |
+
+`-1` no código sempre significa "ilimitado".
+
+## 🔗 Mapeamento PlanType ↔ Stripe (Product IDs / Price IDs)
+
+Fonte da verdade em runtime: `lib/stripe.ts` → `STRIPE_PRICE_IDS`, populado a partir das env vars abaixo. Auditado contra a conta Stripe em 2026-07-15 (modo test) — todos os 12 Price IDs conferem com os produtos ativos.
+
+### Plano Básico — `prod_TjoIVH50jDNyQB`
+
+| Env var | Price ID | Valor | Intervalo |
+|---|---|---|---|
+| `STRIPE_BASICO_MONTHLY_PRICE_ID` | `price_1Tqg69Ee8DKEFqGiQpF2QDc0` | R$ 19,90 | mensal |
+| `STRIPE_BASICO_ANNUAL_PRICE_ID` | `price_1TqgTGEe8DKEFqGitAjqBPI2` | R$ 191,00 | anual |
+| `STRIPE_BASICO_MONTHLY_PRICE_ID_USD` | `price_1TqgQtEe8DKEFqGib5hcnZob` | US$ 9,90 | mensal |
+| `STRIPE_BASICO_ANNUAL_PRICE_ID_USD` | `price_1TqgTmEe8DKEFqGiIHn1cPkh` | US$ 95,00 | anual |
+
+> Price legado `price_1SmKgHEe8DKEFqGiJwa9jy4T` (R$ 49,90/mês) está **arquivado** (`active: false`) desde antes desta auditoria. A API da Stripe não permite deletar um `Price` que já foi usado — arquivar é o estado final possível, e é o que ele já tem.
+
+### Plano Pró — `prod_UqMt35LBrxAdci`
+
+| Env var | Price ID | Valor | Intervalo |
+|---|---|---|---|
+| `STRIPE_PRO_MONTHLY_PRICE_ID` | `price_1Tqg9hEe8DKEFqGi7bUL3qVl` | R$ 39,90 | mensal |
+| `STRIPE_PRO_ANNUAL_PRICE_ID` | `price_1TqgUqEe8DKEFqGiXcvvzIpd` | R$ 383,10 | anual |
+| `STRIPE_PRO_MONTHLY_PRICE_ID_USD` | `price_1TqgAREe8DKEFqGi2IsqIO7m` | US$ 19,90 | mensal |
+| `STRIPE_PRO_ANNUAL_PRICE_ID_USD` | `price_1TqgVDEe8DKEFqGikCqWyyyj` | US$ 191,10 | anual |
+
+### Plano Avançado (`PlanType.BUSINESS`) — `prod_UqMxeipvzDMEKx`
+
+| Env var | Price ID | Valor | Intervalo |
+|---|---|---|---|
+| `STRIPE_BUSINESS_MONTHLY_PRICE_ID` | `price_1TqgD7Ee8DKEFqGifg3nUf42` | R$ 69,90 | mensal |
+| `STRIPE_BUSINESS_ANNUAL_PRICE_ID` | `price_1TqgVjEe8DKEFqGiZ9gpYXQP` | R$ 671,10 | anual |
+| `STRIPE_BUSINESS_MONTHLY_PRICE_ID_USD` | `price_1TqgDbEe8DKEFqGi64d94C2c` | US$ 29,90 | mensal |
+| `STRIPE_BUSINESS_ANNUAL_PRICE_ID_USD` | `price_1TqgWEEe8DKEFqGiAtCQmVpk` | US$ 287,10 | anual |
+
+> ⚠️ Note que o produto na Stripe se chama "Plano Avançado", mas o enum interno é `BUSINESS`. Não renomear um dos dois sem atualizar o outro lado do mapeamento.
+
+Esta tabela é gerada a partir de `STRIPE_PRICE_IDS`. Se um Price ID mudar na Stripe, atualize a env var correspondente — o código não precisa mudar. O mapeamento reverso (Price ID → PlanType/Interval/Currency), usado pelo webhook para sincronizar mudanças de plano feitas fora do checkout (ex.: troca de plano no Billing Portal), fica em `getPlanFromPriceId()` (`lib/stripe.ts`) e é derivado automaticamente desta mesma tabela — não precisa manutenção manual.
+
+## 🔐 Validações e Limites (implementação real)
+
 ```typescript
-{
-  name: "Freemium",
-  price: 0,
-  currency: "BRL",
-  interval: "month",
-  features: {
-    appointmentsPerMonth: 50,
-    professionals: 1,
-    schedules: 2,
-    services: 10,
-    clients: 100,
-    whatsapp: false,
-    reports: "basic",
-    support: "email",
-    customBranding: false,
-  }
-}
+// lib/plan-limits.ts
+export function canAddProfessional(planType: string, currentCount: number): boolean
+export function canCreateAppointment(planType: string, currentMonthCount: number): boolean
+export function getRemainingAppointments(planType: string, currentMonthCount: number): number
+export function shouldNotifyLimitApproaching(planType: string, currentMonthCount: number): boolean // avisa quando restam exatamente 5
 ```
 
-### STANDARD (Padrão)
+O uso de agendamentos do mês é contado diretamente via `prisma.appointment.count()` filtrando por `userId` e o mês corrente — não depende do modelo `PlanUsage` para essa checagem (esse modelo existe no schema mas seu uso ativo deve ser conferido em `app/api/plans/usage` antes de assumir que está em uso pleno).
+
+## 💻 Integração com Stripe (implementação real)
+
+### 1. Criar Checkout Session — `POST /api/stripe/create-checkout`
+Usado no signup de um **novo** tenant (ainda não existe no BD). Cria um Stripe Customer, guarda os dados do formulário em `lib/temporary-storage.ts` (memória, expira em 1h, chave = `session.id`) e cria a Checkout Session com `metadata` contendo email/plano/intervalo/moeda como fallback caso o storage temporário se perca.
+
 ```typescript
-{
-  name: "Standard",
-  price: 49.90,
-  currency: "BRL",
-  interval: "month",
-  features: {
-    appointmentsPerMonth: 200,
-    professionals: 5,
-    schedules: 10,
-    services: 50,
-    clients: 1000,
-    whatsapp: true,
-    reports: "advanced",
-    support: "priority",
-    customBranding: true,
-  }
-}
+const priceId = getStripePriceId(plan, interval, currency) // lib/stripe.ts
+const session = await stripe.checkout.sessions.create({
+  customer: customer.id,
+  mode: 'subscription',
+  line_items: [{ price: priceId, quantity: 1 }],
+  metadata: { email, name, businessName, segmentType, phone, customerId, plan, interval, currency, locale },
+})
+setTemporaryData(session.id, { ...formData, timestamp: Date.now() })
 ```
 
-### PREMIUM (Premium)
-```typescript
-{
-  name: "Premium",
-  price: 99.90,
-  currency: "BRL",
-  interval: "month",
-  features: {
-    appointmentsPerMonth: -1, // Ilimitado
-    professionals: -1,
-    schedules: -1,
-    services: -1,
-    clients: -1,
-    whatsapp: true,
-    reports: "full",
-    support: "24/7",
-    customBranding: true,
-    api: true,
-    multiLocation: true,
-  }
-}
-```
+### 2. Portal de Billing — `POST /api/stripe/portal`
+Requer sessão autenticada com `stripeCustomerId` já setado. Cria uma sessão do Stripe Billing Portal e retorna a URL — não manipula o BD diretamente (a sincronização acontece via webhook quando o usuário altera algo no portal).
 
-## 🔐 Validações e Limites
+### 3. Webhook — `POST /api/stripe/webhook` (`app/api/stripe/webhook/route.ts`)
 
-### Verificar Limite
-```typescript
-async function checkPlanLimit(userId: string, resource: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { planUsage: true },
-  })
-  
-  const limits = PLAN_LIMITS[user.planType]
-  
-  switch (resource) {
-    case 'appointments':
-      if (limits.appointmentsPerMonth === -1) return true
-      return user.planUsage.appointmentsCount < limits.appointmentsPerMonth
-      
-    case 'professionals':
-      const profCount = await prisma.user.count({
-        where: { masterId: userId, role: 'PROFESSIONAL' }
-      })
-      return limits.professionals === -1 || profCount < limits.professionals
-      
-    // ... outros recursos
-  }
-}
-```
+| Evento | Ação |
+|---|---|
+| `checkout.session.completed` | Cria `User` MASTER + `User` PROFESSIONAL (mesmo email, `masterId` do master) + `BusinessConfig`. Persiste `stripeCustomerId`, `subscriptionId`, `planType`, `billingInterval`, `currency`. Idempotente (rechecagem por email+role ou por `stripeCustomerId`). Envia email de boas-vindas. |
+| `customer.subscription.created` | Apenas log — a criação real do usuário acontece em `checkout.session.completed`. |
+| `customer.subscription.updated` | Resolve o plano atual a partir do `price.id` do primeiro item da assinatura via `getPlanFromPriceId()` e sincroniza `planType`/`billingInterval`/`currency` do MASTER **e** de todos os `PROFESSIONAL` vinculados (`masterId`). Sempre atualiza `subscriptionId` e `subscriptionStatus`. Cobre tanto o pós-checkout quanto trocas de plano feitas no Billing Portal. |
+| `customer.subscription.deleted` | Marca `subscriptionStatus: 'canceled'`. **Não existe plano gratuito de fallback** — o `planType` anterior é mantido e a conta fica suspensa (ver `/account/suspended`) até uma nova assinatura ser ativada. |
+| `invoice.payment_succeeded` | Apenas log. |
+| `invoice.payment_failed` | Envia email de falha de pagamento. Não altera `subscriptionStatus` diretamente (isso chega via `customer.subscription.updated`). |
 
-### Incrementar Uso
-```typescript
-async function incrementAppointmentUsage(userId: string) {
-  const planUsage = await prisma.planUsage.findUnique({
-    where: { userId },
-  })
-  
-  // Verificar se período resetou
-  if (new Date() > planUsage.resetAt) {
-    await prisma.planUsage.update({
-      where: { userId },
-      data: {
-        appointmentsCount: 1,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: addMonths(new Date(), 1),
-        resetAt: addMonths(new Date(), 1),
-      },
-    })
-  } else {
-    await prisma.planUsage.update({
-      where: { userId },
-      data: {
-        appointmentsCount: { increment: 1 },
-      },
-    })
-  }
-}
-```
-
-## 💻 Integração com Stripe
-
-### Criar Checkout Session
-```typescript
-async function createCheckoutSession(userId: string, planType: PlanType) {
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  
-  // Criar ou recuperar customer no Stripe
-  let customerId = user.stripeCustomerId
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: user.email,
-      metadata: { userId: user.id },
-    })
-    customerId = customer.id
-    
-    await prisma.user.update({
-      where: { id: userId },
-      data: { stripeCustomerId: customerId },
-    })
-  }
-  
-  // Buscar price ID do plano
-  const priceId = STRIPE_PRICE_IDS[planType]
-  
-  // Criar sessão de checkout
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    line_items: [{
-      price: priceId,
-      quantity: 1,
-    }],
-    success_url: `${process.env.NEXT_PUBLIC_URL}/dashboard/plans?success=true`,
-    cancel_url: `${process.env.NEXT_PUBLIC_URL}/dashboard/plans?canceled=true`,
-  })
-  
-  return session
-}
-```
-
-### Processar Webhook
-```typescript
-async function handleStripeWebhook(event: Stripe.Event) {
-  switch (event.type) {
-    case 'checkout.session.completed':
-      const session = event.data.object as Stripe.Checkout.Session
-      await activateSubscription(session)
-      break
-      
-    case 'customer.subscription.updated':
-      const subscription = event.data.object as Stripe.Subscription
-      await updateSubscriptionStatus(subscription)
-      break
-      
-    case 'customer.subscription.deleted':
-      const cancelled = event.data.object as Stripe.Subscription
-      await handleCancellation(cancelled)
-      break
-  }
-}
-
-async function activateSubscription(session: Stripe.Checkout.Session) {
-  const userId = session.metadata?.userId
-  
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      subscriptionId: session.subscription as string,
-      subscriptionStatus: 'active',
-      planType: session.metadata?.planType as PlanType,
-    },
-  })
-}
-```
-
-## 🎨 Interface
-
-### Página de Planos
-```tsx
-<PlansPage>
-  <Header>
-    <h1>Planos e Assinaturas</h1>
-    {currentPlan && (
-      <CurrentPlanBadge plan={currentPlan} />
-    )}
-  </Header>
-  
-  <UsageStats>
-    <StatCard 
-      title="Agendamentos este mês" 
-      value={`${usage.appointmentsCount} / ${limit}`}
-      progress={usage.appointmentsCount / limit * 100}
-    />
-  </UsageStats>
-  
-  <PlansGrid>
-    {plans.map(plan => (
-      <PlanCard 
-        key={plan.type}
-        plan={plan}
-        current={plan.type === currentPlan}
-        onSelect={() => handleSelectPlan(plan.type)}
-      />
-    ))}
-  </PlansGrid>
-  
-  {hasActiveSubscription && (
-    <Button onClick={openStripePortal}>
-      Gerenciar Assinatura
-    </Button>
-  )}
-</PlansPage>
-```
-
-### Card de Plano
-```tsx
-<PlanCard>
-  <PlanName>{plan.name}</PlanName>
-  <PlanPrice>
-    {plan.price === 0 ? 'Gratuito' : `R$ ${plan.price}/mês`}
-  </PlanPrice>
-  
-  <FeaturesList>
-    <Feature>
-      ✓ {plan.features.appointmentsPerMonth === -1 
-        ? 'Agendamentos ilimitados' 
-        : `${plan.features.appointmentsPerMonth} agendamentos/mês`}
-    </Feature>
-    <Feature>
-      ✓ {plan.features.professionals === -1 
-        ? 'Profissionais ilimitados' 
-        : `Até ${plan.features.professionals} profissionais`}
-    </Feature>
-    {/* ... */}
-  </FeaturesList>
-  
-  <Button 
-    onClick={handleSelectPlan}
-    disabled={isCurrent}
-  >
-    {isCurrent ? 'Plano Atual' : 'Selecionar'}
-  </Button>
-</PlanCard>
-```
+### 4. Criação manual isenta de pagamento — `POST /api/saas-admin/tenants`
+Usada pelo SaaS Admin para cortesias/parcerias/contas de teste. Cria MASTER + PROFESSIONAL + BusinessConfig com `isPaymentExempt: true`, sem tocar na Stripe. `planType` e `billingInterval` são obrigatórios no payload e validados contra as listas `VALID_PLANS`/`VALID_INTERVALS`.
 
 ## 🎯 Casos de Uso
 
-### 1. Upgrade de Plano
-**Fluxo**:
-1. Usuário acessa `/dashboard/plans`
-2. Vê plano atual e uso
-3. Clica em "Selecionar" no plano superior
-4. Redirecionado para checkout Stripe
-5. Preenche dados de pagamento
-6. Confirma
-7. Webhook atualiza plano no sistema
-8. Limites aumentados imediatamente
+### 1. Novo tenant via checkout
+1. Usuário preenche formulário de signup em `/[locale]/signup/[plan]`
+2. `POST /api/stripe/create-checkout` cria Customer + Checkout Session, guarda dados temporários
+3. Usuário é redirecionado ao Stripe Checkout e paga
+4. Stripe dispara `checkout.session.completed` → webhook cria MASTER + PROFESSIONAL + BusinessConfig
+5. Email de boas-vindas enviado
 
-### 2. Atingir Limite do Plano
-**Fluxo**:
-1. Usuário tenta criar 51º agendamento (Freemium)
-2. Sistema verifica limite
-3. Bloqueia ação e exibe modal
-4. "Você atingiu o limite. Faça upgrade!"
-5. Botão para página de planos
-6. Pode fazer upgrade ou aguardar reset mensal
+### 2. Troca de plano via Billing Portal
+1. Usuário clica em "Gerenciar Assinatura" no dashboard → `POST /api/stripe/portal`
+2. Troca de plano dentro do portal hospedado pela Stripe (requer que a "Default configuration" do portal, no Dashboard da Stripe, permita troca de preço — isso é configuração do lado da Stripe, não do código)
+3. Stripe dispara `customer.subscription.updated` com o novo `price.id`
+4. Webhook resolve o novo `PlanType`/`BillingInterval`/`Currency` via `getPlanFromPriceId()` e propaga para o MASTER e todos os PROFESSIONAL da equipe
 
-### 3. Cancelamento de Assinatura
-**Fluxo**:
-1. Usuário acessa gerenciamento
-2. Clica em "Gerenciar Assinatura"
-3. Redirecionado ao Stripe Portal
-4. Cancela assinatura
-5. Webhook recebido
-6. Plano ativo até fim do período pago
-7. Depois volta para Freemium automaticamente
+### 3. Atingir limite do plano
+1. Usuário tenta criar um agendamento além do limite mensal do plano
+2. `checkAppointmentQuota()` bloqueia e retorna `code: 'APPOINTMENT_LIMIT_REACHED'`
+3. Se restarem exatamente 5 agendamentos antes do limite, `NotificationService.notifyPlanLimitApproaching()` é disparado
 
-## 📊 Métricas de Planos
+### 4. Cancelamento de assinatura
+1. Usuário cancela no Billing Portal
+2. Webhook `customer.subscription.deleted` marca `subscriptionStatus: 'canceled'`
+3. Conta é tratada como suspensa (`/account/suspended`) mantendo o último `planType` contratado
+4. Reativação exige nova assinatura ativa (não há downgrade automático para um plano gratuito — não existe plano gratuito no sistema)
 
-### MRR (Monthly Recurring Revenue)
-```typescript
-async function calculateMRR() {
-  const activeSubscriptions = await prisma.user.count({
-    where: {
-      subscriptionStatus: 'active',
-      planType: { not: 'FREEMIUM' },
-    },
-    groupBy: ['planType'],
-  })
-  
-  const mrr = activeSubscriptions.reduce((total, sub) => {
-    return total + (PLAN_PRICES[sub.planType] * sub._count)
-  }, 0)
-  
-  return mrr
-}
-```
+## 🧪 Teste de regressão end-to-end
 
-### Churn Rate
-```typescript
-async function calculateChurnRate(period: 'month' | 'year') {
-  const startOfPeriod = period === 'month' 
-    ? startOfMonth(new Date()) 
-    : startOfYear(new Date())
-  
-  const cancelledSubs = await prisma.user.count({
-    where: {
-      subscriptionStatus: 'cancelled',
-      updatedAt: { gte: startOfPeriod },
-    },
-  })
-  
-  const totalSubs = await prisma.user.count({
-    where: { planType: { not: 'FREEMIUM' } },
-  })
-  
-  return (cancelledSubs / totalSubs) * 100
-}
-```
+`scripts/test-checkout-e2e.ts` exercita o fluxo completo contra o Stripe real em modo test (`sk_test_...`) e a API local:
+1. `POST /api/stripe/create-checkout` (cria Customer real na Stripe)
+2. Simula `checkout.session.completed` assinado com `STRIPE_WEBHOOK_SECRET` real → valida criação de MASTER/PROFESSIONAL/BusinessConfig e persistência de `subscriptionId`
+3. Simula `customer.subscription.updated` (upgrade de plano) → valida sincronização de `planType` no MASTER e propagação ao PROFESSIONAL
+4. Simula `customer.subscription.deleted` → valida `subscriptionStatus: 'canceled'` com `planType` preservado
+5. Limpa os dados de teste no BD e remove o Customer criado na Stripe
+
+Rodar com: `npx tsx scripts/test-checkout-e2e.ts` (requer o dev server rodando — porta configurada em `package.json`, atualmente `3001`).
 
 ## 🚀 Melhorias Futuras
 
-- [ ] Planos anuais (desconto)
-- [ ] Add-ons (recursos extras)
-- [ ] Trial period (período de teste)
 - [ ] Cupons de desconto
 - [ ] Programa de afiliados
 - [ ] Planos customizados (enterprise)
-- [ ] Multi-moeda
 - [ ] Pagamento via PIX/Boleto
-- [ ] Créditos de agendamento
-- [ ] Rollover de limites não usados
+- [ ] Trial period (período de teste)

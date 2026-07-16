@@ -90,8 +90,8 @@ model User {
   businessName       String? // Nome do negócio
   phone              String?
   segmentType        SegmentType @default(BEAUTY_SALON)
-  planType           PlanType    @default(BASICO)
-  billingInterval    BillingInterval?
+  planType           PlanType? // Null para SAAS_ADMIN; sempre setado explicitamente na criação de MASTER/PROFESSIONAL
+  billingInterval    BillingInterval? @default(MONTHLY)
   currency           Currency    @default(BRL)
   locale             String      @default("pt")
   isPaymentExempt    Boolean     @default(false)

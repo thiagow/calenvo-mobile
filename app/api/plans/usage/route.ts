@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const planConfig = PLAN_CONFIGS[user.planType]
+    const planConfig = PLAN_CONFIGS[user.planType ?? 'BASICO']
     const usagePercentage = planConfig.monthlyLimit === -1 
       ? 0 
       : Math.min(Math.round((appointmentsThisMonth / planConfig.monthlyLimit) * 100), 100)
