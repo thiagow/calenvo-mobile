@@ -44,7 +44,7 @@ npx tsx scripts/seed.ts
 npm run lint
 ```
 
-No automated test suite — verification is done via manual scripts in `/scripts/` run with `npx tsx scripts/<script>.ts`.
+Unit tests live alongside the code as `*.test.ts` (Vitest, see `vitest.config.ts`), run with `npm test`. `.github/workflows/typecheck.yml` runs `npx tsc --noEmit` and `npm test` on every push/PR to `master`. Manual verification scripts in `/scripts/` (run with `npx tsx scripts/<script>.ts`) are still used for things that don't fit a unit test (e.g. one-off data checks).
 
 ## Architecture
 
@@ -109,6 +109,17 @@ Copy `.env.example` for the full list.
 - **Conditional classes**: always use the `cn()` utility (`lib/utils.ts`), never string concatenation
 - **Error handling**: try/catch in API routes; surface to user via toast, log to `ErrorLog` model for critical failures
 - **Shadcn components** live in `/components/ui/` — never edit them directly, extend via wrapper components
+
+## CI notes — Stripe price ID test removed (2026-07-16)
+
+`lib/stripe.ts` throws at import time if `STRIPE_SECRET_KEY` is unset. There used to be a `lib/stripe.test.ts` asserting the 12 `STRIPE_*_PRICE_ID` env vars (3 plans × 2 intervals × 2 currencies) were all set, unique, and round-tripped correctly through `getStripePriceId`/`getPlanFromPriceId` — it was the only test file that imported `lib/stripe.ts`. The GitHub Actions repo never had `STRIPE_SECRET_KEY` (or the other 12 Stripe secrets) configured under Settings → Secrets and variables → Actions, so every single CI run since the workflow was introduced (commit `6f5ff12`) crashed instantly on `npm test` — not a typecheck error despite what the job name implied.
+
+Decision: removed `lib/stripe.test.ts` and the now-unused `STRIPE_*` env block from the `npm test` step in `.github/workflows/typecheck.yml`, rather than cadastrar os secrets, to keep CI green without touching GitHub repo settings. The tradeoff: **there is currently no automated check that the Stripe price ID → plan mapping is configured correctly**. A wrong/duplicated/missing price ID in `.env` (prod or local) would only surface manually — e.g. a customer getting provisioned on the wrong plan after checkout, or a subscription webhook failing to resolve a plan via `getPlanFromPriceId`.
+
+If billing/plan-provisioning bugs start showing up, or before touching `lib/stripe.ts` / the checkout or webhook flows again, reintroduce this test. To bring it back:
+1. Restore `lib/stripe.test.ts` from git history (`git log --follow -- lib/stripe.test.ts`, last present before this note).
+2. Add `STRIPE_SECRET_KEY` + the 12 `STRIPE_*_PRICE_ID` (BASICO/PRO/BUSINESS × MONTHLY/ANNUAL × BRL/USD, the `_USD` ones suffixed) as repo secrets in GitHub Actions. The test never calls the real Stripe API, so sandbox/dummy `price_...`-prefixed values work fine — only `STRIPE_SECRET_KEY` needs to be a real (even if test-mode) Stripe key so `lib/stripe.ts` doesn't throw on import.
+3. Re-add the corresponding `env:` block to the `npm test` step in `.github/workflows/typecheck.yml`.
 
 ## Netlify build
 

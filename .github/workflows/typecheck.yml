@@ -7,7 +7,8 @@ on:
     branches: [master]
 
 jobs:
-  typecheck:
+  checks:
+    name: Typecheck & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,17 +25,3 @@ jobs:
       - run: npx tsc --noEmit
 
       - run: npm test
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_BASICO_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_BASICO_MONTHLY_PRICE_ID }}
-          STRIPE_BASICO_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_BASICO_ANNUAL_PRICE_ID }}
-          STRIPE_PRO_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID }}
-          STRIPE_PRO_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
-          STRIPE_BUSINESS_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_BUSINESS_MONTHLY_PRICE_ID }}
-          STRIPE_BUSINESS_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_BUSINESS_ANNUAL_PRICE_ID }}
-          STRIPE_BASICO_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_BASICO_MONTHLY_PRICE_ID_USD }}
-          STRIPE_BASICO_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_BASICO_ANNUAL_PRICE_ID_USD }}
-          STRIPE_PRO_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID_USD }}
-          STRIPE_PRO_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID_USD }}
-          STRIPE_BUSINESS_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_BUSINESS_MONTHLY_PRICE_ID_USD }}
-          STRIPE_BUSINESS_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_BUSINESS_ANNUAL_PRICE_ID_USD }}
