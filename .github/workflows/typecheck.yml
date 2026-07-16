@@ -1,0 +1,40 @@
+name: Typecheck & Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npx tsc --noEmit
+
+      - run: npm test
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_BASICO_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_BASICO_MONTHLY_PRICE_ID }}
+          STRIPE_BASICO_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_BASICO_ANNUAL_PRICE_ID }}
+          STRIPE_PRO_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID }}
+          STRIPE_PRO_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID }}
+          STRIPE_BUSINESS_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_BUSINESS_MONTHLY_PRICE_ID }}
+          STRIPE_BUSINESS_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_BUSINESS_ANNUAL_PRICE_ID }}
+          STRIPE_BASICO_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_BASICO_MONTHLY_PRICE_ID_USD }}
+          STRIPE_BASICO_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_BASICO_ANNUAL_PRICE_ID_USD }}
+          STRIPE_PRO_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_PRO_MONTHLY_PRICE_ID_USD }}
+          STRIPE_PRO_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_PRO_ANNUAL_PRICE_ID_USD }}
+          STRIPE_BUSINESS_MONTHLY_PRICE_ID_USD: ${{ secrets.STRIPE_BUSINESS_MONTHLY_PRICE_ID_USD }}
+          STRIPE_BUSINESS_ANNUAL_PRICE_ID_USD: ${{ secrets.STRIPE_BUSINESS_ANNUAL_PRICE_ID_USD }}
