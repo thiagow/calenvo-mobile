@@ -138,12 +138,11 @@ export async function POST(request: NextRequest) {
       description,
       color,
       workingDays,
-      slotDuration,
       bufferTime,
       advanceBookingDays,
       minNoticeHours,
       serviceIds, // Array de IDs de serviços para vincular
-      professionalIds // Array de IDs de profissionais para vincular
+      professionalIds // Array de IDs de profissionais para vincular (inclui o próprio MASTER, se "eu mesmo atendo")
     } = body
 
     if (!name || !workingDays) {
@@ -157,7 +156,7 @@ export async function POST(request: NextRequest) {
     if (!professionalIds || professionalIds.length === 0) {
       console.log('❌ Validation error - No professionals selected')
       return NextResponse.json(
-        { error: 'Selecione pelo menos um profissional para esta agenda' },
+        { error: 'Selecione ao menos "Eu mesmo atendo" ou um profissional da equipe para esta agenda' },
         { status: 400 }
       )
     }
@@ -170,6 +169,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Confirmar que os serviços pertencem ao tenant
+    const ownedServices = await prisma.service.findMany({
+      where: { id: { in: serviceIds }, userId },
+      select: { id: true, duration: true }
+    })
+    if (ownedServices.length !== serviceIds.length) {
+      return NextResponse.json({ error: 'Um ou mais serviços não foram encontrados' }, { status: 400 })
+    }
+
+    // Confirmar que os profissionais pertencem ao tenant (equipe) OU são o próprio MASTER ("eu mesmo atendo")
+    const ownedProfessionals = await prisma.user.findMany({
+      where: { id: { in: professionalIds }, OR: [{ masterId: userId }, { id: userId }] },
+      select: { id: true }
+    })
+    if (ownedProfessionals.length !== professionalIds.length) {
+      return NextResponse.json({ error: 'Um ou mais profissionais não foram encontrados' }, { status: 400 })
+    }
+
+    // Duração do slot é derivada dos serviços vinculados — não é mais um campo editável pelo usuário
+    const derivedSlotDuration = Math.min(...ownedServices.map((s) => s.duration))
+
     // Criar a agenda
     console.log('🔧 Creating schedule with data:', {
       userId,
@@ -177,12 +197,12 @@ export async function POST(request: NextRequest) {
       description,
       color: color || '#3B82F6',
       workingDays,
-      slotDuration: slotDuration || 30,
+      slotDuration: derivedSlotDuration,
       bufferTime: bufferTime || 0,
       advanceBookingDays: advanceBookingDays || 30,
       minNoticeHours: minNoticeHours || 2
     })
-    
+
     const schedule = await prisma.schedule.create({
       data: {
         userId: userId,
@@ -190,7 +210,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         color: color || '#3B82F6',
         workingDays,
-        slotDuration: slotDuration || 30,
+        slotDuration: derivedSlotDuration,
         bufferTime: bufferTime || 0,
         advanceBookingDays: advanceBookingDays || 30,
         minNoticeHours: minNoticeHours || 2
@@ -199,29 +219,25 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Schedule created:', schedule.id)
 
-    // Vincular serviços se fornecidos
-    if (serviceIds && serviceIds.length > 0) {
-      console.log('🔗 Linking services:', serviceIds)
-      await prisma.scheduleService.createMany({
-        data: serviceIds.map((serviceId: string) => ({
-          scheduleId: schedule.id,
-          serviceId
-        }))
-      })
-      console.log('✅ Services linked')
-    }
+    // Vincular serviços
+    console.log('🔗 Linking services:', serviceIds)
+    await prisma.scheduleService.createMany({
+      data: serviceIds.map((serviceId: string) => ({
+        scheduleId: schedule.id,
+        serviceId
+      }))
+    })
+    console.log('✅ Services linked')
 
-    // Vincular profissionais se fornecidos
-    if (professionalIds && professionalIds.length > 0) {
-      console.log('🔗 Linking professionals:', professionalIds)
-      await prisma.scheduleProfessional.createMany({
-        data: professionalIds.map((professionalId: string) => ({
-          scheduleId: schedule.id,
-          professionalId
-        }))
-      })
-      console.log('✅ Professionals linked')
-    }
+    // Vincular profissionais
+    console.log('🔗 Linking professionals:', professionalIds)
+    await prisma.scheduleProfessional.createMany({
+      data: professionalIds.map((professionalId: string) => ({
+        scheduleId: schedule.id,
+        professionalId
+      }))
+    })
+    console.log('✅ Professionals linked')
 
     // Buscar a agenda criada com os relacionamentos
     const scheduleWithRelations = await prisma.schedule.findUnique({

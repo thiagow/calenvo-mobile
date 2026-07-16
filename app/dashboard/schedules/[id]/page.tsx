@@ -13,19 +13,9 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { ArrowLeft, Save, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { CustomDayConfig } from '@/components/schedule/custom-day-config'
+import { CustomDayConfig, type DayConfig } from '@/components/schedule/custom-day-config'
 import { ScheduleBlocks } from '@/components/schedule/schedule-blocks'
 import { ScheduleTabsList } from '@/components/schedule/schedule-tabs-list'
-
-const WEEK_DAYS = [
-  { value: 0, label: 'Domingo' },
-  { value: 1, label: 'Segunda' },
-  { value: 2, label: 'Terça' },
-  { value: 3, label: 'Quarta' },
-  { value: 4, label: 'Quinta' },
-  { value: 5, label: 'Sexta' },
-  { value: 6, label: 'Sábado' }
-]
 
 const COLORS = [
   { value: '#3B82F6', label: 'Azul' },
@@ -37,31 +27,29 @@ const COLORS = [
   { value: '#06B6D4', label: 'Ciano' }
 ]
 
+const WEEK_DAY_VALUES = [0, 1, 2, 3, 4, 5, 6]
+
 export default function EditSchedulePage() {
   const router = useRouter()
   const params = useParams()
-  const { status } = useSession()
+  const { data: session, status } = useSession()
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
   const [services, setServices] = useState<any[]>([])
   const [professionals, setProfessionals] = useState<any[]>([])
+  const [dayConfigs, setDayConfigs] = useState<DayConfig[]>([])
   const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
     color: '#3B82F6',
-    workingDays: [1, 2, 3, 4, 5],
-    startTime: '08:00',
-    endTime: '18:00',
-    slotDuration: 30,
     bufferTime: 0,
-    lunchStart: '',
-    lunchEnd: '',
     advanceBookingDays: 30,
     minNoticeHours: 2,
     isActive: true,
     acceptWalkIn: false,
     selectedServices: [] as string[],
-    selectedProfessionals: [] as string[]
+    selectedProfessionals: [] as string[],
+    selfAsProfessional: false,
   })
 
   useEffect(() => {
@@ -72,32 +60,47 @@ export default function EditSchedulePage() {
 
   const fetchData = async () => {
     try {
-      const [scheduleRes, servicesRes, professionalsRes] = await Promise.all([
+      const [scheduleRes, servicesRes, professionalsRes, dayConfigRes] = await Promise.all([
         fetch(`/api/schedules/${params.id}`),
         fetch('/api/services'),
-        fetch('/api/professionals')
+        fetch('/api/professionals'),
+        fetch(`/api/schedules/${params.id}/day-config`)
       ])
 
       if (scheduleRes.ok) {
         const scheduleData = await scheduleRes.json()
+        const ownUserId = (session?.user as any)?.id
+        const professionalIds = scheduleData.professionals?.map((p: any) => p.professionalId) || []
+
         setFormData({
           name: scheduleData.name,
           description: scheduleData.description || '',
           color: scheduleData.color,
-          workingDays: scheduleData.workingDays,
-          startTime: scheduleData.startTime,
-          endTime: scheduleData.endTime,
-          slotDuration: scheduleData.slotDuration,
           bufferTime: scheduleData.bufferTime,
-          lunchStart: scheduleData.lunchStart || '',
-          lunchEnd: scheduleData.lunchEnd || '',
           advanceBookingDays: scheduleData.advanceBookingDays,
           minNoticeHours: scheduleData.minNoticeHours,
           isActive: scheduleData.isActive,
           acceptWalkIn: scheduleData.acceptWalkIn || false,
           selectedServices: scheduleData.services?.map((s: any) => s.serviceId) || [],
-          selectedProfessionals: scheduleData.professionals?.map((p: any) => p.professionalId) || []
+          selectedProfessionals: professionalIds.filter((id: string) => id !== ownUserId),
+          selfAsProfessional: professionalIds.includes(ownUserId),
         })
+
+        if (dayConfigRes.ok) {
+          const existingConfigs = await dayConfigRes.json()
+          if (existingConfigs.length > 0) {
+            setDayConfigs(existingConfigs)
+          } else {
+            // Agenda legada, criada antes da unificação: ainda não tem
+            // ScheduleDayConfig — herda workingDays/startTime/endTime como
+            // ponto de partida do editor unificado.
+            setDayConfigs(WEEK_DAY_VALUES.map((day) => ({
+              dayOfWeek: day,
+              isActive: scheduleData.workingDays.includes(day),
+              timeSlots: [{ startTime: scheduleData.startTime, endTime: scheduleData.endTime }]
+            })))
+          }
+        }
       }
 
       if (servicesRes.ok) {
@@ -115,31 +118,6 @@ export default function EditSchedulePage() {
     } finally {
       setLoadingData(false)
     }
-  }
-
-  // Auto-preencher slotDuration baseado no primeiro serviço selecionado
-  useEffect(() => {
-    if (formData.selectedServices.length > 0 && services.length > 0) {
-      const firstSelectedService = services.find(s =>
-        s.id === formData.selectedServices[0]
-      )
-
-      if (firstSelectedService && firstSelectedService.duration) {
-        setFormData((prev: any) => ({
-          ...prev,
-          slotDuration: firstSelectedService.duration
-        }))
-      }
-    }
-  }, [formData.selectedServices, services])
-
-  const handleDayToggle = (day: number) => {
-    setFormData((prev: any) => ({
-      ...prev,
-      workingDays: prev.workingDays.includes(day)
-        ? prev.workingDays.filter((d: number) => d !== day)
-        : [...prev.workingDays, day].sort()
-    }))
   }
 
   const handleServiceToggle = (serviceId: string) => {
@@ -165,8 +143,21 @@ export default function EditSchedulePage() {
     setLoading(true)
 
     try {
-      if (formData.workingDays.length === 0) {
+      const activeDays = dayConfigs.filter(c => c.isActive).map(c => c.dayOfWeek)
+
+      if (activeDays.length === 0) {
         toast.error('Selecione pelo menos um dia de atendimento')
+        setLoading(false)
+        return
+      }
+
+      const professionalIds = [
+        ...(formData.selfAsProfessional && session?.user ? [(session.user as any).id] : []),
+        ...formData.selectedProfessionals,
+      ]
+
+      if (professionalIds.length === 0) {
+        toast.error('Selecione "Eu mesmo atendo" ou pelo menos um profissional para esta agenda')
         setLoading(false)
         return
       }
@@ -175,15 +166,33 @@ export default function EditSchedulePage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          description: formData.description,
+          color: formData.color,
+          workingDays: activeDays,
+          bufferTime: formData.bufferTime,
+          advanceBookingDays: formData.advanceBookingDays,
+          minNoticeHours: formData.minNoticeHours,
+          isActive: formData.isActive,
+          acceptWalkIn: formData.acceptWalkIn,
           serviceIds: formData.selectedServices,
-          professionalIds: formData.selectedProfessionals
+          professionalIds,
         })
       })
 
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || 'Erro ao atualizar agenda')
+      }
+
+      const dayConfigResponse = await fetch(`/api/schedules/${params.id}/day-config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dayConfigs, useCustomDayConfig: true })
+      })
+
+      if (!dayConfigResponse.ok) {
+        throw new Error('Erro ao salvar os horários da agenda')
       }
 
       toast.success('Agenda atualizada com sucesso!')
@@ -317,52 +326,32 @@ export default function EditSchedulePage() {
                   <Users className="h-5 w-5 text-violet-600" />
                   <div>
                     <CardTitle>Profissionais</CardTitle>
-                    <CardDescription>Selecione os profissionais que terão acesso a esta agenda</CardDescription>
+                    <CardDescription>Quem atende nesta agenda</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {professionals.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {professionals.map((professional) => (
-                      <div key={professional.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`professional-${professional.id}`}
-                          checked={formData.selectedProfessionals.includes(professional.id)}
-                          onCheckedChange={() => handleProfessionalToggle(professional.id)}
-                        />
-                        <label htmlFor={`professional-${professional.id}`} className="text-sm font-medium cursor-pointer flex-1">
-                          {professional.name}
-                          {professional.email && <span className="text-xs text-gray-500 block">{professional.email}</span>}
-                        </label>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="self-as-professional"
+                      checked={formData.selfAsProfessional}
+                      onCheckedChange={(checked) => setFormData({ ...formData, selfAsProfessional: checked === true })}
+                    />
+                    <label htmlFor="self-as-professional" className="text-sm font-medium cursor-pointer flex-1">
+                      Eu mesmo atendo
+                    </label>
                   </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">Nenhum profissional cadastrado</p>
-                    <p className="text-xs mt-1">Cadastre profissionais na seção de equipe</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Dias de Atendimento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {WEEK_DAYS.map((day) => (
-                    <div key={day.value} className="flex items-center space-x-2">
+                  {professionals.map((professional) => (
+                    <div key={professional.id} className="flex items-center space-x-2">
                       <Checkbox
-                        id={`day-${day.value}`}
-                        checked={formData.workingDays.includes(day.value)}
-                        onCheckedChange={() => handleDayToggle(day.value)}
+                        id={`professional-${professional.id}`}
+                        checked={formData.selectedProfessionals.includes(professional.id)}
+                        onCheckedChange={() => handleProfessionalToggle(professional.id)}
                       />
-                      <label htmlFor={`day-${day.value}`} className="text-sm font-medium cursor-pointer">
-                        {day.label}
+                      <label htmlFor={`professional-${professional.id}`} className="text-sm font-medium cursor-pointer flex-1">
+                        {professional.name}
+                        {professional.email && <span className="text-xs text-gray-500 block">{professional.email}</span>}
                       </label>
                     </div>
                   ))}
@@ -370,38 +359,18 @@ export default function EditSchedulePage() {
               </CardContent>
             </Card>
 
+            <CustomDayConfig
+              initialConfigs={dayConfigs}
+              onChange={(configs) => setDayConfigs(configs)}
+            />
+
             <Card>
               <CardHeader>
-                <CardTitle>Horários e Slots</CardTitle>
-                <CardDescription>Configure os intervalos e durações para esta agenda</CardDescription>
+                <CardTitle>Intervalo entre Atendimentos</CardTitle>
+                <CardDescription>Tempo de folga entre um agendamento e outro nesta agenda</CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="slotDuration">
-                    Duração do Slot (min)
-                    {formData.selectedServices.length > 0 && (
-                      <span className="text-xs text-gray-500 ml-2">
-                        (Preenchido automaticamente pelo serviço)
-                      </span>
-                    )}
-                  </Label>
-                  <Input
-                    id="slotDuration"
-                    type="number"
-                    min="15"
-                    step="15"
-                    value={formData.slotDuration}
-                    onChange={(e) => setFormData({ ...formData, slotDuration: parseInt(e.target.value) })}
-                    disabled={formData.selectedServices.length > 0}
-                    className={formData.selectedServices.length > 0 ? "bg-gray-50 cursor-not-allowed" : ""}
-                  />
-                  {formData.selectedServices.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selecione um serviço acima para preencher automaticamente
-                    </p>
-                  )}
-                </div>
-                <div>
+              <CardContent>
+                <div className="max-w-xs">
                   <Label htmlFor="bufferTime">Intervalo (min)</Label>
                   <Input
                     id="bufferTime"
@@ -429,12 +398,6 @@ export default function EditSchedulePage() {
               </Button>
             </div>
           </form>
-        </TabsContent>
-
-        <TabsContent value="custom-hours">
-          <CustomDayConfig
-            scheduleId={params.id as string}
-          />
         </TabsContent>
 
         <TabsContent value="blocks">

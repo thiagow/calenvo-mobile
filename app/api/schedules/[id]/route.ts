@@ -83,7 +83,6 @@ export async function PUT(
       workingDays,
       startTime,
       endTime,
-      slotDuration,
       bufferTime,
       lunchStart,
       lunchEnd,
@@ -107,6 +106,31 @@ export async function PUT(
       return NextResponse.json({ error: 'Agenda não encontrada' }, { status: 404 })
     }
 
+    // Confirmar ownership antes de vincular (mesma regra do POST /api/schedules)
+    let ownedServices: { id: string; duration: number }[] | undefined
+    if (serviceIds !== undefined && serviceIds.length > 0) {
+      ownedServices = await prisma.service.findMany({
+        where: { id: { in: serviceIds }, userId },
+        select: { id: true, duration: true }
+      })
+      if (ownedServices.length !== serviceIds.length) {
+        return NextResponse.json({ error: 'Um ou mais serviços não foram encontrados' }, { status: 400 })
+      }
+    }
+
+    if (professionalIds !== undefined && professionalIds.length > 0) {
+      const ownedProfessionals = await prisma.user.findMany({
+        where: { id: { in: professionalIds }, OR: [{ masterId: userId }, { id: userId }] },
+        select: { id: true }
+      })
+      if (ownedProfessionals.length !== professionalIds.length) {
+        return NextResponse.json({ error: 'Um ou mais profissionais não foram encontrados' }, { status: 400 })
+      }
+    }
+
+    // Duração do slot é derivada dos serviços vinculados quando eles mudam
+    const derivedSlotDuration = ownedServices ? Math.min(...ownedServices.map((s) => s.duration)) : undefined
+
     // Atualizar a agenda
     const schedule = await prisma.schedule.update({
       where: { id: params.id },
@@ -117,7 +141,7 @@ export async function PUT(
         workingDays,
         startTime,
         endTime,
-        slotDuration,
+        ...(derivedSlotDuration !== undefined && { slotDuration: derivedSlotDuration }),
         bufferTime,
         lunchStart,
         lunchEnd,

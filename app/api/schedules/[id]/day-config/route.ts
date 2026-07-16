@@ -83,10 +83,21 @@ export async function POST(
     const body = await request.json()
     const { dayConfigs, useCustomDayConfig } = body
 
-    // Atualizar o campo useCustomDayConfig da agenda
+    // workingDays é sincronizado a partir dos dias marcados como ativos aqui —
+    // este endpoint é o único lugar que grava dias-da-semana, evitando o bug de
+    // dessincronia em que um dia ficava ativo no day-config mas bloqueado em
+    // workingDays (ou vice-versa) na tela antiga de "Dias de Atendimento".
+    const activeDays = useCustomDayConfig
+      ? (dayConfigs || []).filter((c: any) => c.isActive).map((c: any) => c.dayOfWeek)
+      : undefined
+
+    // Atualizar o campo useCustomDayConfig (e workingDays, se aplicável) da agenda
     await prisma.schedule.update({
       where: { id: scheduleId },
-      data: { useCustomDayConfig: useCustomDayConfig || false }
+      data: {
+        useCustomDayConfig: useCustomDayConfig || false,
+        ...(activeDays !== undefined && { workingDays: activeDays })
+      }
     })
 
     // Se não usar configuração customizada, remover todas as configurações existentes

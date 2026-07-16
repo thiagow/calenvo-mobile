@@ -1,14 +1,13 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Plus, Trash2, Clock } from 'lucide-react'
-import { toast } from 'sonner'
 
 export interface TimeSlot {
   startTime: string
@@ -32,72 +31,29 @@ const WEEK_DAYS = [
 ]
 
 interface CustomDayConfigProps {
-  scheduleId?: string
-  initialConfigs?: DayConfig[]
-  initialEnabled?: boolean
-  onSave?: (configs: DayConfig[], enabled: boolean) => Promise<void>
-  onChange?: (configs: DayConfig[], enabled: boolean) => void
+  initialConfigs: DayConfig[]
+  onChange: (configs: DayConfig[]) => void
 }
 
-export function CustomDayConfig({ 
-  scheduleId, 
-  initialConfigs = [], 
-  initialEnabled = false,
-  onSave,
-  onChange
-}: CustomDayConfigProps) {
-  const [enabled, setEnabled] = useState(initialEnabled)
-  const [dayConfigs, setDayConfigs] = useState<DayConfig[]>(() => {
-    // Inicializar com todos os dias se não houver configuração
-    if (initialConfigs.length === 0) {
-      return WEEK_DAYS.map(day => ({
-        dayOfWeek: day.value,
-        isActive: [1, 2, 3, 4, 5].includes(day.value), // Segunda a Sexta ativas por padrão
-        timeSlots: [{ startTime: '08:00', endTime: '18:00' }]
-      }))
-    }
-    return initialConfigs
-  })
-  const [loading, setLoading] = useState(false)
+/**
+ * Editor único de "quais dias esta agenda atende e em que horário" — usado
+ * dentro do formulário de criação/edição de agenda (controlado pelo pai, que
+ * salva junto com o resto do form). Substitui as antigas telas separadas
+ * "Dias de Atendimento" (só dias) + aba "Horários" (dias de novo + horário),
+ * que deixavam workingDays e ScheduleDayConfig dessincronizados entre si.
+ */
+export function CustomDayConfig({ initialConfigs, onChange }: CustomDayConfigProps) {
+  const [dayConfigs, setDayConfigs] = useState<DayConfig[]>(initialConfigs)
 
   useEffect(() => {
-    if (scheduleId) {
-      fetchDayConfigs()
-    }
-  }, [scheduleId])
+    setDayConfigs(initialConfigs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(initialConfigs)])
 
   useEffect(() => {
-    if (onChange) {
-      onChange(dayConfigs, enabled)
-    }
-  }, [dayConfigs, enabled])
-
-  const fetchDayConfigs = async () => {
-    if (!scheduleId) return
-    
-    try {
-      const response = await fetch(`/api/schedules/${scheduleId}/day-config`)
-      if (!response.ok) throw new Error('Erro ao buscar configurações')
-      
-      const configs = await response.json()
-
-      // Só sobrescreve se já existirem configs salvas no banco — isso é o que
-      // permite o `initialConfigs` vindo do fluxo de criação (herança dos dias
-      // escolhidos na aba Básica + horário padrão de Configurações gerais)
-      // sobreviver intacto quando a agenda acabou de ser criada e ainda não
-      // tem day-configs persistidas.
-      if (configs.length > 0) {
-        setDayConfigs(configs)
-        setEnabled(true)
-      }
-    } catch (error) {
-      console.error('Error fetching day configs:', error)
-    }
-  }
-
-  const handleToggleEnabled = (checked: boolean) => {
-    setEnabled(checked)
-  }
+    onChange(dayConfigs)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayConfigs])
 
   const handleToggleDay = (dayIndex: number, isActive: boolean) => {
     setDayConfigs(prev =>
@@ -158,180 +114,101 @@ export function CustomDayConfig({
     )
   }
 
-  const handleSave = async () => {
-    if (!scheduleId) {
-      toast.error('ID da agenda não fornecido')
-      return
-    }
-
-    setLoading(true)
-    try {
-      // Validar horários
-      for (const config of dayConfigs) {
-        if (config.isActive && config.timeSlots.length === 0) {
-          toast.error(`${WEEK_DAYS.find(d => d.value === config.dayOfWeek)?.label} está ativo mas não tem horários configurados`)
-          setLoading(false)
-          return
-        }
-
-        for (const slot of config.timeSlots) {
-          if (slot.startTime >= slot.endTime) {
-            toast.error('Horário de início deve ser anterior ao horário de término')
-            setLoading(false)
-            return
-          }
-        }
-      }
-
-      if (onSave) {
-        await onSave(dayConfigs, enabled)
-      } else {
-        const response = await fetch(`/api/schedules/${scheduleId}/day-config`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dayConfigs: enabled ? dayConfigs : [],
-            useCustomDayConfig: enabled
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error('Erro ao salvar configurações')
-        }
-
-        toast.success('Configurações salvas com sucesso!')
-      }
-    } catch (error) {
-      console.error('Error saving day configs:', error)
-      toast.error('Erro ao salvar configurações')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Horários Personalizados por Dia</CardTitle>
-            <CardDescription>
-              Configure horários diferentes para cada dia da semana
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="enable-custom">Ativar</Label>
-            <Switch
-              id="enable-custom"
-              checked={enabled}
-              onCheckedChange={handleToggleEnabled}
-            />
-          </div>
-        </div>
+        <CardTitle>Dias e Horários de Atendimento</CardTitle>
+        <CardDescription>
+          Escolha os dias da semana e os horários de atendimento em cada um
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {!enabled ? (
-          <p className="text-sm text-gray-500 text-center py-4">
-            Ative esta opção para configurar horários diferentes para cada dia da semana
-          </p>
-        ) : (
-          <>
-            {WEEK_DAYS.map((day) => {
-              const config = dayConfigs.find(c => c.dayOfWeek === day.value)
-              if (!config) return null
+        {WEEK_DAYS.map((day) => {
+          const config = dayConfigs.find(c => c.dayOfWeek === day.value)
+          if (!config) return null
 
-              return (
-                <div key={day.value} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Switch
-                        checked={config.isActive}
-                        onCheckedChange={(checked) => handleToggleDay(day.value, checked)}
-                      />
-                      <Label className="text-base font-semibold">
-                        {day.label}
-                      </Label>
-                    </div>
-                    {config.isActive && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddTimeSlot(day.value)}
+          return (
+            <div key={day.value} className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={config.isActive}
+                    onCheckedChange={(checked) => handleToggleDay(day.value, checked)}
+                  />
+                  <Label className="text-base font-semibold">
+                    {day.label}
+                  </Label>
+                </div>
+                {config.isActive && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleAddTimeSlot(day.value)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Adicionar Horário
+                  </Button>
+                )}
+              </div>
+
+              {config.isActive && (
+                <div className="space-y-2 ml-11">
+                  {config.timeSlots.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                      Nenhum horário configurado
+                    </p>
+                  ) : (
+                    config.timeSlots.map((slot, slotIndex) => (
+                      <div
+                        key={slotIndex}
+                        className="flex items-center gap-2 bg-gray-50 p-2 rounded"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Adicionar Horário
-                      </Button>
-                    )}
-                  </div>
-
-                  {config.isActive && (
-                    <div className="space-y-2 ml-11">
-                      {config.timeSlots.length === 0 ? (
-                        <p className="text-sm text-gray-500">
-                          Nenhum horário configurado
-                        </p>
-                      ) : (
-                        config.timeSlots.map((slot, slotIndex) => (
-                          <div
-                            key={slotIndex}
-                            className="flex items-center gap-2 bg-gray-50 p-2 rounded"
-                          >
-                            <Clock className="h-4 w-4 text-gray-400" />
-                            <Input
-                              type="time"
-                              value={slot.startTime}
-                              onChange={(e) =>
-                                handleTimeSlotChange(
-                                  day.value,
-                                  slotIndex,
-                                  'startTime',
-                                  e.target.value
-                                )
-                              }
-                              className="w-32"
-                            />
-                            <span className="text-gray-500">até</span>
-                            <Input
-                              type="time"
-                              value={slot.endTime}
-                              onChange={(e) =>
-                                handleTimeSlotChange(
-                                  day.value,
-                                  slotIndex,
-                                  'endTime',
-                                  e.target.value
-                                )
-                              }
-                              className="w-32"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleRemoveTimeSlot(day.value, slotIndex)}
-                              disabled={config.timeSlots.length === 1}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                        <Clock className="h-4 w-4 text-gray-400" />
+                        <Input
+                          type="time"
+                          value={slot.startTime}
+                          onChange={(e) =>
+                            handleTimeSlotChange(
+                              day.value,
+                              slotIndex,
+                              'startTime',
+                              e.target.value
+                            )
+                          }
+                          className="w-32"
+                        />
+                        <span className="text-gray-500">até</span>
+                        <Input
+                          type="time"
+                          value={slot.endTime}
+                          onChange={(e) =>
+                            handleTimeSlotChange(
+                              day.value,
+                              slotIndex,
+                              'endTime',
+                              e.target.value
+                            )
+                          }
+                          className="w-32"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveTimeSlot(day.value, slotIndex)}
+                          disabled={config.timeSlots.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    ))
                   )}
                 </div>
-              )
-            })}
-
-            {scheduleId && (
-              <div className="flex justify-end pt-4">
-                <Button onClick={handleSave} disabled={loading}>
-                  {loading ? 'Salvando...' : 'Salvar Configurações'}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </div>
+          )
+        })}
       </CardContent>
     </Card>
   )
