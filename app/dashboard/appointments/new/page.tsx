@@ -158,7 +158,7 @@ export default function NewAppointmentPage() {
   const availableSlots = availableTimeSlots.filter((s: any) => s.available)
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4">
       {/* Voltar */}
       <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-muted-foreground">
         <ArrowLeft className="h-4 w-4" />
@@ -390,15 +390,15 @@ export default function NewAppointmentPage() {
             <Textarea value={formData.notes} onChange={e => set('notes', e.target.value)} placeholder={placeholders.appointmentNotes} rows={3} />
           </CardContent>
         </Card>
-      </form>
 
-      {/* Barra de ações fixa */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border px-4 pt-3 flex gap-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
-        <Button variant="outline" className="flex-1" onClick={() => router.back()}>Cancelar</Button>
-        <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-          {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Criando...</> : <><Save className="h-4 w-4 mr-2" />Criar {t.appointment}</>}
-        </Button>
-      </div>
+        {/* Barra de ações */}
+        <div className="sticky bottom-0 bg-background border-t border-border pt-3 flex gap-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
+          <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="submit" className="flex-1" disabled={loading}>
+            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Criando...</> : <><Save className="h-4 w-4 mr-2" />Criar {t.appointment}</>}
+          </Button>
+        </div>
+      </form>
     </div>
   )
 }
