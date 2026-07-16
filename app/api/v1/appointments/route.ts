@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authenticateApiRequest, hasScope } from '@/lib/api-auth'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
 import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 
@@ -171,15 +171,15 @@ export async function POST(request: NextRequest) {
 
   const finalDuration = duration || service?.duration || 30
 
-  const hasConflict = await checkScheduleConflict({
+  const resolution = await resolveProfessionalForBooking({
     scheduleId,
-    professionalId,
     date: appointmentDate,
     duration: finalDuration,
+    requestedProfessionalId: professionalId || null,
   })
 
-  if (hasConflict) {
-    return NextResponse.json({ error: 'Já existe um agendamento neste horário para esta agenda e profissional' }, { status: 409 })
+  if (resolution.error) {
+    return NextResponse.json({ error: resolution.error }, { status: 409 })
   }
 
   let client = clientId
@@ -207,7 +207,7 @@ export async function POST(request: NextRequest) {
       clientId: client.id,
       scheduleId,
       serviceId: serviceId || null,
-      professionalId: professionalId || null,
+      professionalId: resolution.professionalId,
       date: appointmentDate,
       duration: finalDuration,
       status: 'SCHEDULED',

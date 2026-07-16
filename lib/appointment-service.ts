@@ -73,3 +73,59 @@ export async function checkScheduleConflict(params: {
     return date < existingEnd && appointmentEnd > existingStart
   })
 }
+
+export interface ProfessionalResolution {
+  professionalId: string | null
+  error?: string
+}
+
+/**
+ * Resolve qual profissional fica com um novo agendamento — único lugar que decide
+ * isso, usado por todos os pontos de criação (booking público, chat de IA,
+ * dashboard, API v1). Sem essa centralização, cada rota fazia sua própria checagem
+ * solta de `checkScheduleConflict` e a capacidade por profissional divergia entre
+ * elas.
+ */
+export async function resolveProfessionalForBooking(params: {
+  scheduleId: string
+  date: Date
+  duration: number
+  requestedProfessionalId?: string | null
+}): Promise<ProfessionalResolution> {
+  const { scheduleId, date, duration, requestedProfessionalId } = params
+
+  const schedule = await prisma.schedule.findUnique({
+    where: { id: scheduleId },
+    select: { professionals: { select: { professionalId: true } } },
+  })
+  const linkedIds = schedule?.professionals.map((p) => p.professionalId) || []
+
+  if (requestedProfessionalId) {
+    if (!linkedIds.includes(requestedProfessionalId)) {
+      return { professionalId: null, error: 'Profissional não vinculado a esta agenda' }
+    }
+    const conflict = await checkScheduleConflict({ scheduleId, professionalId: requestedProfessionalId, date, duration })
+    if (conflict) {
+      return { professionalId: null, error: 'Este profissional já está ocupado nesse horário' }
+    }
+    return { professionalId: requestedProfessionalId }
+  }
+
+  // Agenda legada sem nenhum profissional vinculado: mantém o comportamento
+  // histórico (sem atribuição, conflito checado pra agenda inteira).
+  if (linkedIds.length === 0) {
+    const conflict = await checkScheduleConflict({ scheduleId, date, duration })
+    return conflict
+      ? { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
+      : { professionalId: null }
+  }
+
+  for (const id of linkedIds) {
+    const conflict = await checkScheduleConflict({ scheduleId, professionalId: id, date, duration })
+    if (!conflict) {
+      return { professionalId: id }
+    }
+  }
+
+  return { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
+}

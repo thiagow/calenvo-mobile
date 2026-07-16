@@ -54,6 +54,14 @@ export async function GET(
           include: {
             service: true
           }
+        },
+        professionals: {
+          where: { professional: { isActive: true } },
+          select: {
+            professional: {
+              select: { id: true, name: true, isActive: true }
+            }
+          }
         }
       },
       orderBy: {

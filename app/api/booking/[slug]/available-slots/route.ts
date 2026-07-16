@@ -13,6 +13,7 @@ export async function GET(
     const scheduleId = searchParams.get('scheduleId')
     const serviceId = searchParams.get('serviceId')
     const date = searchParams.get('date')
+    const professionalId = searchParams.get('professionalId')
 
     if (!scheduleId || !serviceId || !date) {
       return NextResponse.json(
@@ -26,7 +27,13 @@ export async function GET(
       return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
     }
 
-    const slots = await getAvailableSlots({ scheduleId, serviceId, date, userId: tenant.id })
+    const slots = await getAvailableSlots({
+      scheduleId,
+      serviceId,
+      date,
+      userId: tenant.id,
+      ...(professionalId && { professionalId }),
+    })
 
     if (slots === null) {
       return NextResponse.json(

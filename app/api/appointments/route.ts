@@ -8,7 +8,7 @@ import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
-import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -277,20 +277,21 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Validar conflito de horários
+    // Validar conflito de horários e resolver o profissional (o escolhido, ou o
+    // primeiro livre entre os vinculados à agenda quando não especificado)
+    let resolvedProfessionalId: string | null = professionalId || null
     if (scheduleId) {
-      const hasConflict = await checkScheduleConflict({
+      const resolution = await resolveProfessionalForBooking({
         scheduleId,
-        professionalId,
         date: new Date(date),
         duration,
+        requestedProfessionalId: professionalId || null,
       })
 
-      if (hasConflict) {
-        return NextResponse.json({
-          error: 'Já existe um agendamento neste horário para esta agenda e profissional'
-        }, { status: 409 })
+      if (resolution.error) {
+        return NextResponse.json({ error: resolution.error }, { status: 409 })
       }
+      resolvedProfessionalId = resolution.professionalId
     }
 
     const appointment = await prisma.appointment.create({
@@ -299,7 +300,7 @@ export async function POST(request: NextRequest) {
         clientId,
         scheduleId: scheduleId || null,
         serviceId: serviceId || null,
-        professionalId: professionalId || null,
+        professionalId: resolvedProfessionalId,
         date: new Date(date),
         duration,
         status,

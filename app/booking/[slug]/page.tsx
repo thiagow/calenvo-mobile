@@ -45,10 +45,17 @@ interface Service {
   price: number | null
 }
 
+interface Professional {
+  id: string
+  name: string
+  isActive: boolean
+}
+
 interface Schedule {
   id: string
   name: string
   services: { service: Service }[]
+  professionals: { professional: Professional }[]
 }
 
 interface TimeSlot {
@@ -65,12 +72,14 @@ export default function PublicBookingPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedSchedule, setSelectedSchedule] = useState<string>('')
   const [selectedService, setSelectedService] = useState<string>('')
+  const [selectedProfessional, setSelectedProfessional] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
   const [selectedTime, setSelectedTime] = useState<string>('')
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [confirmedProfessionalName, setConfirmedProfessionalName] = useState<string | null>(null)
 
   // Dados do cliente
   const [clientName, setClientName] = useState('')
@@ -86,7 +95,11 @@ export default function PublicBookingPage() {
     if (selectedSchedule && selectedService && selectedDate) {
       fetchAvailableSlots()
     }
-  }, [selectedSchedule, selectedService, selectedDate])
+  }, [selectedSchedule, selectedService, selectedProfessional, selectedDate])
+
+  useEffect(() => {
+    setSelectedProfessional('')
+  }, [selectedSchedule])
 
   const fetchBusinessInfo = async () => {
     try {
@@ -120,8 +133,9 @@ export default function PublicBookingPage() {
     setLoadingSlots(true)
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
+      const professionalParam = selectedProfessional ? `&professionalId=${selectedProfessional}` : ''
       const response = await fetch(
-        `/api/booking/${slug}/available-slots?scheduleId=${selectedSchedule}&serviceId=${selectedService}&date=${dateStr}`
+        `/api/booking/${slug}/available-slots?scheduleId=${selectedSchedule}&serviceId=${selectedService}&date=${dateStr}${professionalParam}`
       )
 
       if (response.ok) {
@@ -156,11 +170,14 @@ export default function PublicBookingPage() {
           time: selectedTime,
           clientName,
           clientEmail,
-          clientPhone
+          clientPhone,
+          ...(selectedProfessional && { professionalId: selectedProfessional })
         })
       })
 
       if (response.ok) {
+        const data = await response.json()
+        setConfirmedProfessionalName(data.appointment?.professionalName || null)
         setSuccess(true)
         toast.success('Agendamento realizado com sucesso!')
       } else {
@@ -179,11 +196,18 @@ export default function PublicBookingPage() {
     setSuccess(false)
     setSelectedSchedule('')
     setSelectedService('')
+    setSelectedProfessional('')
     setSelectedDate(undefined)
     setSelectedTime('')
     setClientName('')
     setClientEmail('')
     setClientPhone('')
+    setConfirmedProfessionalName(null)
+  }
+
+  const getSelectedScheduleProfessionals = () => {
+    const schedule = schedules.find(s => s.id === selectedSchedule)
+    return (schedule?.professionals || []).map(p => p.professional).filter(p => p.isActive)
   }
 
   const getSelectedServiceDetails = () => {
@@ -219,6 +243,11 @@ export default function PublicBookingPage() {
               <p className="text-gray-600">
                 Seu agendamento foi realizado com sucesso. Em breve você receberá uma confirmação.
               </p>
+              {confirmedProfessionalName && (
+                <p className="text-gray-700 font-medium">
+                  Você será atendido(a) por {confirmedProfessionalName}
+                </p>
+              )}
               <Button onClick={handleNewBooking} className="w-full">
                 Fazer Novo Agendamento
               </Button>
@@ -327,6 +356,30 @@ export default function PublicBookingPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Profissional */}
+              {selectedService && getSelectedScheduleProfessionals().length === 1 && (
+                <p className="text-sm text-gray-600">
+                  Atendido(a) por: <strong>{getSelectedScheduleProfessionals()[0].name}</strong>
+                </p>
+              )}
+              {selectedService && getSelectedScheduleProfessionals().length > 1 && (
+                <div className="space-y-2">
+                  <Label htmlFor="professional">Profissional</Label>
+                  <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Qualquer profissional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getSelectedScheduleProfessionals().map(professional => (
+                        <SelectItem key={professional.id} value={professional.id}>
+                          {professional.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </CardContent>

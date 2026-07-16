@@ -24,11 +24,11 @@ vi.mock('@/lib/db', () => ({
 }))
 
 const checkAppointmentQuotaMock = vi.fn(async () => ({ allowed: true, currentCount: 0, remaining: 10 }))
-const checkScheduleConflictMock = vi.fn(async () => false)
+const resolveProfessionalForBookingMock = vi.fn(async () => ({ professionalId: null }))
 
 vi.mock('@/lib/appointment-service', () => ({
   checkAppointmentQuota: checkAppointmentQuotaMock,
-  checkScheduleConflict: checkScheduleConflictMock,
+  resolveProfessionalForBooking: resolveProfessionalForBookingMock,
 }))
 
 const getAvailableSlotsMock = vi.fn(async () => [{ time: '10:00', available: true }])

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { NotificationService } from '@/lib/notification-service'
-import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 import { parseCalendarDate } from '@/lib/availability-service'
 
@@ -22,7 +22,8 @@ export async function POST(
       time,
       clientName,
       clientEmail,
-      clientPhone
+      clientPhone,
+      professionalId
     } = body
 
     // Validações
@@ -111,16 +112,18 @@ export async function POST(
     const appointmentDate = parseCalendarDate(date)
     appointmentDate.setHours(hours, minutes, 0, 0)
 
-    // Verificar se já existe agendamento com sobreposição de horário
-    const hasConflict = await checkScheduleConflict({
+    // Resolve qual profissional atende (o escolhido pelo cliente, ou o primeiro
+    // livre entre os vinculados à agenda quando o cliente não tiver preferência)
+    const resolution = await resolveProfessionalForBooking({
       scheduleId,
       date: appointmentDate,
       duration: service.duration,
+      requestedProfessionalId: professionalId || null,
     })
 
-    if (hasConflict) {
+    if (resolution.error) {
       return NextResponse.json(
-        { error: 'Este horário já está ocupado' },
+        { error: resolution.error },
         { status: 409 }
       )
     }
@@ -136,6 +139,7 @@ export async function POST(
         status: initialStatus,
         scheduleId,
         serviceId,
+        professionalId: resolution.professionalId,
         clientId: client.id,
         userId: user.id,
         price: service.price || undefined
@@ -158,12 +162,17 @@ export async function POST(
       // Não falhar a criação do agendamento se houver erro na notificação
     }
 
+    const professional = resolution.professionalId
+      ? await prisma.user.findUnique({ where: { id: resolution.professionalId }, select: { name: true } })
+      : null
+
     return NextResponse.json({
       success: true,
       appointment: {
         id: appointment.id,
         date: appointment.date,
-        status: appointment.status
+        status: appointment.status,
+        professionalName: professional?.name ?? null
       }
     })
   } catch (error) {

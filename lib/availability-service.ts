@@ -22,17 +22,20 @@ export function parseCalendarDate(dateStr: string): Date {
 
 /**
  * Calcula os horários disponíveis de uma agenda/serviço num dia específico,
- * considerando dias de trabalho, bloqueios, horário de almoço e agendamentos
- * já existentes. Compartilhado entre a página pública de agendamento e as
- * ferramentas do agente de IA (widget de chat) — mesma regra em ambos.
+ * considerando dias de trabalho, bloqueios, horário de almoço, antecedência
+ * mínima/máxima e agendamentos já existentes. Único motor de disponibilidade do
+ * sistema — compartilhado pela página pública de agendamento, pelas ferramentas
+ * do agente de IA (widget de chat) e pela tela de agendamento do dashboard —
+ * mesma regra em todos, incluindo a capacidade por profissional (ver `professionalId`).
  */
 export async function getAvailableSlots(params: {
   scheduleId: string
   serviceId: string
   date: string
   userId: string
+  professionalId?: string
 }): Promise<AvailabilitySlot[] | null> {
-  const { scheduleId, serviceId, date: dateStr, userId } = params
+  const { scheduleId, serviceId, date: dateStr, userId, professionalId } = params
 
   const schedule = await prisma.schedule.findFirst({
     where: { id: scheduleId, userId },
@@ -40,6 +43,7 @@ export async function getAvailableSlots(params: {
       dayConfigs: true,
       blocks: true,
       services: { where: { serviceId }, include: { service: true } },
+      professionals: { select: { professionalId: true } },
     },
   })
 
@@ -50,6 +54,14 @@ export async function getAvailableSlots(params: {
 
   const date = parseCalendarDate(dateStr)
   const dayOfWeek = date.getDay()
+
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (date < todayStart) return []
+
+  const maxBookingDate = new Date(todayStart)
+  maxBookingDate.setDate(maxBookingDate.getDate() + schedule.advanceBookingDays)
+  if (date > maxBookingDate) return []
 
   if (!schedule.workingDays.includes(dayOfWeek)) return []
 
@@ -114,8 +126,16 @@ export async function getAvailableSlots(params: {
       scheduleId,
       date: { gte: dateStart, lte: dateEnd },
       status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      ...(professionalId && { professionalId }),
     },
   })
+
+  // Sem profissional específico ("qualquer um"), a agenda tem capacidade para até
+  // N atendimentos simultâneos — um por profissional vinculado — em vez de travar
+  // no primeiro agendamento existente. Com um profissional específico, a
+  // capacidade é sempre 1 (a query acima já filtrou só os agendamentos dele).
+  const capacity = professionalId ? 1 : Math.max(1, schedule.professionals.length)
+  const minBookingTime = new Date(now.getTime() + schedule.minNoticeHours * 60 * 60 * 1000)
 
   for (const slot of slots) {
     const [slotHour, slotMinute] = slot.time.split(':').map(Number)
@@ -123,7 +143,12 @@ export async function getAvailableSlots(params: {
     slotDate.setHours(slotHour, slotMinute, 0, 0)
     const slotEndDate = new Date(slotDate.getTime() + serviceDuration * 60000)
 
-    const hasConflict = existingAppointments.some((apt) => {
+    if (slotDate < minBookingTime) {
+      slot.available = false
+      continue
+    }
+
+    const overlapCount = existingAppointments.filter((apt) => {
       const aptDate = new Date(apt.date)
       const aptEndDate = new Date(aptDate.getTime() + apt.duration * 60000)
       return (
@@ -131,9 +156,9 @@ export async function getAvailableSlots(params: {
         (slotEndDate > aptDate && slotEndDate <= aptEndDate) ||
         (slotDate <= aptDate && slotEndDate >= aptEndDate)
       )
-    })
+    }).length
 
-    if (hasConflict) {
+    if (overlapCount >= capacity) {
       slot.available = false
     }
   }

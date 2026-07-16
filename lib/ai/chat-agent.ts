@@ -1,11 +1,18 @@
 import OpenAI from 'openai'
 import { prisma } from '@/lib/db'
-import { checkAppointmentQuota, checkScheduleConflict } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
 import { getAvailableSlots, parseCalendarDate } from '@/lib/availability-service'
 import type { User, BusinessConfig } from '@prisma/client'
 
 const MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
-const MAX_TOOL_ROUNDS = 5
+const MAX_TOOL_ROUNDS = 8
+// Trava de código, não só de prompt: o modelo às vezes insiste em checar
+// disponibilidade dia após dia em vez de parar em 2 candidatas (visto em teste
+// real com agenda multi-profissional totalmente livre — nada no retorno da
+// ferramenta dava um sinal claro de "pare por aqui"). Depois desse limite,
+// check_availability para de rodar de verdade e devolve uma instrução direta
+// pro modelo responder com o que já tem.
+const MAX_AVAILABILITY_CHECKS = 4
 
 const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -60,13 +67,14 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'check_availability',
-      description: 'Verifica os horários disponíveis para um serviço numa agenda, numa data específica.',
+      description: 'Verifica os horários disponíveis para um serviço numa agenda, numa data específica. Se o cliente tiver preferência por um profissional específico (dentre os listados em list_services), passe professionalId — caso contrário, omita para ver a disponibilidade combinada de todos os profissionais da agenda.',
       parameters: {
         type: 'object',
         properties: {
           scheduleId: { type: 'string' },
           serviceId: { type: 'string' },
           date: { type: 'string', description: 'Data no formato YYYY-MM-DD' },
+          professionalId: { type: 'string', description: 'Opcional — id do profissional preferido pelo cliente' },
         },
         required: ['scheduleId', 'serviceId', 'date'],
       },
@@ -87,6 +95,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           clientName: { type: 'string' },
           clientPhone: { type: 'string' },
           clientEmail: { type: 'string' },
+          professionalId: { type: 'string', description: 'Opcional — id do profissional escolhido pelo cliente; omita se ele não tiver preferência' },
         },
         required: ['scheduleId', 'serviceId', 'date', 'time', 'clientName', 'clientPhone'],
       },
@@ -104,14 +113,34 @@ export async function executeTool(
       try {
         const services = await prisma.service.findMany({
           where: { userId: tenant.id, isActive: true },
-          include: { schedules: { include: { schedule: true } } },
+          include: {
+            schedules: {
+              include: {
+                schedule: {
+                  include: {
+                    professionals: {
+                      where: { professional: { isActive: true } },
+                      select: { professional: { select: { id: true, name: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
         })
         return services.map((s) => ({
           serviceId: s.id,
           name: s.name,
           duration: s.duration,
           price: s.price,
-          schedules: s.schedules.map((ss) => ({ scheduleId: ss.scheduleId, scheduleName: ss.schedule.name })),
+          schedules: s.schedules.map((ss) => ({
+            scheduleId: ss.scheduleId,
+            scheduleName: ss.schedule.name,
+            // Se houver mais de um, pergunte a preferência do cliente antes de
+            // chamar check_availability/create_appointment com um professionalId
+            // específico. Com só um, não é preciso perguntar nada.
+            professionals: ss.schedule.professionals.map((sp) => ({ id: sp.professional.id, name: sp.professional.name })),
+          })),
         }))
       } catch (error) {
         console.error('[chat-agent] Erro em list_services:', { tenantId: tenant.id, error })
@@ -135,6 +164,7 @@ export async function executeTool(
           serviceId: input.serviceId,
           date: input.date,
           userId: tenant.id,
+          ...(input.professionalId && { professionalId: input.professionalId }),
         })
         if (slots === null) return { error: 'Agenda ou serviço não encontrado' }
         return { slots: slots.filter((s) => s.available).map((s) => s.time) }
@@ -153,8 +183,10 @@ export async function executeTool(
         if (typeof input.clientName !== 'string' || !input.clientName.trim()) {
           return { error: 'Nome do cliente é obrigatório. Peça o nome antes de confirmar o agendamento.' }
         }
-        if (typeof input.clientPhone !== 'string' || !input.clientPhone.trim()) {
-          return { error: 'Telefone do cliente é obrigatório. Peça o telefone antes de confirmar o agendamento.' }
+        // Telefone real sempre tem dígitos — pega o caso do modelo inventar um
+        // valor de preenchimento (ex.: "Telefone") em vez de pedir o de verdade.
+        if (typeof input.clientPhone !== 'string' || !input.clientPhone.trim() || !/\d/.test(input.clientPhone)) {
+          return { error: 'Telefone do cliente inválido ou não informado. Peça o telefone real ao cliente (com números) antes de confirmar o agendamento — nunca invente um valor.' }
         }
         if (!DATE_RE.test(input.date)) {
           return { error: 'Data inválida. Confirme a data com o cliente no formato AAAA-MM-DD.' }
@@ -187,12 +219,13 @@ export async function executeTool(
           return { error: 'Data ou horário inválido. Peça para o cliente confirmar novamente.' }
         }
 
-        const hasConflict = await checkScheduleConflict({
+        const resolution = await resolveProfessionalForBooking({
           scheduleId: input.scheduleId,
           date: appointmentDate,
           duration: service.duration,
+          requestedProfessionalId: input.professionalId || null,
         })
-        if (hasConflict) return { error: 'Este horário acabou de ficar indisponível. Peça para o cliente escolher outro horário.' }
+        if (resolution.error) return { error: resolution.error }
 
         let clientRecord = await prisma.client.findFirst({ where: { userId: tenant.id, phone: input.clientPhone } })
         if (!clientRecord) {
@@ -215,6 +248,7 @@ export async function executeTool(
             status: initialStatus,
             scheduleId: input.scheduleId,
             serviceId: input.serviceId,
+            professionalId: resolution.professionalId,
             clientId: clientRecord.id,
             userId: tenant.id,
             price: service.price || undefined,
@@ -222,11 +256,16 @@ export async function executeTool(
           },
         })
 
+        const professional = resolution.professionalId
+          ? await prisma.user.findUnique({ where: { id: resolution.professionalId }, select: { name: true } })
+          : null
+
         return {
           success: true,
           appointmentId: appointment.id,
           status: appointment.status,
           date: appointment.date,
+          professionalName: professional?.name ?? null,
         }
       } catch (error) {
         console.error('[chat-agent] Erro em create_appointment:', { input, tenantId: tenant.id, error })
@@ -255,13 +294,14 @@ ${address ? `Endereço: ${address}` : ''}
 
 Seu objetivo é ajudar o visitante a marcar um horário. Fluxo recomendado:
 1. Entenda qual serviço a pessoa quer (use list_services se precisar).
-2. Depois de saber o serviço (e a agenda, se houver mais de uma), sugira proativamente as duas datas mais próximas com horários livres, chamando check_availability para cada data candidata — não pergunte apenas "qual data você quer" sem antes tentar sugerir algo. Nunca sugira uma data antes de saber o serviço.
-3. Se o cliente mencionar uma data sem o ano, calcule o ano a partir da data de hoje informada acima: use o ano atual, ou o ano seguinte se essa data já tiver passado neste ano. Sempre chame check_availability com a data resolvida no formato AAAA-MM-DD — mesmo que seja uma data diferente das que você já sugeriu antes. Nunca diga que uma data não está disponível sem antes checar essa data específica com check_availability.
-4. Confirme com a pessoa qual horário ela quer, e peça nome e telefone.
-5. Só chame create_appointment depois que o cliente confirmar explicitamente o horário e informar nome e telefone.
-6. Depois de criar, confirme o agendamento de forma clara (data, horário, serviço).
+2. Olhe "professionals" da agenda desse serviço no retorno de list_services (sem chamar mais nenhuma ferramenta): se tiver mais de um, pergunte rapidamente se o cliente tem preferência por algum deles, citando os nomes — não insista, "qualquer um" é uma resposta válida. Se tiver só um (ou nenhum vinculado), não pergunte nada e siga em frente. Nunca chame check_availability por profissional só para decidir se pergunta ou não — a pergunta usa apenas os nomes que list_services já devolveu.
+3. Depois de resolvido o profissional (escolhido ou "qualquer um"), sugira proativamente as duas datas mais próximas com horários livres. Chame check_availability no máximo 2 vezes para isso — na primeira data que já tiver horários livres, pare e sugira essa data junto com a próxima data candidata (mesmo sem checá-la ainda, ou checando só mais uma vez); nunca continue testando um terceiro, quarto ou quinto dia só para "ter certeza". Não pergunte apenas "qual data você quer" sem antes tentar sugerir algo.
+4. Se o cliente mencionar uma data sem o ano, calcule o ano a partir da data de hoje informada acima: use o ano atual, ou o ano seguinte se essa data já tiver passado neste ano. Sempre chame check_availability com a data resolvida no formato AAAA-MM-DD — mesmo que seja uma data diferente das que você já sugeriu antes. Nunca diga que uma data não está disponível sem antes checar essa data específica com check_availability.
+5. Confirme com a pessoa qual horário ela quer, e peça nome e telefone.
+6. Só chame create_appointment depois que o cliente tiver informado, na conversa, o nome e o telefone reais dele — nunca antes disso. Se ele confirmar o horário mas não tiver dito nome/telefone ainda, pergunte e espere a resposta antes de chamar a ferramenta.
+7. Depois de criar, confirme o agendamento de forma clara (data, horário, serviço, e o nome do profissional quando houver um definido).
 
-Nunca invente serviços, horários ou disponibilidade — sempre use as ferramentas. Nunca invente ou "lembre de cor" o scheduleId/serviceId de mensagens antigas: se você não tiver o resultado de list_services desta própria conversa disponível agora, chame list_services de novo antes de check_availability ou create_appointment — nunca use um ID que você não obteve de uma resposta real da ferramenta. Se não conseguir ajudar, sugira que a pessoa entre em contato diretamente.
+Nunca invente serviços, horários ou disponibilidade — sempre use as ferramentas. Nunca invente ou "lembre de cor" o scheduleId/serviceId de mensagens antigas: se você não tiver o resultado de list_services desta própria conversa disponível agora, chame list_services de novo antes de check_availability ou create_appointment — nunca use um ID que você não obteve de uma resposta real da ferramenta. Nunca invente clientName ou clientPhone (ex.: não use valores de preenchimento como "Cliente" ou "Telefone") — use exatamente o nome e o telefone que o cliente escreveu na conversa; se ele não escreveu esses dados ainda, pergunte antes de chamar create_appointment. Se não conseguir ajudar, sugira que a pessoa entre em contato diretamente.
 
 Formato da resposta:
 - Use markdown simples quando ajudar a leitura: **negrito** para destacar, listas numeradas ou com marcadores ao apresentar múltiplos serviços ou horários.
@@ -320,6 +360,8 @@ export async function runChatAgent(
     ...messages.map((m) => ({ role: m.role, content: m.content }) as OpenAI.Chat.Completions.ChatCompletionMessageParam),
   ]
 
+  let availabilityChecks = 0
+
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await client.chat.completions.create({
       model: MODEL,
@@ -345,7 +387,17 @@ export async function runChatAgent(
       } catch {
         input = {}
       }
-      const result = await executeTool(toolCall.function.name, input, tenant)
+      let result: any
+      if (toolCall.function.name === 'check_availability') {
+        availabilityChecks++
+        if (availabilityChecks > MAX_AVAILABILITY_CHECKS) {
+          result = { error: 'Já foram verificadas datas suficientes. Pare de chamar check_availability e responda ao cliente agora com as opções que você já obteve.' }
+        } else {
+          result = await executeTool(toolCall.function.name, input, tenant)
+        }
+      } else {
+        result = await executeTool(toolCall.function.name, input, tenant)
+      }
       conversation.push({
         role: 'tool',
         tool_call_id: toolCall.id,
