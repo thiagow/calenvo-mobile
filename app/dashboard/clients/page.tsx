@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Search, Plus, Phone, History, Package, Edit, Users, ChevronRight } from 'lucide-react'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { Search, Plus, Phone, History, Package, Edit, Users, MoreVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate } from '@/lib/utils'
 import { useSegmentConfig } from '@/contexts/segment-context'
@@ -168,16 +169,28 @@ export default function ClientsPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/clients/${client.id}/packages`)}>
-                      <Package className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => router.push(`/dashboard/clients/${client.id}/history`)}>
-                      <History className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(client)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center flex-shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={e => e.stopPropagation()}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${client.id}/packages`)}>
+                          <Package className="mr-2 h-4 w-4" />
+                          Pacotes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => router.push(`/dashboard/clients/${client.id}/history`)}>
+                          <History className="mr-2 h-4 w-4" />
+                          Histórico
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openEdit(client)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
 
