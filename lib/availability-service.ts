@@ -165,3 +165,65 @@ export async function getAvailableSlots(params: {
 
   return slots
 }
+
+/**
+ * Agendas ativas do tenant que oferecem um serviço (e, se `professionalId` for
+ * dado, que também têm esse profissional vinculado). Um mesmo serviço pode
+ * estar em várias agendas — a página pública e o chat de IA não pedem mais
+ * `scheduleId` ao cliente, então essa é a resolução server-side que substitui
+ * a escolha manual de agenda.
+ */
+export async function resolveCandidateSchedules(params: {
+  userId: string
+  serviceId: string
+  professionalId?: string
+}): Promise<{ id: string }[]> {
+  const { userId, serviceId, professionalId } = params
+
+  return prisma.schedule.findMany({
+    where: {
+      userId,
+      isActive: true,
+      services: { some: { serviceId } },
+      ...(professionalId && { professionals: { some: { professionalId } } }),
+    },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  })
+}
+
+/**
+ * Disponibilidade de um serviço sem precisar de scheduleId: resolve as agendas
+ * candidatas e une os horários de todas — um horário aparece disponível se
+ * estiver livre em pelo menos uma delas. Retorna `null` quando o serviço não
+ * está em nenhuma agenda (ativa) do tenant, ou nenhuma tem esse profissional.
+ */
+export async function getAvailableSlotsForService(params: {
+  userId: string
+  serviceId: string
+  date: string
+  professionalId?: string
+}): Promise<AvailabilitySlot[] | null> {
+  const { userId, serviceId, date, professionalId } = params
+
+  const candidates = await resolveCandidateSchedules({ userId, serviceId, professionalId })
+  if (candidates.length === 0) return null
+
+  const slotsPerSchedule = await Promise.all(
+    candidates.map((schedule) =>
+      getAvailableSlots({ scheduleId: schedule.id, serviceId, date, userId, professionalId })
+    )
+  )
+
+  const merged = new Map<string, boolean>()
+  for (const slots of slotsPerSchedule) {
+    if (!slots) continue
+    for (const slot of slots) {
+      merged.set(slot.time, (merged.get(slot.time) ?? false) || slot.available)
+    }
+  }
+
+  return Array.from(merged.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([time, available]) => ({ time, available }))
+}

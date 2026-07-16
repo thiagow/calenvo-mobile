@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { NotificationService } from '@/lib/notification-service'
-import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveBookingTarget } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 import { parseCalendarDate } from '@/lib/availability-service'
 
@@ -16,7 +16,6 @@ export async function POST(
     const { slug } = params
     const body = await request.json()
     const {
-      scheduleId,
       serviceId,
       date,
       time,
@@ -27,7 +26,7 @@ export async function POST(
     } = body
 
     // Validações
-    if (!scheduleId || !serviceId || !date || !time || !clientName || !clientPhone) {
+    if (!serviceId || !date || !time || !clientName || !clientPhone) {
       return NextResponse.json(
         { error: 'Dados obrigatórios faltando' },
         { status: 400 }
@@ -95,35 +94,24 @@ export async function POST(
       )
     }
 
-    // Confirmar que a agenda também pertence a este tenant
-    const schedule = await prisma.schedule.findFirst({
-      where: { id: scheduleId, userId: user.id }
-    })
-
-    if (!schedule) {
-      return NextResponse.json(
-        { error: 'Agenda não encontrada' },
-        { status: 404 }
-      )
-    }
-
     // Criar data/hora do agendamento
     const [hours, minutes] = time.split(':').map(Number)
     const appointmentDate = parseCalendarDate(date)
     appointmentDate.setHours(hours, minutes, 0, 0)
 
-    // Resolve qual profissional atende (o escolhido pelo cliente, ou o primeiro
-    // livre entre os vinculados à agenda quando o cliente não tiver preferência)
-    const resolution = await resolveProfessionalForBooking({
-      scheduleId,
+    // Resolve a agenda (o cliente não escolhe mais) e o profissional (o
+    // escolhido, ou o primeiro livre entre os vinculados, quando não houver preferência)
+    const resolution = await resolveBookingTarget({
+      userId: user.id,
+      serviceId,
       date: appointmentDate,
       duration: service.duration,
       requestedProfessionalId: professionalId || null,
     })
 
-    if (resolution.error) {
+    if (resolution.error || !resolution.scheduleId) {
       return NextResponse.json(
-        { error: resolution.error },
+        { error: resolution.error || 'Este horário acabou de ficar indisponível' },
         { status: 409 }
       )
     }
@@ -137,7 +125,7 @@ export async function POST(
         date: appointmentDate,
         duration: service.duration,
         status: initialStatus,
-        scheduleId,
+        scheduleId: resolution.scheduleId,
         serviceId,
         professionalId: resolution.professionalId,
         clientId: client.id,

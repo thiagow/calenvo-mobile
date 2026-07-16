@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { canCreateAppointment, getRemainingAppointments } from '@/lib/plan-limits'
+import { resolveCandidateSchedules } from '@/lib/availability-service'
 import { PlanType } from '@prisma/client'
 
 export interface QuotaCheckResult {
@@ -128,4 +129,52 @@ export async function resolveProfessionalForBooking(params: {
   }
 
   return { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
+}
+
+export interface BookingTargetResolution {
+  scheduleId: string | null
+  professionalId: string | null
+  error?: string
+}
+
+/**
+ * Resolve, a partir só de serviceId (+ professionalId opcional), qual agenda e
+ * qual profissional recebem um novo agendamento — o cliente final não escolhe
+ * mais a agenda diretamente. Tenta cada agenda candidata (`resolveCandidateSchedules`)
+ * em ordem e usa a primeira em que `resolveProfessionalForBooking` não retornar erro.
+ */
+export async function resolveBookingTarget(params: {
+  userId: string
+  serviceId: string
+  date: Date
+  duration: number
+  requestedProfessionalId?: string | null
+}): Promise<BookingTargetResolution> {
+  const { userId, serviceId, date, duration, requestedProfessionalId } = params
+
+  const candidates = await resolveCandidateSchedules({
+    userId,
+    serviceId,
+    professionalId: requestedProfessionalId || undefined,
+  })
+
+  if (candidates.length === 0) {
+    return { scheduleId: null, professionalId: null, error: 'Nenhuma agenda disponível para este serviço' }
+  }
+
+  let lastError: string | undefined
+  for (const candidate of candidates) {
+    const resolution = await resolveProfessionalForBooking({
+      scheduleId: candidate.id,
+      date,
+      duration,
+      requestedProfessionalId,
+    })
+    if (!resolution.error) {
+      return { scheduleId: candidate.id, professionalId: resolution.professionalId }
+    }
+    lastError = resolution.error
+  }
+
+  return { scheduleId: null, professionalId: null, error: lastError || 'Este horário acabou de ficar indisponível' }
 }

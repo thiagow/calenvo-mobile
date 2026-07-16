@@ -57,7 +57,8 @@ export async function GET(
 
     return NextResponse.json({
       businessName: user.businessName || user.name || 'Agendamento Online',
-      businessLogo: user.businessConfig.businessLogo
+      businessLogo: user.businessConfig.businessLogo,
+      address: user.businessConfig.address || null
     })
   } catch (error) {
     console.error('Erro ao buscar informações:', error)

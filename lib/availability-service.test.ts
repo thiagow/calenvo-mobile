@@ -4,31 +4,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // pertence ao tenant (userId) do chamador — mesma classe de vazamento cross-tenant
 // já corrigida em app/api/booking/[slug]/create/route.ts. Um scheduleId de outro
 // tenant, adivinhado ou vazado, não pode mais retornar disponibilidade real.
-let mockSchedule: any
-let mockAppointments: any[] = []
-
-const findFirstMock = vi.fn(async ({ where }: { where: { id: string; userId: string } }) => {
-  if (where.id === 'schedule-1' && where.userId === 'tenant-a') {
-    return mockSchedule
-  }
-  return null
-})
-
-vi.mock('@/lib/db', () => ({
-  prisma: {
-    schedule: { findFirst: findFirstMock },
-    appointment: {
-      findMany: vi.fn(async ({ where }: { where: { professionalId?: string } }) =>
-        where.professionalId ? mockAppointments.filter((a) => a.professionalId === where.professionalId) : mockAppointments
-      ),
-    },
-  },
-}))
-
-beforeEach(() => {
-  mockAppointments = []
-  mockSchedule = {
+function baseSchedule(overrides: Partial<any> = {}) {
+  return {
     id: 'schedule-1',
+    userId: 'tenant-a',
     workingDays: [0, 1, 2, 3, 4, 5, 6],
     startTime: '08:00',
     endTime: '18:00',
@@ -43,7 +22,38 @@ beforeEach(() => {
     blocks: [],
     services: [{ service: { id: 'service-1', duration: 30 } }],
     professionals: [],
+    ...overrides,
   }
+}
+
+let mockSchedulesById: Record<string, any> = {}
+let mockScheduleList: { id: string }[] = []
+let mockAppointments: any[] = []
+
+const findFirstMock = vi.fn(async ({ where }: { where: { id: string; userId: string } }) => {
+  const schedule = mockSchedulesById[where.id]
+  return schedule && schedule.userId === where.userId ? schedule : null
+})
+
+const findManyScheduleMock = vi.fn(async () => mockScheduleList)
+
+vi.mock('@/lib/db', () => ({
+  prisma: {
+    schedule: { findFirst: findFirstMock, findMany: findManyScheduleMock },
+    appointment: {
+      findMany: vi.fn(async ({ where }: { where: { scheduleId: string; professionalId?: string } }) =>
+        mockAppointments.filter((a) =>
+          a.scheduleId === where.scheduleId && (!where.professionalId || a.professionalId === where.professionalId)
+        )
+      ),
+    },
+  },
+}))
+
+beforeEach(() => {
+  mockAppointments = []
+  mockSchedulesById = { 'schedule-1': baseSchedule() }
+  mockScheduleList = [{ id: 'schedule-1' }]
 })
 
 describe('parseCalendarDate', () => {
@@ -65,6 +75,11 @@ function futureDateStr(daysAhead: number): string {
   const d = new Date()
   d.setDate(d.getDate() + daysAhead)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function dateAt(dateStr: string, hour: number, minute = 0): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(y, m - 1, d, hour, minute, 0, 0)
 }
 
 describe('getAvailableSlots', () => {
@@ -97,7 +112,7 @@ describe('getAvailableSlots', () => {
 
   it('rejeita data além de advanceBookingDays', async () => {
     const { getAvailableSlots } = await import('@/lib/availability-service')
-    mockSchedule.advanceBookingDays = 10
+    mockSchedulesById['schedule-1'].advanceBookingDays = 10
 
     const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(20), userId: 'tenant-a' })
 
@@ -119,10 +134,8 @@ describe('getAvailableSlots', () => {
     it('com 3 profissionais vinculados e 1 agendamento no horário, o slot continua disponível', async () => {
       const { getAvailableSlots } = await import('@/lib/availability-service')
       const date = futureDateStr(5)
-      mockSchedule.professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }]
-      const [y, m, d] = date.split('-').map(Number)
-      const aptDate = new Date(y, m - 1, d, 9, 0, 0, 0)
-      mockAppointments = [{ date: aptDate, duration: 30, professionalId: 'p1' }]
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }]
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p1' }]
 
       const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
 
@@ -133,13 +146,11 @@ describe('getAvailableSlots', () => {
     it('com 3 profissionais vinculados e 3 agendamentos no mesmo horário, o slot fica indisponível', async () => {
       const { getAvailableSlots } = await import('@/lib/availability-service')
       const date = futureDateStr(5)
-      mockSchedule.professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }]
-      const [y, m, d] = date.split('-').map(Number)
-      const aptDate = new Date(y, m - 1, d, 9, 0, 0, 0)
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }]
       mockAppointments = [
-        { date: aptDate, duration: 30, professionalId: 'p1' },
-        { date: aptDate, duration: 30, professionalId: 'p2' },
-        { date: aptDate, duration: 30, professionalId: 'p3' },
+        { scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p1' },
+        { scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p2' },
+        { scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p3' },
       ]
 
       const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
@@ -151,10 +162,8 @@ describe('getAvailableSlots', () => {
     it('com professionalId específico, considera só os agendamentos daquele profissional (capacidade 1)', async () => {
       const { getAvailableSlots } = await import('@/lib/availability-service')
       const date = futureDateStr(5)
-      mockSchedule.professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
-      const [y, m, d] = date.split('-').map(Number)
-      const aptDate = new Date(y, m - 1, d, 9, 0, 0, 0)
-      mockAppointments = [{ date: aptDate, duration: 30, professionalId: 'p2' }]
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p2' }]
 
       const forP1 = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p1' })
       const forP2 = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p2' })
@@ -162,5 +171,69 @@ describe('getAvailableSlots', () => {
       expect(forP1!.find((s) => s.time === '09:00')?.available).toBe(true)
       expect(forP2!.find((s) => s.time === '09:00')?.available).toBe(false)
     })
+  })
+})
+
+describe('resolveCandidateSchedules', () => {
+  it('busca agendas ativas do tenant filtrando por serviço', async () => {
+    const { resolveCandidateSchedules } = await import('@/lib/availability-service')
+
+    await resolveCandidateSchedules({ userId: 'tenant-a', serviceId: 'service-1' })
+
+    expect(findManyScheduleMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: 'tenant-a',
+          isActive: true,
+          services: { some: { serviceId: 'service-1' } },
+        }),
+      })
+    )
+  })
+
+  it('inclui filtro por profissional quando informado', async () => {
+    const { resolveCandidateSchedules } = await import('@/lib/availability-service')
+
+    await resolveCandidateSchedules({ userId: 'tenant-a', serviceId: 'service-1', professionalId: 'p1' })
+
+    expect(findManyScheduleMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          professionals: { some: { professionalId: 'p1' } },
+        }),
+      })
+    )
+  })
+})
+
+describe('getAvailableSlotsForService', () => {
+  it('retorna null quando o serviço não está em nenhuma agenda ativa', async () => {
+    mockScheduleList = []
+    const { getAvailableSlotsForService } = await import('@/lib/availability-service')
+
+    const result = await getAvailableSlotsForService({ userId: 'tenant-a', serviceId: 'service-1', date: futureDateStr(5) })
+
+    expect(result).toBeNull()
+  })
+
+  // O cliente não escolhe mais a agenda: um serviço pode estar em 2 agendas
+  // diferentes, e um horário livre em qualquer uma delas deve aparecer como
+  // disponível — a união das duas, não a interseção.
+  it('une os horários de duas agendas candidatas (livre numa, ocupado na outra)', async () => {
+    const date = futureDateStr(5)
+    mockSchedulesById = {
+      'schedule-1': baseSchedule({ id: 'schedule-1' }),
+      'schedule-2': baseSchedule({ id: 'schedule-2' }),
+    }
+    mockScheduleList = [{ id: 'schedule-1' }, { id: 'schedule-2' }]
+    mockAppointments = [
+      { scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: null },
+    ]
+
+    const { getAvailableSlotsForService } = await import('@/lib/availability-service')
+    const result = await getAvailableSlotsForService({ userId: 'tenant-a', serviceId: 'service-1', date })
+
+    // schedule-1 tem o 09:00 ocupado, mas schedule-2 está livre — a união mostra disponível
+    expect(result!.find((s) => s.time === '09:00')?.available).toBe(true)
   })
 })

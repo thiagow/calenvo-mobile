@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAvailableSlots } from '@/lib/availability-service'
+import { getAvailableSlotsForService } from '@/lib/availability-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 
 export const dynamic = 'force-dynamic'
@@ -10,14 +10,13 @@ export async function GET(
   try {
     const { slug } = params
     const searchParams = request.nextUrl.searchParams
-    const scheduleId = searchParams.get('scheduleId')
     const serviceId = searchParams.get('serviceId')
     const date = searchParams.get('date')
     const professionalId = searchParams.get('professionalId')
 
-    if (!scheduleId || !serviceId || !date) {
+    if (!serviceId || !date) {
       return NextResponse.json(
-        { error: 'Parâmetros obrigatórios: scheduleId, serviceId, date' },
+        { error: 'Parâmetros obrigatórios: serviceId, date' },
         { status: 400 }
       )
     }
@@ -27,8 +26,7 @@ export async function GET(
       return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
     }
 
-    const slots = await getAvailableSlots({
-      scheduleId,
+    const slots = await getAvailableSlotsForService({
       serviceId,
       date,
       userId: tenant.id,

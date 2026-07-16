@@ -1,66 +1,33 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowLeft } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Calendar } from '@/components/ui/calendar'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import {
-  Calendar as CalendarIcon,
-  Clock,
-  User,
-  Mail,
-  Phone,
-  CheckCircle2,
-  Loader2,
-  ArrowLeft
-} from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { applyPhoneMask } from '@/lib/utils'
+import { BookingStepper, type StepDefinition } from './_components/booking-stepper'
+import { ServiceStep } from './_components/service-step'
+import { ProfessionalStep } from './_components/professional-step'
+import { DateTimeStep } from './_components/datetime-step'
+import { ConfirmStep } from './_components/confirm-step'
+import { SuccessScreen } from './_components/success-screen'
+import type { BookingProfessional, BookingService, BookingTimeSlot } from './_components/types'
+
+const STEPS: StepDefinition[] = [
+  { key: 'service', label: 'Serviço' },
+  { key: 'professional', label: 'Profissional' },
+  { key: 'datetime', label: 'Data e Hora' },
+  { key: 'confirm', label: 'Confirmação' },
+]
 
 interface BusinessInfo {
   businessName: string
   businessLogo: string | null
-}
-
-interface Service {
-  id: string
-  name: string
-  description: string | null
-  duration: number
-  price: number | null
-}
-
-interface Professional {
-  id: string
-  name: string
-  isActive: boolean
-}
-
-interface Schedule {
-  id: string
-  name: string
-  services: { service: Service }[]
-  professionals: { professional: Professional }[]
-}
-
-interface TimeSlot {
-  time: string
-  available: boolean
+  address: string | null
 }
 
 export default function PublicBookingPage() {
@@ -69,91 +36,141 @@ export default function PublicBookingPage() {
 
   const [loading, setLoading] = useState(true)
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null)
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [selectedSchedule, setSelectedSchedule] = useState<string>('')
-  const [selectedService, setSelectedService] = useState<string>('')
-  const [selectedProfessional, setSelectedProfessional] = useState<string>('')
-  const [selectedDate, setSelectedDate] = useState<Date>()
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([])
-  const [selectedTime, setSelectedTime] = useState<string>('')
-  const [loadingSlots, setLoadingSlots] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [confirmedProfessionalName, setConfirmedProfessionalName] = useState<string | null>(null)
+  const [services, setServices] = useState<BookingService[]>([])
 
-  // Dados do cliente
+  const [stepIndex, setStepIndex] = useState(0)
+  const [selectedService, setSelectedService] = useState<BookingService | null>(null)
+  const [professionals, setProfessionals] = useState<BookingProfessional[]>([])
+  const [loadingProfessionals, setLoadingProfessionals] = useState(false)
+  const [selectedProfessional, setSelectedProfessional] = useState<BookingProfessional | null>(null)
+  const [professionalChosen, setProfessionalChosen] = useState(false)
+
+  const [selectedDate, setSelectedDate] = useState<Date>()
+  const [slots, setSlots] = useState<BookingTimeSlot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [selectedTime, setSelectedTime] = useState('')
+
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [clientPhone, setClientPhone] = useState('')
 
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [confirmedProfessionalName, setConfirmedProfessionalName] = useState<string | null>(null)
+
   useEffect(() => {
     fetchBusinessInfo()
-    fetchSchedules()
+    fetchServices()
   }, [slug])
 
   useEffect(() => {
-    if (selectedSchedule && selectedService && selectedDate) {
+    if (selectedDate && selectedService) {
       fetchAvailableSlots()
     }
-  }, [selectedSchedule, selectedService, selectedProfessional, selectedDate])
-
-  useEffect(() => {
-    setSelectedProfessional('')
-  }, [selectedSchedule])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate])
 
   const fetchBusinessInfo = async () => {
     try {
       const response = await fetch(`/api/booking/${slug}/info`)
       if (response.ok) {
-        const data = await response.json()
-        setBusinessInfo(data)
+        setBusinessInfo(await response.json())
       }
     } catch (error) {
       console.error('Erro ao buscar informações:', error)
     }
   }
 
-  const fetchSchedules = async () => {
+  const fetchServices = async () => {
     try {
-      const response = await fetch(`/api/booking/${slug}/schedules`)
+      const response = await fetch(`/api/booking/${slug}/services`)
       if (response.ok) {
-        const data = await response.json()
-        setSchedules(data)
+        setServices(await response.json())
       }
     } catch (error) {
-      console.error('Erro ao buscar agendas:', error)
+      console.error('Erro ao buscar serviços:', error)
     } finally {
       setLoading(false)
     }
   }
 
+  const fetchProfessionals = async (service: BookingService) => {
+    setLoadingProfessionals(true)
+    try {
+      const response = await fetch(`/api/booking/${slug}/professionals?serviceId=${service.id}`)
+      const data = response.ok ? await response.json() : []
+      setProfessionals(data)
+      return data as BookingProfessional[]
+    } catch (error) {
+      console.error('Erro ao buscar profissionais:', error)
+      setProfessionals([])
+      return []
+    } finally {
+      setLoadingProfessionals(false)
+    }
+  }
+
   const fetchAvailableSlots = async () => {
-    if (!selectedDate || !selectedSchedule || !selectedService) return
+    if (!selectedDate || !selectedService) return
 
     setLoadingSlots(true)
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd')
-      const professionalParam = selectedProfessional ? `&professionalId=${selectedProfessional}` : ''
+      const professionalParam = selectedProfessional ? `&professionalId=${selectedProfessional.id}` : ''
       const response = await fetch(
-        `/api/booking/${slug}/available-slots?scheduleId=${selectedSchedule}&serviceId=${selectedService}&date=${dateStr}${professionalParam}`
+        `/api/booking/${slug}/available-slots?serviceId=${selectedService.id}&date=${dateStr}${professionalParam}`
       )
-
       if (response.ok) {
         const data = await response.json()
-        setAvailableSlots(data.slots || [])
+        setSlots(data.slots || [])
       }
     } catch (error) {
       console.error('Erro ao buscar horários:', error)
-      setAvailableSlots([])
+      setSlots([])
     } finally {
       setLoadingSlots(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSelectService = async (service: BookingService) => {
+    setSelectedService(service)
+    setSelectedProfessional(null)
+    setProfessionalChosen(false)
+    setSelectedDate(undefined)
+    setSelectedTime('')
+    setSlots([])
 
-    if (!clientName || !clientPhone || !selectedSchedule || !selectedService || !selectedDate || !selectedTime) {
+    const found = await fetchProfessionals(service)
+    if (found.length === 0) {
+      setStepIndex(2)
+    } else {
+      setStepIndex(1)
+    }
+  }
+
+  const handleSelectProfessional = (professional: BookingProfessional | null) => {
+    setSelectedProfessional(professional)
+    setProfessionalChosen(true)
+    setSelectedDate(undefined)
+    setSelectedTime('')
+    setSlots([])
+    setStepIndex(2)
+  }
+
+  const handleConfirmDateTime = () => {
+    setStepIndex(3)
+  }
+
+  const handleBack = () => {
+    if (stepIndex === 2 && professionals.length === 0) {
+      setStepIndex(0)
+      return
+    }
+    setStepIndex((prev) => Math.max(0, prev - 1))
+  }
+
+  const handleSubmit = async () => {
+    if (!selectedService || !selectedDate || !selectedTime || !clientName || !clientPhone) {
       toast.error('Por favor, preencha todos os campos obrigatórios')
       return
     }
@@ -164,15 +181,14 @@ export default function PublicBookingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scheduleId: selectedSchedule,
-          serviceId: selectedService,
+          serviceId: selectedService.id,
           date: format(selectedDate, 'yyyy-MM-dd'),
           time: selectedTime,
           clientName,
           clientEmail,
           clientPhone,
-          ...(selectedProfessional && { professionalId: selectedProfessional })
-        })
+          ...(selectedProfessional && { professionalId: selectedProfessional.id }),
+        }),
       })
 
       if (response.ok) {
@@ -194,10 +210,13 @@ export default function PublicBookingPage() {
 
   const handleNewBooking = () => {
     setSuccess(false)
-    setSelectedSchedule('')
-    setSelectedService('')
-    setSelectedProfessional('')
+    setStepIndex(0)
+    setSelectedService(null)
+    setProfessionals([])
+    setSelectedProfessional(null)
+    setProfessionalChosen(false)
     setSelectedDate(undefined)
+    setSlots([])
     setSelectedTime('')
     setClientName('')
     setClientEmail('')
@@ -205,318 +224,139 @@ export default function PublicBookingPage() {
     setConfirmedProfessionalName(null)
   }
 
-  const getSelectedScheduleProfessionals = () => {
-    const schedule = schedules.find(s => s.id === selectedSchedule)
-    return (schedule?.professionals || []).map(p => p.professional).filter(p => p.isActive)
-  }
-
-  const getSelectedServiceDetails = () => {
-    const schedule = schedules.find(s => s.id === selectedSchedule)
-    if (!schedule) return null
-
-    const serviceItem = schedule.services.find(s => s.service.id === selectedService)
-    return serviceItem?.service || null
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     )
   }
 
-  if (success) {
+  if (success && selectedService && selectedDate) {
+    const dateLabel = selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle2 className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Agendamento Confirmado!
-              </h2>
-              <p className="text-gray-600">
-                Seu agendamento foi realizado com sucesso. Em breve você receberá uma confirmação.
-              </p>
-              {confirmedProfessionalName && (
-                <p className="text-gray-700 font-medium">
-                  Você será atendido(a) por {confirmedProfessionalName}
-                </p>
-              )}
-              <Button onClick={handleNewBooking} className="w-full">
-                Fazer Novo Agendamento
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <SuccessScreen
+        serviceName={selectedService.name}
+        professionalName={confirmedProfessionalName}
+        dateLabel={dateLabel}
+        time={selectedTime}
+        onNewBooking={handleNewBooking}
+      />
     )
   }
+
+  const canGoBack = stepIndex > 0
+  const canConfirmDateTime = Boolean(selectedDate && selectedTime)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header com Logo e Nome do Negócio */}
-        <div className="text-center mb-8">
-          {businessInfo?.businessLogo && (
-            <div className="mb-4 flex justify-center">
-              <div className="relative w-24 h-24 rounded-full overflow-hidden bg-white shadow-lg">
-                <Image
-                  src={`/api/files/logo?key=${businessInfo.businessLogo}`}
-                  alt={businessInfo.businessName || 'Logo'}
-                  fill
-                  className="object-contain p-2"
-                />
-              </div>
-            </div>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-lg px-4 pb-32 pt-6">
+        <div className="mb-6 flex items-center gap-3">
+          {canGoBack ? (
+            <button onClick={handleBack} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-muted">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="w-9" />
           )}
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            {businessInfo?.businessName || 'Agendamento Online'}
-          </h1>
-          <p className="text-gray-600">
-            Agende seu horário de forma rápida e fácil
-          </p>
+          <div className="min-w-0 flex-1 text-center">
+            {businessInfo?.businessLogo && (
+              <div className="mb-1 flex justify-center">
+                <div className="relative h-10 w-10 overflow-hidden rounded-full bg-white shadow-sm">
+                  <Image
+                    src={`/api/files/logo?key=${businessInfo.businessLogo}`}
+                    alt={businessInfo.businessName || 'Logo'}
+                    fill
+                    className="object-contain p-1"
+                  />
+                </div>
+              </div>
+            )}
+            <h1 className="truncate text-lg font-bold calenvo-gradient">
+              {businessInfo?.businessName || 'Agendamento Online'}
+            </h1>
+          </div>
+          <div className="w-9" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Seleção de Agenda/Serviço */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <CalendarIcon className="mr-2 h-5 w-5 text-blue-600" />
-                Selecione o Serviço
-              </CardTitle>
-              <CardDescription>
-                Escolha a agenda e o serviço que deseja agendar
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Agenda */}
-              <div className="space-y-2">
-                <Label htmlFor="schedule">Agenda *</Label>
-                <Select value={selectedSchedule} onValueChange={setSelectedSchedule}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma agenda" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schedules.map(schedule => (
-                      <SelectItem key={schedule.id} value={schedule.id}>
-                        {schedule.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="mb-8">
+          <BookingStepper steps={STEPS} currentIndex={stepIndex} />
+        </div>
 
-              {/* Serviço */}
-              {selectedSchedule && (
-                <div className="space-y-2">
-                  <Label htmlFor="service">Serviço *</Label>
-                  <Select value={selectedService} onValueChange={setSelectedService}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {schedules
-                        .find(s => s.id === selectedSchedule)
-                        ?.services.map(({ service }) => (
-                          <SelectItem key={service.id} value={service.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span>{service.name}</span>
-                              <span className="text-sm text-gray-500 ml-2">
-                                {service.duration}min
-                                {service.price && ` - R$ ${service.price.toFixed(2)}`}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={STEPS[stepIndex].key}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.18 }}
+          >
+            {stepIndex === 0 && (
+              <ServiceStep services={services} onSelect={handleSelectService} />
+            )}
 
-                  {selectedService && getSelectedServiceDetails() && (
-                    <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                        <span className="text-gray-700">
-                          Duração: {getSelectedServiceDetails()?.duration} minutos
-                        </span>
-                        {getSelectedServiceDetails()?.price && (
-                          <>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-700">
-                              Valor: R$ {getSelectedServiceDetails()?.price?.toFixed(2)}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+            {stepIndex === 1 && (
+              <ProfessionalStep
+                professionals={professionals}
+                loading={loadingProfessionals}
+                onSelect={handleSelectProfessional}
+              />
+            )}
 
-              {/* Profissional */}
-              {selectedService && getSelectedScheduleProfessionals().length === 1 && (
-                <p className="text-sm text-gray-600">
-                  Atendido(a) por: <strong>{getSelectedScheduleProfessionals()[0].name}</strong>
-                </p>
-              )}
-              {selectedService && getSelectedScheduleProfessionals().length > 1 && (
-                <div className="space-y-2">
-                  <Label htmlFor="professional">Profissional</Label>
-                  <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Qualquer profissional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getSelectedScheduleProfessionals().map(professional => (
-                        <SelectItem key={professional.id} value={professional.id}>
-                          {professional.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            {stepIndex === 2 && (
+              <DateTimeStep
+                selectedDate={selectedDate}
+                onSelectDate={(date) => {
+                  setSelectedDate(date)
+                  setSelectedTime('')
+                }}
+                slots={slots}
+                loadingSlots={loadingSlots}
+                selectedTime={selectedTime}
+                onSelectTime={setSelectedTime}
+              />
+            )}
 
-          {/* Seleção de Data e Hora */}
-          {selectedService && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="mr-2 h-5 w-5 text-blue-600" />
-                  Escolha Data e Horário
-                </CardTitle>
-                <CardDescription>
-                  Selecione a data e o horário desejado
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Calendário */}
-                <div className="flex justify-center">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    locale={ptBR}
-                    disabled={(date) => date < new Date()}
-                    className="rounded-md border"
-                  />
-                </div>
-
-                {/* Horários Disponíveis */}
-                {selectedDate && (
-                  <div className="space-y-2">
-                    <Label>Horários Disponíveis *</Label>
-                    {loadingSlots ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                      </div>
-                    ) : availableSlots.length > 0 ? (
-                      <div className="grid grid-cols-4 gap-2">
-                        {availableSlots.map(slot => (
-                          <Button
-                            key={slot.time}
-                            type="button"
-                            variant={selectedTime === slot.time ? 'default' : 'outline'}
-                            disabled={!slot.available}
-                            onClick={() => setSelectedTime(slot.time)}
-                            className="w-full"
-                          >
-                            {slot.time}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-center text-gray-500 py-4">
-                        Não há horários disponíveis para esta data
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Dados do Cliente */}
-          {selectedTime && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="mr-2 h-5 w-5 text-blue-600" />
-                  Seus Dados
-                </CardTitle>
-                <CardDescription>
-                  Informe seus dados para contato
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="clientName">Nome Completo *</Label>
-                  <Input
-                    id="clientName"
-                    type="text"
-                    placeholder="Seu nome completo"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="clientPhone">WhatsApp *</Label>
-                  <Input
-                    id="clientPhone"
-                    type="tel"
-                    placeholder="(00) 00000-0000"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(applyPhoneMask(e.target.value))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="clientEmail">E-mail (opcional)</Label>
-                  <Input
-                    id="clientEmail"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                  />
-                </div>
-
-                <div className="pt-4">
-                  <Button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    size="lg"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Confirmar Agendamento
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </form>
+            {stepIndex === 3 && selectedService && selectedDate && (
+              <ConfirmStep
+                service={selectedService}
+                professional={professionalChosen ? selectedProfessional : null}
+                date={selectedDate}
+                time={selectedTime}
+                address={businessInfo?.address || null}
+                clientName={clientName}
+                clientPhone={clientPhone}
+                clientEmail={clientEmail}
+                onChangeName={setClientName}
+                onChangePhone={setClientPhone}
+                onChangeEmail={setClientEmail}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      {(stepIndex === 2 || stepIndex === 3) && (
+        <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 p-4 backdrop-blur">
+          <div className="mx-auto max-w-lg">
+            {stepIndex === 2 && (
+              <Button className="w-full" size="lg" disabled={!canConfirmDateTime} onClick={handleConfirmDateTime}>
+                Confirmar Horário
+              </Button>
+            )}
+            {stepIndex === 3 && (
+              <Button
+                className="w-full"
+                size="lg"
+                disabled={submitting || !clientName || !clientPhone}
+                onClick={handleSubmit}
+              >
+                {submitting ? 'Processando...' : 'Confirmar Agendamento'}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
