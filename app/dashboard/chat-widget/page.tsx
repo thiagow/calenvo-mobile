@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MessageCircle, Copy, Check, Loader2 } from 'lucide-react'
+import { MessageCircle, Copy, Check, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface ChatWidgetConfig {
   enabled: boolean
+  displayName: string
+  avatarUrl: string | null
   welcomeMessage: string
   primaryColor: string
   position: 'bottom-right' | 'bottom-left'
@@ -23,8 +25,33 @@ export default function ChatWidgetPage() {
   const [config, setConfig] = useState<ChatWidgetConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [copiedScript, setCopiedScript] = useState(false)
   const [copiedIframe, setCopiedIframe] = useState(false)
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { toast.error('Máximo 5MB'); return }
+    if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem'); return }
+    const reader = new FileReader()
+    reader.onloadend = () => setAvatarPreview(reader.result as string)
+    reader.readAsDataURL(file)
+    setUploadingAvatar(true)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch('/api/upload/chat-avatar', { method: 'POST', body: fd })
+      if (!res.ok) throw new Error()
+      const d = await res.json()
+      setConfig(c => c && ({ ...c, avatarUrl: d.cloud_storage_path }))
+      toast.success('Avatar enviado!')
+    } catch {
+      toast.error('Erro ao enviar avatar')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/dashboard/chat-widget')
@@ -81,6 +108,32 @@ export default function ChatWidgetPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+          <div className="flex items-center gap-4 pb-1">
+            <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-muted overflow-hidden flex-shrink-0">
+              {avatarPreview || config.avatarUrl ? (
+                <img src={avatarPreview || `/api/files/logo?key=${config.avatarUrl}`} alt="Avatar do chat" className="w-full h-full object-cover" />
+              ) : (
+                <Upload className="h-6 w-6 text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <Label>Foto de perfil no chat</Label>
+              <Input type="file" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} className="text-xs mt-1" />
+              <p className="text-[10px] text-muted-foreground mt-1">PNG/JPG, máx 5MB. Aparece no ícone flutuante, no cabeçalho e nas respostas do chat.</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="displayName">Nome exibido no chat</Label>
+            <Input
+              id="displayName"
+              placeholder="Agendamento Online"
+              value={config.displayName}
+              onChange={(e) => setConfig({ ...config, displayName: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">Deixe em branco para usar o padrão "Agendamento Online"</p>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="enabled">Chat ativo</Label>

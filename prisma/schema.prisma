@@ -629,6 +629,8 @@ model ChatWidgetConfig {
   userId         String   @unique
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   enabled          Boolean  @default(false)
+  displayName      String?
+  avatarUrl        String?
   welcomeMessage   String   @default("Olá! Como posso ajudar a agendar seu horário?")
   primaryColor     String   @default("#7C3AED")
   position         String   @default("bottom-right") // bottom-right | bottom-left

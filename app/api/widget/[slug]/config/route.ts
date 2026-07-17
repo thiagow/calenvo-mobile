@@ -21,7 +21,8 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
 
   return NextResponse.json(
     {
-      businessName: tenant.businessName || tenant.name || 'Atendimento',
+      businessName: widgetConfig?.displayName || tenant.businessName || tenant.name || 'Agendamento Online',
+      avatarUrl: widgetConfig?.avatarUrl ?? null,
       enabled: widgetConfig?.enabled ?? false,
       welcomeMessage: widgetConfig?.welcomeMessage ?? 'Olá! Como posso ajudar a agendar seu horário?',
       primaryColor: widgetConfig?.primaryColor ?? '#7C3AED',

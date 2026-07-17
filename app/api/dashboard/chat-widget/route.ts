@@ -33,6 +33,7 @@ export async function GET() {
 
   return NextResponse.json({
     ...config,
+    displayName: config.displayName || '',
     slug: user.businessConfig?.publicUrl || user.id,
   })
 }
@@ -44,12 +45,13 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { enabled, welcomeMessage, primaryColor, position, showLauncherText } = body
+  const { enabled, displayName, welcomeMessage, primaryColor, position, showLauncherText } = body
 
   const config = await prisma.chatWidgetConfig.upsert({
     where: { userId: user.id },
     update: {
       ...(typeof enabled === 'boolean' && { enabled }),
+      ...(typeof displayName === 'string' && { displayName: displayName || null }),
       ...(welcomeMessage && { welcomeMessage }),
       ...(primaryColor && { primaryColor }),
       ...(position && { position }),
@@ -58,6 +60,7 @@ export async function PUT(request: NextRequest) {
     create: {
       userId: user.id,
       enabled: enabled ?? false,
+      displayName: displayName || undefined,
       welcomeMessage: welcomeMessage || undefined,
       primaryColor: primaryColor || undefined,
       position: position || undefined,
