@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight } from 'lucide-react'
+import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useUserRole } from '@/hooks/use-user-role'
@@ -76,6 +76,12 @@ export default function SettingsPage() {
   const [businessName, setBusinessName] = useState('')
   const [phone, setPhone] = useState('')
 
+  const [editingSlug, setEditingSlug] = useState(false)
+  const [slugDraft, setSlugDraft] = useState('')
+  const [slugChecking, setSlugChecking] = useState(false)
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null)
+  const [slugSaving, setSlugSaving] = useState(false)
+
   const fetchConfig = async () => {
     const res = await fetch('/api/settings/business-config')
     if (res.ok) {
@@ -138,13 +144,67 @@ export default function SettingsPage() {
     return { ...c, workingDays: Array.from(s).sort((a, b) => a - b) }
   })
 
+  const currentSlug = config.publicUrl || generateSlug(businessName) || (session?.user as any)?.id?.substring(0, 8) || 'agendamento'
+
   const getPublicUrl = () => {
     const base = typeof window !== 'undefined' ? window.location.origin : ''
-    const slug = config.publicUrl || generateSlug(businessName) || (session?.user as any)?.id?.substring(0, 8) || 'agendamento'
-    return `${base}/booking/${slug}`
+    return `${base}/booking/${currentSlug}`
   }
 
   const copyUrl = () => { navigator.clipboard.writeText(getPublicUrl()); toast.success('URL copiada!') }
+
+  const openSlugEdit = () => {
+    setSlugDraft(currentSlug)
+    setSlugAvailable(null)
+    setEditingSlug(true)
+  }
+
+  const cancelSlugEdit = () => {
+    setEditingSlug(false)
+    setSlugDraft('')
+    setSlugAvailable(null)
+  }
+
+  const handleSlugChange = (raw: string) => {
+    const sanitized = generateSlug(raw)
+    setSlugDraft(sanitized)
+    setSlugAvailable(null)
+  }
+
+  useEffect(() => {
+    if (!editingSlug || slugDraft.length < 3) { setSlugAvailable(null); return }
+    if (slugDraft === config.publicUrl) { setSlugAvailable(true); return }
+    setSlugChecking(true)
+    const t = setTimeout(() => {
+      fetch(`/api/settings/public-url?slug=${encodeURIComponent(slugDraft)}`)
+        .then(r => r.json())
+        .then(d => setSlugAvailable(!!d.available))
+        .catch(() => setSlugAvailable(null))
+        .finally(() => setSlugChecking(false))
+    }, 500)
+    return () => clearTimeout(t)
+  }, [slugDraft, editingSlug, config.publicUrl])
+
+  const saveSlug = async () => {
+    if (!slugAvailable) return
+    setSlugSaving(true)
+    try {
+      const res = await fetch('/api/settings/public-url', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: slugDraft }),
+      })
+      const d = await res.json()
+      if (!res.ok) { toast.error(d.error || 'Erro ao salvar link'); return }
+      setConfig(c => ({ ...c, publicUrl: d.publicUrl }))
+      toast.success('Link público atualizado!')
+      cancelSlugEdit()
+    } catch {
+      toast.error('Erro ao salvar link')
+    } finally {
+      setSlugSaving(false)
+    }
+  }
 
   if (loading) return (
     <div className="space-y-3">
@@ -258,12 +318,60 @@ export default function SettingsPage() {
       {/* Agendamento Online */}
       <Section title="Agendamento Online" icon={Globe} iconColor="bg-purple-500/10 text-purple-600">
         <div>
-          <Label className="text-xs text-muted-foreground">URL pública</Label>
-          <div className="flex gap-2 mt-1">
-            <Input value={getPublicUrl()} readOnly className="bg-muted text-xs flex-1" />
-            <Button size="icon" variant="outline" onClick={copyUrl}><Copy className="h-4 w-4" /></Button>
-            <Button size="icon" variant="outline" onClick={() => window.open(getPublicUrl(), '_blank')}><ExternalLink className="h-4 w-4" /></Button>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">URL pública</Label>
+            {!editingSlug && (
+              <button onClick={openSlugEdit} className="flex items-center gap-1 text-xs text-primary font-medium">
+                <Pencil className="h-3 w-3" /> Editar
+              </button>
+            )}
           </div>
+
+          {!editingSlug ? (
+            <div className="flex gap-2 mt-1">
+              <Input value={getPublicUrl()} readOnly className="bg-muted text-xs flex-1" />
+              <Button size="icon" variant="outline" onClick={copyUrl}><Copy className="h-4 w-4" /></Button>
+              <Button size="icon" variant="outline" onClick={() => window.open(getPublicUrl(), '_blank')}><ExternalLink className="h-4 w-4" /></Button>
+            </div>
+          ) : (
+            <div className="mt-1 space-y-2">
+              <div className="flex items-center gap-1 h-10 rounded-md border border-input bg-background px-3 text-xs">
+                <span className="text-muted-foreground whitespace-nowrap">
+                  {typeof window !== 'undefined' ? window.location.origin.replace(/^https?:\/\//, '') : ''}/booking/
+                </span>
+                <input
+                  value={slugDraft}
+                  onChange={e => handleSlugChange(e.target.value)}
+                  className="flex-1 min-w-0 bg-transparent outline-none"
+                  autoFocus
+                />
+                {slugChecking ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground flex-shrink-0" />
+                ) : slugAvailable === true ? (
+                  <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                ) : slugAvailable === false ? (
+                  <X className="h-3.5 w-3.5 text-destructive flex-shrink-0" />
+                ) : null}
+              </div>
+
+              {slugAvailable === false && (
+                <p className="text-xs text-destructive">Esse link já está em uso.</p>
+              )}
+
+              <div className="flex items-start gap-1.5 text-[10px] text-amber-600 bg-amber-500/10 rounded-lg px-2.5 py-2">
+                <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                <span>Isso muda seu link público. Endereços já compartilhados com a URL atual param de funcionar.</span>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={cancelSlugEdit}>Cancelar</Button>
+                <Button size="sm" className="flex-1" onClick={saveSlug} disabled={!slugAvailable || slugSaving}>
+                  {slugSaving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3 pt-2 border-t border-border">
