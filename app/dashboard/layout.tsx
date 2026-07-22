@@ -22,8 +22,12 @@ export default async function DashboardLayout({
   const userId = (session.user as any)?.id
   const role = (session.user as any)?.role
 
-  // SAAS_ADMIN não tem assinatura própria — nunca é bloqueado por este gate.
-  if (role !== 'SAAS_ADMIN' && userId) {
+  // SAAS_ADMIN não usa o dashboard de tenant — defesa em profundidade além do middleware.
+  if (role === 'SAAS_ADMIN') {
+    redirect('/saas-admin')
+  }
+
+  if (userId) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { subscriptionStatus: true, isPaymentExempt: true }

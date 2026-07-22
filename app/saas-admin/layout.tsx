@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { SaasAdminSidebar } from '@/components/saas-admin/saas-admin-sidebar'
-import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { SaasAdminHeader } from '@/components/saas-admin/saas-admin-header'
 
 export default async function SaasAdminLayout({
     children,
@@ -27,8 +27,6 @@ export default async function SaasAdminLayout({
         user: {
             name: session.user?.name,
             email: session.user?.email,
-            planType: 'BUSINESS',
-            businessName: 'SaaS Admin'
         }
     }
 
@@ -37,7 +35,7 @@ export default async function SaasAdminLayout({
             <SaasAdminSidebar />
 
             <div className="flex flex-1 flex-col overflow-hidden lg:ml-64">
-                <DashboardHeader sessionData={sessionData} />
+                <SaasAdminHeader sessionData={sessionData} />
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
                     {children}

@@ -17,7 +17,7 @@ import {
 
 const navigation = [
     { name: 'Dashboard', href: '/saas-admin', icon: Home },
-    { name: 'Clientes', href: '/saas-admin/tenants', icon: Users },
+    { name: 'Contas', href: '/saas-admin/tenants', icon: Users },
     { name: 'Pagamentos', href: '/saas-admin/payments', icon: CreditCard },
     { name: 'Logs', href: '/saas-admin/logs', icon: FileText },
 ]
