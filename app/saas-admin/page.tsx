@@ -69,7 +69,7 @@ export default function SaasAdminDashboard() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total de Tenants</CardTitle>
+                        <CardTitle className="text-sm font-medium">Total de Contas</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -82,7 +82,7 @@ export default function SaasAdminDashboard() {
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Tenants Ativos</CardTitle>
+                        <CardTitle className="text-sm font-medium">Contas Ativas</CardTitle>
                         <UserCheck className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -136,7 +136,7 @@ export default function SaasAdminDashboard() {
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Novos Tenants</CardTitle>
+                        <CardTitle className="text-sm font-medium">Novas Contas</CardTitle>
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -159,7 +159,7 @@ export default function SaasAdminDashboard() {
                             {stats.distribution.byPlan.map((item) => (
                                 <div key={item.plan} className="flex items-center justify-between">
                                     <span className="text-sm font-medium">{item.plan}</span>
-                                    <span className="text-sm text-muted-foreground">{item.count} tenants</span>
+                                    <span className="text-sm text-muted-foreground">{item.count} contas</span>
                                 </div>
                             ))}
                         </div>
@@ -175,7 +175,7 @@ export default function SaasAdminDashboard() {
                             {stats.distribution.bySegment.slice(0, 5).map((item) => (
                                 <div key={item.segment} className="flex items-center justify-between">
                                     <span className="text-sm font-medium">{item.segment}</span>
-                                    <span className="text-sm text-muted-foreground">{item.count} tenants</span>
+                                    <span className="text-sm text-muted-foreground">{item.count} contas</span>
                                 </div>
                             ))}
                         </div>
