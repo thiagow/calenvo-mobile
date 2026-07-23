@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, UserCheck, UserX, Calendar, DollarSign, TrendingUp } from 'lucide-react'
+import { SEGMENT_CONFIGS } from '@/lib/types'
 
 interface Stats {
     overview: {
@@ -174,7 +175,9 @@ export default function SaasAdminDashboard() {
                         <div className="space-y-2">
                             {stats.distribution.bySegment.slice(0, 5).map((item) => (
                                 <div key={item.segment} className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">{item.segment}</span>
+                                    <span className="text-sm font-medium">
+                                        {SEGMENT_CONFIGS[item.segment as keyof typeof SEGMENT_CONFIGS]?.name ?? item.segment}
+                                    </span>
                                     <span className="text-sm text-muted-foreground">{item.count} contas</span>
                                 </div>
                             ))}

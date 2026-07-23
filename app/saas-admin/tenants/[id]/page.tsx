@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useDialog } from '@/components/providers/dialog-provider'
+import { SEGMENT_CONFIGS } from '@/lib/types'
 
 export default function TenantDetailsPage({ params }: { params: { id: string } }) {
     const router = useRouter()
@@ -244,7 +245,7 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
 
                         <div className="flex justify-between border-t pt-4">
                             <span className="text-sm font-medium">Segmento:</span>
-                            <span className="text-sm">{tenant.segmentType}</span>
+                            <span className="text-sm">{SEGMENT_CONFIGS[tenant.segmentType as keyof typeof SEGMENT_CONFIGS]?.name ?? tenant.segmentType}</span>
                         </div>
                         <div className="flex justify-between">
                             <span className="text-sm font-medium">Telefone:</span>

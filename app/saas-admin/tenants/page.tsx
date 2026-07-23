@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Search, Eye, Lock, Unlock, Plus } from 'lucide-react'
 import { useDialog } from '@/components/providers/dialog-provider'
 import Link from 'next/link'
+import { SEGMENT_CONFIGS } from '@/lib/types'
 
 interface Tenant {
     id: string
@@ -159,7 +160,7 @@ export default function TenantsPage() {
                                         </div>
                                         <p className="text-sm text-muted-foreground">{tenant.email}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            {tenant._count.professionals} profissionais • {tenant.segmentType}
+                                            {tenant._count.professionals} profissionais • {SEGMENT_CONFIGS[tenant.segmentType as keyof typeof SEGMENT_CONFIGS]?.name ?? tenant.segmentType}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
