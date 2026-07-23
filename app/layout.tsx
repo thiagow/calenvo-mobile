@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <head>
-        <link rel="apple-touch-icon" href="/calenvo-logo.png" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body className={dmSans.className}>
         <Providers>
