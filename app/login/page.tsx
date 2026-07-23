@@ -1,6 +1,5 @@
 
 import { LoginForm } from '@/components/auth/login-form'
-import { CookieCleaner } from '@/components/auth/cookie-cleaner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { LogoIcon } from '@/components/brand/logo'
@@ -8,7 +7,6 @@ import { LogoIcon } from '@/components/brand/logo'
 export default function LoginPage() {
   return (
     <>
-      <CookieCleaner />
       <div className="min-h-screen bg-gradient-to-br from-violet-50 to-purple-50 flex items-center justify-center px-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
