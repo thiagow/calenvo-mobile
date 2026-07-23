@@ -67,9 +67,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // Get the token to check user role
+  // cookieName/secureCookie fixados para bater com o cookie custom em lib/auth-options.ts
+  // (sem isso, getToken() assume "__Secure-next-auth.session-token" em produção HTTPS
+  // e nunca encontra o cookie real, tratando todo mundo como não autenticado)
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName: 'next-auth.session-token',
+    secureCookie: false
   })
 
   // Protect /saas-admin routes - only SAAS_ADMIN can access
