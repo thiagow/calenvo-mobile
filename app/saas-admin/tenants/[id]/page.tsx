@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Lock, Unlock, Zap, Gift } from 'lucide-react'
+import { ArrowLeft, Lock, Unlock, Zap, Gift, Users, CalendarDays, UserRound, Briefcase, CalendarRange } from 'lucide-react'
 import {
     Select,
     SelectContent,
@@ -15,6 +15,20 @@ import {
 } from "@/components/ui/select"
 import { useDialog } from '@/components/providers/dialog-provider'
 import { SEGMENT_CONFIGS } from '@/lib/types'
+
+function MetricTile({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
+    return (
+        <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Icon className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+                <p className="text-lg font-semibold leading-none">{value}</p>
+                <p className="mt-1 text-xs text-muted-foreground truncate">{label}</p>
+            </div>
+        </div>
+    )
+}
 
 export default function TenantDetailsPage({ params }: { params: { id: string } }) {
     const router = useRouter()
@@ -258,26 +272,17 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                     <CardHeader>
                         <CardTitle>Métricas</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium">Profissionais:</span>
-                            <span className="text-sm">{tenant._count.professionals}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium">Agendamentos:</span>
-                            <span className="text-sm">{tenant._count.appointments}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium">Clientes:</span>
-                            <span className="text-sm">{tenant._count.clients}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium">Serviços:</span>
-                            <span className="text-sm">{tenant._count.services}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm font-medium">Agendas:</span>
-                            <span className="text-sm">{tenant._count.schedules}</span>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-3">
+                            <MetricTile
+                                icon={Users}
+                                label="Profissionais"
+                                value={1 + (tenant.professionals?.length ?? 0)}
+                            />
+                            <MetricTile icon={CalendarDays} label="Agendamentos" value={tenant._count.appointments} />
+                            <MetricTile icon={UserRound} label="Clientes" value={tenant._count.clients} />
+                            <MetricTile icon={Briefcase} label="Serviços" value={tenant._count.services} />
+                            <MetricTile icon={CalendarRange} label="Agendas" value={tenant._count.schedules} />
                         </div>
                     </CardContent>
                 </Card>
