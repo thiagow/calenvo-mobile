@@ -248,7 +248,12 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   })
 
   if (!user) {
-    console.error('❌ Usuário não encontrado para customer:', customerId)
+    console.error('[STRIPE_WEBHOOK_ORPHAN_EVENT] Usuário não encontrado para customer', {
+      handler: 'handleSubscriptionUpdated',
+      customerId,
+      subscriptionId: subscription.id,
+      status: subscription.status,
+    })
     return
   }
 
@@ -297,7 +302,11 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   })
 
   if (!user) {
-    console.error('❌ Usuário não encontrado para customer:', customerId)
+    console.error('[STRIPE_WEBHOOK_ORPHAN_EVENT] Usuário não encontrado para customer', {
+      handler: 'handleSubscriptionDeleted',
+      customerId,
+      subscriptionId: subscription.id,
+    })
     return
   }
 
@@ -321,7 +330,11 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   })
 
   if (!user) {
-    console.error('❌ Usuário não encontrado para customer:', customerId)
+    console.error('[STRIPE_WEBHOOK_ORPHAN_EVENT] Usuário não encontrado para customer', {
+      handler: 'handlePaymentFailed',
+      customerId,
+      invoiceId: invoice.id,
+    })
     return
   }
 
