@@ -7,11 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AVAILABLE_SEGMENTS, PLAN_CONFIGS } from '@/lib/types'
-import { PlanType, SegmentType } from '@prisma/client'
-import { Loader2, ArrowLeft } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { PLAN_CONFIGS } from '@/lib/types'
+import { PlanType } from '@prisma/client'
+import { Loader2, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { applyPhoneMask } from '@/lib/utils'
+import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
 
 const PLAN_OPTIONS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
 
@@ -19,15 +22,17 @@ export default function NewTenantPage() {
     const router = useRouter()
     const { alert } = useDialog()
     const [loading, setLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
         businessName: '',
-        segmentType: 'BEAUTY_SALON' as SegmentType,
+        segmentTypes: ['BEAUTY_SALON'] as string[],
         phone: '',
         planType: 'BASICO' as PlanType,
         billingInterval: 'MONTHLY' as 'MONTHLY' | 'ANNUAL',
+        isPaymentExempt: true,
     })
 
     const handleChange = (field: string, value: string) => {
@@ -36,6 +41,16 @@ export default function NewTenantPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (formData.segmentTypes.length === 0) {
+            await alert({
+                title: 'Erro',
+                description: 'Selecione ao menos um segmento',
+                variant: 'error'
+            })
+            return
+        }
+
         setLoading(true)
 
         try {
@@ -109,14 +124,26 @@ export default function NewTenantPage() {
 
                         <div className="space-y-2">
                             <Label htmlFor="password">Senha inicial</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                minLength={6}
-                                value={formData.password}
-                                onChange={(e) => handleChange('password', e.target.value)}
-                                required
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    minLength={6}
+                                    value={formData.password}
+                                    onChange={(e) => handleChange('password', e.target.value)}
+                                    className="pr-10"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((prev) => !prev)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -130,22 +157,11 @@ export default function NewTenantPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="segmentType">Segmento</Label>
-                            <Select
-                                value={formData.segmentType}
-                                onValueChange={(value) => handleChange('segmentType', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {AVAILABLE_SEGMENTS.map((segment) => (
-                                        <SelectItem key={segment.value} value={segment.value}>
-                                            {segment.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label>Segmentos</Label>
+                            <SegmentMultiSelect
+                                value={formData.segmentTypes}
+                                onChange={(value) => setFormData(prev => ({ ...prev, segmentTypes: value }))}
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -153,10 +169,23 @@ export default function NewTenantPage() {
                             <Input
                                 id="phone"
                                 type="tel"
+                                inputMode="numeric"
+                                placeholder="(11) 99999-0000"
                                 value={formData.phone}
-                                onChange={(e) => handleChange('phone', e.target.value)}
+                                onChange={(e) => handleChange('phone', applyPhoneMask(e.target.value))}
                                 required
                             />
+                        </div>
+
+                        <div className="flex items-center gap-2 rounded-md border border-input p-3">
+                            <Checkbox
+                                id="isPaymentExempt"
+                                checked={formData.isPaymentExempt}
+                                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPaymentExempt: checked === true }))}
+                            />
+                            <Label htmlFor="isPaymentExempt" className="cursor-pointer font-normal">
+                                Isentar de pagamento (cortesia/parceria, sem cobrança no Stripe)
+                            </Label>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -203,7 +232,7 @@ export default function NewTenantPage() {
                                     Criando...
                                 </>
                             ) : (
-                                'Criar cliente isento de pagamento'
+                                formData.isPaymentExempt ? 'Criar cliente isento de pagamento' : 'Criar cliente'
                             )}
                         </Button>
                     </form>

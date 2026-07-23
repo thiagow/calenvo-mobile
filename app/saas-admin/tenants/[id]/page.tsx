@@ -258,8 +258,14 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                         </div>
 
                         <div className="flex justify-between border-t pt-4">
-                            <span className="text-sm font-medium">Segmento:</span>
-                            <span className="text-sm">{SEGMENT_CONFIGS[tenant.segmentType as keyof typeof SEGMENT_CONFIGS]?.name ?? tenant.segmentType}</span>
+                            <span className="text-sm font-medium">Segmentos:</span>
+                            <div className="flex flex-wrap justify-end gap-1">
+                                {(tenant.segmentTypes as string[]).map((s) => (
+                                    <Badge key={s} variant="outline" className="text-xs">
+                                        {SEGMENT_CONFIGS[s as keyof typeof SEGMENT_CONFIGS]?.name ?? s}
+                                    </Badge>
+                                ))}
+                            </div>
                         </div>
                         <div className="flex justify-between">
                             <span className="text-sm font-medium">Telefone:</span>

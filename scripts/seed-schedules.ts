@@ -25,7 +25,7 @@ async function main() {
     // Criar serviços baseados no segmento do usuário
     let services: any[] = []
 
-    if (user.segmentType === 'PHYSIOTHERAPY') {
+    if (user.segmentTypes.includes('PHYSIOTHERAPY')) {
       console.log('  🏥 Criando serviços para clínica médica...')
       
       const serviceData = [
@@ -45,7 +45,7 @@ async function main() {
         console.log(`    ✓ Serviço criado: ${service.name}`)
       }
 
-    } else if (user.segmentType === 'BEAUTY_SALON') {
+    } else if (user.segmentTypes.includes('BEAUTY_SALON')) {
       console.log('  💇 Criando serviços para salão de beleza...')
       
       const serviceData = [
@@ -89,9 +89,9 @@ async function main() {
     // Criar agenda padrão
     console.log('  📅 Criando agenda padrão...')
     
-    const scheduleName = user.segmentType === 'PHYSIOTHERAPY' 
+    const scheduleName = user.segmentTypes.includes('PHYSIOTHERAPY')
       ? 'Consultas Gerais'
-      : user.segmentType === 'BEAUTY_SALON'
+      : user.segmentTypes.includes('BEAUTY_SALON')
       ? 'Atendimentos'
       : 'Agenda Principal'
 

@@ -39,7 +39,7 @@ export default function SegmentSettingsPage() {
       const response = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segmentType: selectedSegment })
+        body: JSON.stringify({ segmentTypes: [selectedSegment] })
       })
 
       if (!response.ok) {

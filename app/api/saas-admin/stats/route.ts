@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
             appointmentsThisMonth,
             newTenantsLast30Days,
             tenantsByPlan,
-            tenantsBySegment
+            tenantSegments
         ] = await Promise.all([
             // Total de tenants
             prisma.user.count({
@@ -61,13 +61,20 @@ export async function GET(req: NextRequest) {
                 where: { role: 'MASTER' },
                 _count: true
             }),
-            // Distribuição por segmento
-            prisma.user.groupBy({
-                by: ['segmentType'],
+            // Distribuição por segmento (contagem em memória: segmentTypes é array, não dá pra usar groupBy)
+            prisma.user.findMany({
                 where: { role: 'MASTER' },
-                _count: true
+                select: { segmentTypes: true }
             })
         ])
+
+        const segmentCounts = new Map<string, number>()
+        for (const { segmentTypes } of tenantSegments) {
+            for (const segment of segmentTypes) {
+                segmentCounts.set(segment, (segmentCounts.get(segment) || 0) + 1)
+            }
+        }
+        const tenantsBySegment = Array.from(segmentCounts.entries()).map(([segmentType, count]) => ({ segmentType, _count: count }))
 
         // Calcular receita mensal estimada
         const monthlyRevenue = tenantsByPlan.reduce((total, group) => {

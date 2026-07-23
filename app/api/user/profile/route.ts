@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         whatsapp: true,
         businessName: true,
         phone: true,
-        segmentType: true,
+        segmentTypes: true,
         planType: true,
         isActive: true,
         createdAt: true,
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
       'whatsapp',
       'businessName',
       'phone',
-      'segmentType'
+      'segmentTypes'
     ]
 
     const updateData: any = {}
@@ -74,6 +74,10 @@ export async function PATCH(request: NextRequest) {
       if (body[field] !== undefined) {
         updateData[field] = body[field]
       }
+    }
+
+    if (updateData.segmentTypes !== undefined && (!Array.isArray(updateData.segmentTypes) || updateData.segmentTypes.length === 0)) {
+      return NextResponse.json({ error: 'Selecione ao menos um segmento' }, { status: 400 })
     }
 
     const updatedUser = await prisma.user.update({
@@ -87,7 +91,7 @@ export async function PATCH(request: NextRequest) {
         whatsapp: true,
         businessName: true,
         phone: true,
-        segmentType: true,
+        segmentTypes: true,
         planType: true,
         isActive: true,
         createdAt: true,

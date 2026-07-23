@@ -16,7 +16,7 @@ interface Tenant {
     name: string | null
     email: string
     businessName: string | null
-    segmentType: string
+    segmentTypes: string[]
     planType: string
     isActive: boolean
     isPaymentExempt: boolean
@@ -160,7 +160,7 @@ export default function TenantsPage() {
                                         </div>
                                         <p className="text-sm text-muted-foreground">{tenant.email}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            {tenant._count.professionals} profissionais • {SEGMENT_CONFIGS[tenant.segmentType as keyof typeof SEGMENT_CONFIGS]?.name ?? tenant.segmentType}
+                                            {tenant._count.professionals} profissionais • {tenant.segmentTypes.map((s) => SEGMENT_CONFIGS[s as keyof typeof SEGMENT_CONFIGS]?.name ?? s).join(', ')}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">

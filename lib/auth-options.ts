@@ -69,7 +69,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role,
           businessName: user.businessName,
-          segmentType: user.segmentType,
+          segmentTypes: user.segmentTypes,
           planType: user.planType,
           masterId: user.masterId
         }
@@ -109,7 +109,7 @@ export const authOptions: NextAuthOptions = {
           token.role = (user as any).role
           token.planType = (user as any).planType
           token.businessName = (user as any).businessName
-          token.segmentType = (user as any).segmentType
+          token.segmentTypes = (user as any).segmentTypes
           token.masterId = (user as any).masterId
         }
         return token
@@ -128,7 +128,7 @@ export const authOptions: NextAuthOptions = {
             ; (session.user as any).role = token.role
             ; (session.user as any).planType = token.planType
             ; (session.user as any).businessName = token.businessName
-            ; (session.user as any).segmentType = token.segmentType
+            ; (session.user as any).segmentTypes = token.segmentTypes
             ; (session.user as any).masterId = token.masterId
         }
         return session

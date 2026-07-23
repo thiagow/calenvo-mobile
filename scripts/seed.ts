@@ -26,7 +26,7 @@ async function main() {
         password: testPassword,
         name: 'Dr. John Doe',
         businessName: 'Clínica Teste',
-        segmentType: 'BEAUTY_SALON',
+        segmentTypes: ['BEAUTY_SALON'],
         phone: '(11) 99999-9999',
         planType: 'BUSINESS' // Admin with Business privileges
       }

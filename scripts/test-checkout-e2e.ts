@@ -53,7 +53,7 @@ async function main() {
         password: 'senhaTeste123',
         name: 'E2E Test User',
         businessName: 'Negócio Teste E2E',
-        segmentType: 'BEAUTY_SALON',
+        segmentTypes: ['BEAUTY_SALON'],
         phone: '11999999999',
         plan: 'PRO',
         interval: 'MONTHLY',

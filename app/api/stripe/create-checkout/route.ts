@@ -3,26 +3,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripe, getStripePriceId, type BillingInterval } from '@/lib/stripe'
 import { prisma } from '@/lib/db'
 import { setTemporaryData } from '@/lib/temporary-storage'
-import { PlanType, Currency } from '@prisma/client'
+import { PlanType, Currency, SegmentType } from '@prisma/client'
 import { PLAN_CONFIGS } from '@/lib/types'
 
 const VALID_PLANS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
 const VALID_INTERVALS: BillingInterval[] = ['MONTHLY', 'ANNUAL']
+const VALID_SEGMENTS: SegmentType[] = [
+  'BEAUTY_SALON', 'BARBERSHOP', 'AESTHETIC_CLINIC', 'TECH_SAAS',
+  'PROFESSIONAL_SERVICES', 'HR', 'PHYSIOTHERAPY', 'EDUCATION', 'PET_SHOP', 'OTHER'
+]
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { email, password, name, businessName, segmentType, phone, plan, interval, locale } = body
+    const { email, password, name, businessName, segmentTypes, phone, plan, interval, locale } = body
     const currency: Currency = locale === 'en' ? 'USD' : 'BRL'
 
     console.log('🔑 Iniciando criação de checkout:', { email, name, plan, interval, currency })
 
     // Validação de campos obrigatórios
-    if (!email || !password || !name || !businessName || !phone || !segmentType) {
+    if (!email || !password || !name || !businessName || !phone || !Array.isArray(segmentTypes) || segmentTypes.length === 0) {
       return NextResponse.json(
-        { message: 'Todos os campos são obrigatórios' },
+        { message: 'Todos os campos são obrigatórios (selecione ao menos um segmento)' },
         { status: 400 }
       )
+    }
+
+    if (!segmentTypes.every((s: string) => VALID_SEGMENTS.includes(s as SegmentType))) {
+      return NextResponse.json({ message: 'Segmento inválido' }, { status: 400 })
     }
 
     if (!VALID_PLANS.includes(plan)) {
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
       name,
       metadata: {
         businessName,
-        segmentType,
+        segmentTypes: segmentTypes.join(','),
         phone,
       },
     })
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
         email,
         name,
         businessName,
-        segmentType,
+        segmentTypes: segmentTypes.join(','),
         phone,
         customerId: customer.id,
         plan,
@@ -120,7 +128,7 @@ export async function POST(req: NextRequest) {
       password,
       name,
       businessName,
-      segmentType,
+      segmentTypes: segmentTypes as SegmentType[],
       phone,
       customerId: customer.id,
       plan: plan as PlanType,

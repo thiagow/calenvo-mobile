@@ -9,7 +9,7 @@ export interface TemporaryData {
   password: string
   name: string
   businessName: string
-  segmentType: SegmentType
+  segmentTypes: SegmentType[]
   phone: string
   customerId: string
   plan: PlanType

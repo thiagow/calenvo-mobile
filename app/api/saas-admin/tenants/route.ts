@@ -7,6 +7,10 @@ import { PlanType, SegmentType } from '@prisma/client'
 
 const VALID_PLANS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
 const VALID_INTERVALS = ['MONTHLY', 'ANNUAL']
+const VALID_SEGMENTS: SegmentType[] = [
+    'BEAUTY_SALON', 'BARBERSHOP', 'AESTHETIC_CLINIC', 'TECH_SAAS',
+    'PROFESSIONAL_SERVICES', 'HR', 'PHYSIOTHERAPY', 'EDUCATION', 'PET_SHOP', 'OTHER'
+]
 
 /**
  * GET /api/saas-admin/tenants
@@ -39,7 +43,7 @@ export async function GET(req: NextRequest) {
         }
 
         if (segmentType) {
-            where.segmentType = segmentType
+            where.segmentTypes = { has: segmentType }
         }
 
         if (isActive !== null && isActive !== undefined) {
@@ -63,7 +67,7 @@ export async function GET(req: NextRequest) {
                     name: true,
                     email: true,
                     businessName: true,
-                    segmentType: true,
+                    segmentTypes: true,
                     planType: true,
                     isActive: true,
                     isPaymentExempt: true,
@@ -120,13 +124,17 @@ export async function POST(req: NextRequest) {
     try {
         const session = await requireSaasAdmin()
         const body = await req.json()
-        const { name, email, password, businessName, segmentType, phone, planType, billingInterval } = body
+        const { name, email, password, businessName, segmentTypes, phone, planType, billingInterval, isPaymentExempt } = body
 
-        if (!name || !email || !password || !businessName || !phone || !segmentType) {
+        if (!name || !email || !password || !businessName || !phone || !Array.isArray(segmentTypes) || segmentTypes.length === 0) {
             return NextResponse.json(
-                { error: 'Todos os campos são obrigatórios' },
+                { error: 'Todos os campos são obrigatórios (selecione ao menos um segmento)' },
                 { status: 400 }
             )
+        }
+
+        if (!segmentTypes.every((s: string) => VALID_SEGMENTS.includes(s as SegmentType))) {
+            return NextResponse.json({ error: 'Segmento inválido' }, { status: 400 })
         }
 
         if (!VALID_PLANS.includes(planType)) {
@@ -136,6 +144,13 @@ export async function POST(req: NextRequest) {
         if (!VALID_INTERVALS.includes(billingInterval)) {
             return NextResponse.json({ error: 'Intervalo de cobrança inválido' }, { status: 400 })
         }
+
+        const phoneDigits = String(phone).replace(/\D/g, '')
+        if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+            return NextResponse.json({ error: 'Telefone inválido' }, { status: 400 })
+        }
+
+        const paymentExempt = isPaymentExempt !== false
 
         const existingUser = await prisma.user.findUnique({
             where: { email_role: { email, role: 'MASTER' } }
@@ -157,11 +172,11 @@ export async function POST(req: NextRequest) {
                     password: hashedPassword,
                     name,
                     businessName,
-                    segmentType: segmentType as SegmentType,
+                    segmentTypes: segmentTypes as SegmentType[],
                     phone,
                     planType: planType as PlanType,
                     billingInterval,
-                    isPaymentExempt: true,
+                    isPaymentExempt: paymentExempt,
                     role: 'MASTER',
                 }
             })
@@ -172,7 +187,7 @@ export async function POST(req: NextRequest) {
                     password: hashedPassword,
                     name,
                     businessName,
-                    segmentType: segmentType as SegmentType,
+                    segmentTypes: segmentTypes as SegmentType[],
                     phone,
                     whatsapp: phone,
                     role: 'PROFESSIONAL',
@@ -180,7 +195,7 @@ export async function POST(req: NextRequest) {
                     isActive: true,
                     planType: planType as PlanType,
                     billingInterval,
-                    isPaymentExempt: true,
+                    isPaymentExempt: paymentExempt,
                 }
             })
 
@@ -204,7 +219,7 @@ export async function POST(req: NextRequest) {
 
         await prisma.adminAuditLog.create({
             data: {
-                action: 'TENANT_CREATED_PAYMENT_EXEMPT',
+                action: paymentExempt ? 'TENANT_CREATED_PAYMENT_EXEMPT' : 'TENANT_CREATED',
                 adminId: (session.user as any).id,
                 targetId: user.id,
                 details: {

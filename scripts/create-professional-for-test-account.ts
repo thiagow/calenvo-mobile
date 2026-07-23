@@ -27,7 +27,7 @@ async function createProfessionalForTestAccount() {
 
     console.log(`✅ Usuário encontrado: ${masterUser.name} (${masterUser.email})`)
     console.log(`📋 Plano atual: ${masterUser.planType}`)
-    console.log(`📋 Segmento: ${masterUser.segmentType}`)
+    console.log(`📋 Segmento: ${masterUser.segmentTypes.join(', ')}`)
 
     // Verificar se já tem profissionais vinculados
     const existingProfessionals = await prisma.user.findMany({
@@ -61,7 +61,7 @@ async function createProfessionalForTestAccount() {
         role: 'PROFESSIONAL',
         whatsapp: masterUser.whatsapp,
         phone: masterUser.phone,
-        segmentType: masterUser.segmentType,
+        segmentTypes: masterUser.segmentTypes,
         planType: masterUser.planType,
         masterId: masterUser.id,
         isActive: true,

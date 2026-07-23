@@ -4,12 +4,11 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import toast from 'react-hot-toast'
-import { AVAILABLE_SEGMENTS } from '@/lib/types'
-import { PlanType, SegmentType } from '@prisma/client'
+import { PlanType } from '@prisma/client'
 import { Loader2, User, Mail, Lock, Building, Phone, Briefcase, CreditCard } from 'lucide-react'
 import { useTranslations, useLocale } from 'next-intl'
+import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
 
 interface PaidSignupFormProps {
   plan: PlanType
@@ -26,7 +25,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
     email: '',
     password: '',
     businessName: '',
-    segmentType: 'BEAUTY_SALON' as SegmentType,
+    segmentTypes: ['BEAUTY_SALON'] as string[],
     phone: ''
   })
 
@@ -38,7 +37,7 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
     e.preventDefault()
     setLoading(true)
 
-    if (!formData.name || !formData.email || !formData.password || !formData.businessName || !formData.phone || !formData.segmentType) {
+    if (!formData.name || !formData.email || !formData.password || !formData.businessName || !formData.phone || formData.segmentTypes.length === 0) {
       toast.error(t('requiredFieldsError'))
       setLoading(false)
       return
@@ -132,29 +131,16 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="segmentType" className="text-gray-700">{t('fieldSegment')}</Label>
-        <div className="relative">
-          <Briefcase className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
-          <Select
-            value={formData.segmentType}
-            onValueChange={(value) => handleChange('segmentType', value)}
-          >
-            <SelectTrigger className="pl-10 bg-white border-gray-200 text-gray-900">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-white border-gray-200">
-              {AVAILABLE_SEGMENTS.map((segment) => (
-                <SelectItem
-                  key={segment.value}
-                  value={segment.value}
-                  className="text-gray-900 focus:bg-violet-50 focus:text-violet-900"
-                >
-                  {tSegments(segment.value)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Label className="text-gray-700 flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-gray-400" />
+          {t('fieldSegment')}
+        </Label>
+        <SegmentMultiSelect
+          value={formData.segmentTypes}
+          onChange={(value) => setFormData(prev => ({ ...prev, segmentTypes: value }))}
+          getLabel={(segmentValue) => tSegments(segmentValue)}
+          className="space-y-2 rounded-md border border-gray-200 bg-white p-3"
+        />
       </div>
 
       <div className="space-y-2">

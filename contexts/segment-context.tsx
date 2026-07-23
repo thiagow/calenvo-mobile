@@ -25,7 +25,7 @@ export function SegmentProvider({ children }: { children: React.ReactNode }) {
           const response = await fetch('/api/user/profile')
           if (response.ok) {
             const data = await response.json()
-            setSegmentType(data.segmentType || 'MEDICAL_CLINIC')
+            setSegmentType(data.segmentTypes?.[0] || 'MEDICAL_CLINIC')
           }
         } catch (error) {
           console.error('Error fetching segment type:', error)
