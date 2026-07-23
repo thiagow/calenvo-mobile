@@ -112,6 +112,21 @@ export const authOptions: NextAuthOptions = {
           token.segmentTypes = (user as any).segmentTypes
           token.masterId = (user as any).masterId
         }
+
+        // Invalida sessões emitidas antes da senha ter sido trocada (ex.: via "esqueci senha").
+        // Só se aplica a tokens já existentes (iat presente) — um login recém-feito nunca é stale.
+        if (token.id && typeof token.iat === 'number') {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { passwordChangedAt: true }
+          })
+
+          if (dbUser?.passwordChangedAt && dbUser.passwordChangedAt.getTime() / 1000 > token.iat) {
+            console.log('🚫 JWT callback: token anterior à troca de senha, forçando logout')
+            return null as any
+          }
+        }
+
         return token
       } catch (error) {
         console.error('❌ JWT callback error:', error)

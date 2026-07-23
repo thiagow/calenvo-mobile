@@ -95,6 +95,7 @@ model User {
   currency           Currency    @default(BRL)
   locale             String      @default("pt")
   isPaymentExempt    Boolean     @default(false)
+  passwordChangedAt  DateTime?
   stripeCustomerId   String?
   subscriptionId     String?
   subscriptionStatus String?

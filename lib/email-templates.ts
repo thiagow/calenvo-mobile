@@ -14,6 +14,13 @@ export interface PaymentFailedEmailData {
   locale?: string
 }
 
+export interface ResetPasswordEmailData {
+  name: string
+  email: string
+  resetUrl: string
+  locale?: string
+}
+
 const WELCOME_COPY = {
   pt: {
     title: 'Bem-vindo ao Calenvo!',
@@ -99,6 +106,35 @@ const PAYMENT_FAILED_COPY = {
     footerAutomated: 'This is an automated email. Please do not reply.',
     footerRights: 'All rights reserved.',
     subject: '⚠️ Issue with Your Payment - Calenvo',
+  },
+} as const
+
+const RESET_PASSWORD_COPY = {
+  pt: {
+    title: 'Redefinir Senha - Calenvo',
+    headerTitle: '🔒 Redefinir Senha',
+    greeting: (name: string) => `Olá, ${name}`,
+    intro: 'Recebemos uma solicitação para redefinir a senha da sua conta no <strong style="color: #667eea;">Calenvo</strong>.',
+    instructions: 'Clique no botão abaixo para escolher uma nova senha. Esse link é válido por 1 hora.',
+    ctaButton: 'Redefinir Minha Senha',
+    ignore: 'Se você não solicitou essa troca de senha, pode ignorar este email com segurança — sua senha continua a mesma.',
+    support: 'Precisa de ajuda? Entre em contato:',
+    footerAutomated: 'Este é um email automático. Por favor, não responda.',
+    footerRights: 'Todos os direitos reservados.',
+    subject: '🔒 Redefinir sua senha - Calenvo',
+  },
+  en: {
+    title: 'Reset Password - Calenvo',
+    headerTitle: '🔒 Reset Password',
+    greeting: (name: string) => `Hi, ${name}`,
+    intro: 'We received a request to reset the password for your <strong style="color: #667eea;">Calenvo</strong> account.',
+    instructions: 'Click the button below to choose a new password. This link is valid for 1 hour.',
+    ctaButton: 'Reset My Password',
+    ignore: "If you didn't request this password change, you can safely ignore this email — your password remains unchanged.",
+    support: 'Need help? Contact us:',
+    footerAutomated: 'This is an automated email. Please do not reply.',
+    footerRights: 'All rights reserved.',
+    subject: '🔒 Reset your password - Calenvo',
   },
 } as const
 
@@ -313,6 +349,86 @@ export function getPaymentFailedEmailHTML(data: PaymentFailedEmailData): string 
   `
 }
 
+export function getResetPasswordEmailHTML(data: ResetPasswordEmailData): string {
+  const c = RESET_PASSWORD_COPY[resolveLocale(data.locale)]
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${c.title}</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center;">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 32px; font-weight: bold;">
+                    ${c.headerTitle}
+                  </h1>
+                </td>
+              </tr>
+
+              <!-- Body -->
+              <tr>
+                <td style="padding: 40px 30px;">
+                  <h2 style="color: #333333; margin-top: 0; font-size: 24px;">
+                    ${c.greeting(data.name)}
+                  </h2>
+
+                  <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                    ${c.intro}
+                  </p>
+
+                  <p style="color: #666666; font-size: 16px; line-height: 1.6;">
+                    ${c.instructions}
+                  </p>
+
+                  <!-- CTA Button -->
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                    <tr>
+                      <td align="center">
+                        <a href="${data.resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 6px; font-size: 16px; font-weight: bold;">
+                          ${c.ctaButton}
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <p style="color: #999999; font-size: 14px; line-height: 1.6;">
+                    ${c.ignore}
+                  </p>
+
+                  <!-- Support -->
+                  <p style="color: #999999; font-size: 14px; line-height: 1.6; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eeeeee;">
+                    ${c.support} <a href="mailto:contato@calenvo.com.br" style="color: #667eea; text-decoration: none;">contato@calenvo.com.br</a>
+                  </p>
+                </td>
+              </tr>
+
+              <!-- Footer -->
+              <tr>
+                <td style="background-color: #f8f9ff; padding: 20px 30px; text-align: center; border-top: 1px solid #eeeeee;">
+                  <p style="color: #999999; font-size: 12px; margin: 0;">
+                    ${c.footerAutomated}<br>
+                    &copy; ${new Date().getFullYear()} Calenvo. ${c.footerRights}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `
+}
+
 export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://calenvo.app'
@@ -377,6 +493,40 @@ export async function sendPaymentFailedEmail(data: PaymentFailedEmailData): Prom
     return true
   } catch (error) {
     console.error('❌ Erro ao enviar email de falha no pagamento:', error)
+    return false
+  }
+}
+
+export async function sendResetPasswordEmail(data: ResetPasswordEmailData): Promise<boolean> {
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://calenvo.app'
+    const appName = 'Calenvo'
+    const c = RESET_PASSWORD_COPY[resolveLocale(data.locale)]
+
+    const response = await fetch('https://apps.abacus.ai/api/sendNotificationEmail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deployment_token: process.env.ABACUSAI_API_KEY,
+        subject: c.subject,
+        body: getResetPasswordEmailHTML(data),
+        is_html: true,
+        recipient_email: data.email,
+        sender_email: `noreply@${new URL(appUrl).hostname}`,
+        sender_alias: appName,
+      }),
+    })
+
+    const result = await response.json()
+    if (!result.success) {
+      console.error('❌ Erro ao enviar email de redefinição de senha:', result.message)
+      return false
+    }
+
+    console.log('✅ Email de redefinição de senha enviado para:', data.email)
+    return true
+  } catch (error) {
+    console.error('❌ Erro ao enviar email de redefinição de senha:', error)
     return false
   }
 }

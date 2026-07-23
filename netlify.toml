@@ -1,5 +1,5 @@
 [build]
-  command = "npx -y prisma@6.7.0 generate && npx tsc --noEmit && next build"
+  command = "npx -y prisma@6.7.0 migrate deploy && npx -y prisma@6.7.0 generate && npx tsc --noEmit && next build"
   publish = ".next"
 
 [build.environment]

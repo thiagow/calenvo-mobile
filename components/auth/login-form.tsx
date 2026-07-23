@@ -124,6 +124,11 @@ export function LoginForm() {
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-xs text-violet-600 hover:underline">
+            Esqueceu sua senha?
+          </Link>
+        </div>
       </div>
 
       <Button
