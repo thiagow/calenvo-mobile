@@ -15,7 +15,7 @@ const SegmentContext = createContext<SegmentContextType | undefined>(undefined)
 
 export function SegmentProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession()
-  const [segmentType, setSegmentType] = useState<SegmentType>('MEDICAL_CLINIC')
+  const [segmentType, setSegmentType] = useState<SegmentType>('BEAUTY_SALON')
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function SegmentProvider({ children }: { children: React.ReactNode }) {
           const response = await fetch('/api/user/profile')
           if (response.ok) {
             const data = await response.json()
-            setSegmentType(data.segmentTypes?.[0] || 'MEDICAL_CLINIC')
+            setSegmentType(data.segmentTypes?.[0] || 'BEAUTY_SALON')
           }
         } catch (error) {
           console.error('Error fetching segment type:', error)

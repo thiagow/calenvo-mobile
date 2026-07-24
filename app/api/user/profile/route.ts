@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { generateSlug } from '@/lib/utils'
 import { resolveUniqueSlug } from '@/lib/tenant-resolver'
+import { SegmentType } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +59,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userId = (session.user as any).id
+    const userRole = (session.user as any).role
     const body = await request.json()
 
     // Campos permitidos para atualização
@@ -76,26 +78,52 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    if (updateData.segmentTypes !== undefined && (!Array.isArray(updateData.segmentTypes) || updateData.segmentTypes.length === 0)) {
-      return NextResponse.json({ error: 'Selecione ao menos um segmento' }, { status: 400 })
+    if (updateData.segmentTypes !== undefined) {
+      // Segmentos são uma propriedade do negócio como um todo (não da pessoa
+      // logada) — só o admin da conta (MASTER) pode alterá-los.
+      if (userRole !== 'MASTER') {
+        return NextResponse.json({ error: 'Apenas o administrador da conta pode alterar os segmentos' }, { status: 403 })
+      }
+
+      const validSegments = Object.values(SegmentType)
+      if (
+        !Array.isArray(updateData.segmentTypes) ||
+        updateData.segmentTypes.length === 0 ||
+        !updateData.segmentTypes.every((s: string) => validSegments.includes(s as SegmentType))
+      ) {
+        return NextResponse.json({ error: 'Selecione ao menos um segmento válido' }, { status: 400 })
+      }
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        whatsapp: true,
-        businessName: true,
-        phone: true,
-        segmentTypes: true,
-        planType: true,
-        isActive: true,
-        createdAt: true,
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          whatsapp: true,
+          businessName: true,
+          phone: true,
+          segmentTypes: true,
+          planType: true,
+          isActive: true,
+          createdAt: true,
+        }
+      })
+
+      // Sincroniza com a linha PROFESSIONAL vinculada, do mesmo jeito que já
+      // acontece na criação da conta (checkout e criação manual pelo saas-admin).
+      if (updateData.segmentTypes !== undefined) {
+        await tx.user.updateMany({
+          where: { masterId: userId, role: 'PROFESSIONAL' },
+          data: { segmentTypes: updateData.segmentTypes }
+        })
       }
+
+      return user
     })
 
     // Gera o link público (publicUrl) só na primeira vez que o negócio tem um

@@ -178,6 +178,7 @@ export const AVAILABLE_SEGMENTS = [
   { value: 'PET_SHOP', label: 'Pet Shop', icon: '🐾' },
   { value: 'PROFESSIONAL_SERVICES', label: 'Consultoria', icon: '🎯' },
   { value: 'TECH_SAAS', label: 'Tecnologia', icon: '💻' },
+  { value: 'HR', label: 'Recursos Humanos', icon: '👥' },
   { value: 'OTHER', label: 'Outros', icon: '🔧' }
 ]
 

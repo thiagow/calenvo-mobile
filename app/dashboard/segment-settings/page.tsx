@@ -1,36 +1,48 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Check, Info, RefreshCw } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Building2, Check, Info } from 'lucide-react'
 import { toast } from 'sonner'
-import { useSegmentConfig } from '@/contexts/segment-context'
-import { getAvailableSegments, SegmentType } from '@/lib/segment-config'
+import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
+import { SEGMENT_CONFIGS } from '@/lib/types'
 
 export default function SegmentSettingsPage() {
-  const router = useRouter()
-  const { config: currentConfig, segmentType: currentSegmentType, isLoading } = useSegmentConfig()
-  const [selectedSegment, setSelectedSegment] = useState<SegmentType | ''>('')
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const availableSegments = getAvailableSegments()
+  const [role, setRole] = useState('')
+  const [currentSegments, setCurrentSegments] = useState<string[]>([])
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([])
 
   useEffect(() => {
-    if (currentSegmentType && !isLoading) {
-      setSelectedSegment(currentSegmentType)
+    fetchProfile()
+  }, [])
+
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch('/api/user/profile')
+      if (res.ok) {
+        const data = await res.json()
+        setRole(data.role)
+        setCurrentSegments(data.segmentTypes || [])
+        setSelectedSegments(data.segmentTypes || [])
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+    } finally {
+      setLoading(false)
     }
-  }, [currentSegmentType, isLoading])
+  }
+
+  const hasChanges = JSON.stringify([...selectedSegments].sort()) !== JSON.stringify([...currentSegments].sort())
 
   const handleSave = async () => {
-    if (!selectedSegment) {
-      toast.error('Por favor, selecione um tipo de negócio')
+    if (selectedSegments.length === 0) {
+      toast.error('Selecione ao menos um segmento')
       return
     }
 
@@ -39,33 +51,30 @@ export default function SegmentSettingsPage() {
       const response = await fetch('/api/user/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segmentTypes: [selectedSegment] })
+        body: JSON.stringify({ segmentTypes: selectedSegments })
       })
 
       if (!response.ok) {
-        throw new Error('Erro ao atualizar configuração')
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || 'Erro ao atualizar segmentos')
       }
 
-      toast.success('Configuração atualizada com sucesso!')
-      
-      // Dar um tempo para o toast aparecer antes de recarregar
+      toast.success('Segmentos atualizados com sucesso!')
+
+      // A terminologia exibida no dashboard (contexts/segment-context.tsx) só
+      // é recalculada no carregamento da página — recarrega pra refletir.
       setTimeout(() => {
         window.location.reload()
       }, 1000)
-    } catch (error) {
-      console.error('Error updating segment:', error)
-      toast.error('Erro ao atualizar configuração')
+    } catch (error: any) {
+      console.error('Error updating segments:', error)
+      toast.error(error.message || 'Erro ao atualizar segmentos')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    window.location.reload()
-  }
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
@@ -75,211 +84,83 @@ export default function SegmentSettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tipo de Negócio</h1>
-        <p className="text-gray-600">Configure o tipo de negócio para personalizar a interface do sistema</p>
+        <h1 className="text-2xl font-bold text-gray-900">Segmentos do Negócio</h1>
+        <p className="text-gray-600">Define a terminologia e os campos exibidos no sistema</p>
       </div>
 
-      {/* Current Configuration */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
-            Configuração Atual
+            Segmentos Atuais
           </CardTitle>
-          <CardDescription>
-            O tipo de negócio define a terminologia e campos exibidos no sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-violet-900">Tipo Atual:</span>
-              <Badge className="bg-violet-600">
-                {availableSegments.find(s => s.value === currentSegmentType)?.label || 'Não definido'}
-              </Badge>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <span className="text-gray-600">Cliente:</span>
-                <span className="ml-2 font-medium">{currentConfig.terminology.client}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Agendamento:</span>
-                <span className="ml-2 font-medium">{currentConfig.terminology.appointment}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Profissional:</span>
-                <span className="ml-2 font-medium">{currentConfig.terminology.professional}</span>
-              </div>
-              <div>
-                <span className="text-gray-600">Serviço:</span>
-                <span className="ml-2 font-medium">{currentConfig.terminology.service}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-violet-200">
-              <span className="text-xs font-medium text-violet-900 mb-2 block">Campos Visíveis:</span>
-              <div className="flex flex-wrap gap-2">
-                {currentConfig.fields.showInsurance && (
-                  <Badge variant="outline" className="text-xs">Convênio</Badge>
-                )}
-                {currentConfig.fields.showModality && (
-                  <Badge variant="outline" className="text-xs">Modalidade</Badge>
-                )}
-                {currentConfig.fields.showSpecialty && (
-                  <Badge variant="outline" className="text-xs">Especialidade</Badge>
-                )}
-                {currentConfig.fields.showProducts && (
-                  <Badge variant="outline" className="text-xs">Produtos</Badge>
-                )}
-                {currentConfig.fields.showDepositRequired && (
-                  <Badge variant="outline" className="text-xs">Sinal/Depósito</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="w-full sm:w-auto"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Atualizar Visualização
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Change Segment Type */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Alterar Tipo de Negócio</CardTitle>
-          <CardDescription>
-            Selecione o tipo que melhor descreve seu negócio
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Importante:</strong> Ao alterar o tipo de negócio, a terminologia em todo o sistema 
-              será atualizada automaticamente. Por exemplo, "Paciente" pode se tornar "Cliente", 
-              "Consulta" pode se tornar "Agendamento", etc.
-            </AlertDescription>
-          </Alert>
-
-          <div>
-            <Label htmlFor="segmentType">Tipo de Negócio *</Label>
-            <Select 
-              value={selectedSegment} 
-              onValueChange={(value) => setSelectedSegment(value as SegmentType)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o tipo de negócio" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableSegments.map((segment) => (
-                  <SelectItem key={segment.value} value={segment.value}>
-                    <div>
-                      <div className="font-medium">{segment.label}</div>
-                      <div className="text-xs text-gray-500">{segment.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedSegment && selectedSegment !== currentSegmentType && (
-            <Alert className="bg-amber-50 border-amber-200">
-              <Info className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-900">
-                Você está prestes a alterar o tipo de negócio. A página será recarregada 
-                após salvar para aplicar as mudanças.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex gap-3">
-            <Button 
-              onClick={handleSave}
-              disabled={saving || !selectedSegment || selectedSegment === currentSegmentType}
-              className="bg-violet-600 hover:bg-violet-700"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Salvar Alterações
-                </>
-              )}
-            </Button>
-            
-            {selectedSegment !== currentSegmentType && (
-              <Button 
-                variant="outline"
-                onClick={() => setSelectedSegment(currentSegmentType)}
-              >
-                Cancelar
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Examples */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Exemplos de Terminologia por Tipo</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {availableSegments.map((segment) => {
-              const segmentConfig = require('@/lib/segment-config').getSegmentConfig(segment.value)
-              return (
-                <div key={segment.value} className="border rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant={segment.value === currentSegmentType ? 'default' : 'outline'}>
-                      {segment.label}
-                    </Badge>
-                    {segment.value === currentSegmentType && (
-                      <span className="text-xs text-green-600 flex items-center gap-1">
-                        <Check className="h-3 w-3" />
-                        Ativo
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Cliente:</span>
-                      <div className="font-medium">{segmentConfig.terminology.client}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Agendamento:</span>
-                      <div className="font-medium">{segmentConfig.terminology.appointment}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Profissional:</span>
-                      <div className="font-medium">{segmentConfig.terminology.professional}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Serviço:</span>
-                      <div className="font-medium">{segmentConfig.terminology.service}</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
+          <div className="flex flex-wrap gap-2">
+            {currentSegments.map((s) => (
+              <Badge key={s} className="bg-violet-600">
+                {SEGMENT_CONFIGS[s as keyof typeof SEGMENT_CONFIGS]?.name ?? s}
+              </Badge>
+            ))}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Alterar Segmentos</CardTitle>
+          <CardDescription>
+            Selecione todos os tipos de negócio que se aplicam — é possível escolher mais de um
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {role !== 'MASTER' ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Apenas o administrador da conta pode alterar os segmentos do negócio.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Importante:</strong> Ao alterar os segmentos, a terminologia em todo o
+                  sistema será atualizada automaticamente, inclusive para os profissionais da equipe.
+                </AlertDescription>
+              </Alert>
+
+              <SegmentMultiSelect value={selectedSegments} onChange={setSelectedSegments} />
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || !hasChanges || selectedSegments.length === 0}
+                  className="bg-violet-600 hover:bg-violet-700"
+                >
+                  {saving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Salvar Alterações
+                    </>
+                  )}
+                </Button>
+
+                {hasChanges && (
+                  <Button variant="outline" onClick={() => setSelectedSegments(currentSegments)}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

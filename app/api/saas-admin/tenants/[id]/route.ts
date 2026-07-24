@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireSaasAdmin } from '@/lib/saas-admin-guard'
+import { SegmentType } from '@prisma/client'
 
 /**
  * GET /api/saas-admin/tenants/[id]
@@ -78,12 +79,12 @@ export async function PATCH(
         const session = await requireSaasAdmin()
         const { id } = params
         const body = await req.json()
-        const { isActive, planType, isPaymentExempt, reason } = body
+        const { isActive, planType, isPaymentExempt, segmentTypes, reason } = body
 
         // Verificar se o tenant existe
         const tenant = await prisma.user.findUnique({
             where: { id },
-            select: { role: true, email: true, name: true, planType: true, isActive: true, isPaymentExempt: true }
+            select: { role: true, email: true, name: true, planType: true, isActive: true, isPaymentExempt: true, segmentTypes: true }
         })
 
         if (!tenant || tenant.role !== 'MASTER') {
@@ -115,6 +116,27 @@ export async function PATCH(
             action = action ? `${action}_AND_${exemptAction}` : exemptAction
         }
 
+        // Se estiver alterando os segmentos
+        if (Array.isArray(segmentTypes)) {
+            const validSegments = Object.values(SegmentType)
+            if (
+                segmentTypes.length === 0 ||
+                !segmentTypes.every((s: string) => validSegments.includes(s as SegmentType))
+            ) {
+                return NextResponse.json(
+                    { error: 'Segmentos inválidos' },
+                    { status: 400 }
+                )
+            }
+
+            const currentSorted = [...tenant.segmentTypes].sort().join(',')
+            const nextSorted = [...segmentTypes].sort().join(',')
+            if (currentSorted !== nextSorted) {
+                dataToUpdate.segmentTypes = segmentTypes
+                action = action ? `${action}_AND_SEGMENTS_CHANGED` : 'TENANT_SEGMENTS_CHANGED'
+            }
+        }
+
         if (Object.keys(dataToUpdate).length === 0) {
             return NextResponse.json(
                 { error: 'Nenhuma alteração solicitada' },
@@ -137,6 +159,15 @@ export async function PATCH(
                     data: { isActive }
                 })
             }
+
+            // Segmentos são uma propriedade do negócio como um todo — sincroniza
+            // com todos os profissionais vinculados, igual à criação da conta.
+            if (dataToUpdate.segmentTypes) {
+                await tx.user.updateMany({
+                    where: { masterId: id, role: 'PROFESSIONAL' },
+                    data: { segmentTypes: dataToUpdate.segmentTypes }
+                })
+            }
         })
 
         // Registrar log de auditoria
@@ -154,7 +185,9 @@ export async function PATCH(
                     oldStatus: tenant.isActive,
                     newStatus: typeof isActive === 'boolean' ? isActive : tenant.isActive,
                     oldPaymentExempt: tenant.isPaymentExempt,
-                    newPaymentExempt: typeof isPaymentExempt === 'boolean' ? isPaymentExempt : tenant.isPaymentExempt
+                    newPaymentExempt: typeof isPaymentExempt === 'boolean' ? isPaymentExempt : tenant.isPaymentExempt,
+                    oldSegments: tenant.segmentTypes,
+                    newSegments: dataToUpdate.segmentTypes || tenant.segmentTypes
                 },
                 ipAddress: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined
             }

@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useDialog } from '@/components/providers/dialog-provider'
-import { SEGMENT_CONFIGS } from '@/lib/types'
+import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
 
 function MetricTile({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
     return (
@@ -36,10 +36,19 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
     const [tenant, setTenant] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [updatingPlan, setUpdatingPlan] = useState(false)
+    const [editingSegments, setEditingSegments] = useState<string[]>([])
+    const [savingSegments, setSavingSegments] = useState(false)
 
     useEffect(() => {
         fetchTenantDetails()
     }, [])
+
+    useEffect(() => {
+        if (tenant) setEditingSegments(tenant.segmentTypes as string[])
+    }, [tenant])
+
+    const segmentsChanged = !!tenant &&
+        JSON.stringify([...editingSegments].sort()) !== JSON.stringify([...(tenant.segmentTypes as string[])].sort())
 
     const fetchTenantDetails = async () => {
         try {
@@ -172,6 +181,49 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
         }
     }
 
+    const handleSaveSegments = async () => {
+        if (!tenant || editingSegments.length === 0) return
+
+        const confirmed = await confirm({
+            title: 'Alterar Segmentos',
+            description: 'Isso vai atualizar a terminologia e os campos exibidos para esse negócio, incluindo os profissionais vinculados.',
+            confirmText: 'Salvar'
+        })
+
+        if (!confirmed) return
+
+        setSavingSegments(true)
+        try {
+            const res = await fetch(`/api/saas-admin/tenants/${params.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    segmentTypes: editingSegments,
+                    reason: 'Segmentos alterados pelo administrador'
+                })
+            })
+
+            if (res.ok) {
+                fetchTenantDetails()
+            } else {
+                await alert({
+                    title: 'Erro',
+                    description: 'Erro ao atualizar segmentos',
+                    variant: 'error'
+                })
+            }
+        } catch (error) {
+            console.error('Error updating segments:', error)
+            await alert({
+                title: 'Erro',
+                description: 'Erro ao atualizar segmentos',
+                variant: 'error'
+            })
+        } finally {
+            setSavingSegments(false)
+        }
+    }
+
     if (loading) {
         return <div className="text-center py-8">Carregando...</div>
     }
@@ -257,15 +309,19 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                             </Select>
                         </div>
 
-                        <div className="flex justify-between border-t pt-4">
-                            <span className="text-sm font-medium">Segmentos:</span>
-                            <div className="flex flex-wrap justify-end gap-1">
-                                {(tenant.segmentTypes as string[]).map((s) => (
-                                    <Badge key={s} variant="outline" className="text-xs">
-                                        {SEGMENT_CONFIGS[s as keyof typeof SEGMENT_CONFIGS]?.name ?? s}
-                                    </Badge>
-                                ))}
-                            </div>
+                        <div className="space-y-2 border-t pt-4">
+                            <label className="text-sm font-medium">Segmentos:</label>
+                            <SegmentMultiSelect value={editingSegments} onChange={setEditingSegments} />
+                            {segmentsChanged && (
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveSegments}
+                                    disabled={savingSegments || editingSegments.length === 0}
+                                    className="w-full sm:w-auto"
+                                >
+                                    {savingSegments ? 'Salvando...' : 'Salvar Segmentos'}
+                                </Button>
+                            )}
                         </div>
                         <div className="flex justify-between">
                             <span className="text-sm font-medium">Telefone:</span>
