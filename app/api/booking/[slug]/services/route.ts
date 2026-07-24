@@ -36,12 +36,21 @@ export async function GET(
         description: true,
         duration: true,
         price: true,
+        showPriceOnBooking: true,
+        priceIsStartingFrom: true,
         category: true,
       },
       orderBy: { name: 'asc' },
     })
 
-    return NextResponse.json(services)
+    // Nunca vazar o preço quando o dono desativou a exibição pública
+    const publicServices = services.map(({ showPriceOnBooking, priceIsStartingFrom, ...service }) => ({
+      ...service,
+      price: showPriceOnBooking ? service.price : null,
+      priceIsStartingFrom: showPriceOnBooking ? priceIsStartingFrom : false,
+    }))
+
+    return NextResponse.json(publicServices)
   } catch (error) {
     console.error('Erro ao buscar serviços para agendamento:', error)
     return NextResponse.json({ error: 'Erro ao buscar serviços' }, { status: 500 })

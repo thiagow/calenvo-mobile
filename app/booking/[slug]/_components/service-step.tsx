@@ -53,7 +53,7 @@ export function ServiceStep({ services, onSelect }: ServiceStepProps) {
                   <p className="truncate font-medium text-foreground">{service.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {service.duration}min
-                    {service.price ? ` · ${formatCurrency(service.price)}` : ''}
+                    {service.price ? ` · ${service.priceIsStartingFrom ? 'a partir de ' : ''}${formatCurrency(service.price)}` : ''}
                   </p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

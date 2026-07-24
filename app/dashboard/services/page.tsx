@@ -14,6 +14,7 @@ import { useDialog } from '@/components/providers/dialog-provider'
 interface Service {
   id: string; name: string; description: string | null; duration: number
   price: number | null; category: string | null; isActive: boolean
+  showPriceOnBooking: boolean; priceIsStartingFrom: boolean
   requiresDeposit: boolean; depositAmount: number | null
   schedules: any[]; _count: { appointments: number }
 }
@@ -92,7 +93,9 @@ export default function ServicesPage() {
                             </span>
                             {service.price && (
                               <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                                <DollarSign className="h-3 w-3" />R${service.price.toFixed(2)}
+                                <DollarSign className="h-3 w-3" />
+                                {service.priceIsStartingFrom ? 'A partir de ' : ''}R${service.price.toFixed(2)}
+                                {!service.showPriceOnBooking && <span className="text-muted-foreground font-normal">(oculto)</span>}
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground">{service._count.appointments} agendamentos</span>

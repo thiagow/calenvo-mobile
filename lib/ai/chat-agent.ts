@@ -132,7 +132,10 @@ export async function executeTool(
           serviceId: s.id,
           name: s.name,
           duration: s.duration,
-          price: s.price,
+          price: s.showPriceOnBooking ? s.price : null,
+          priceLabel: s.showPriceOnBooking && s.price != null
+            ? `${s.priceIsStartingFrom ? 'a partir de ' : ''}R$ ${s.price.toFixed(2)}`
+            : null,
           schedules: s.schedules.map((ss) => ({
             scheduleId: ss.scheduleId,
             scheduleName: ss.schedule.name,

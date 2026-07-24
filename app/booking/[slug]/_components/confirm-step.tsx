@@ -115,7 +115,7 @@ export function ConfirmStep({
             <>
               <Separator />
               <div className="flex items-center justify-between font-semibold">
-                <span>Total</span>
+                <span>{service.priceIsStartingFrom ? 'Total (a partir de)' : 'Total'}</span>
                 <span>{formatCurrency(service.price)}</span>
               </div>
             </>

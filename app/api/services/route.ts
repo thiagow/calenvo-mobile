@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
       description,
       duration,
       price,
+      showPriceOnBooking,
+      priceIsStartingFrom,
       category,
       requiresDeposit,
       depositAmount
@@ -116,6 +118,8 @@ export async function POST(request: NextRequest) {
         description,
         duration: duration || 30,
         price: price ? parseFloat(price) : null,
+        showPriceOnBooking: showPriceOnBooking ?? false,
+        priceIsStartingFrom: priceIsStartingFrom ?? false,
         category,
         requiresDeposit: requiresDeposit || false,
         depositAmount: depositAmount ? parseFloat(depositAmount) : null

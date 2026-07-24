@@ -4,6 +4,7 @@ export interface BookingService {
   description: string | null
   duration: number
   price: number | null
+  priceIsStartingFrom: boolean
   category: string | null
 }
 

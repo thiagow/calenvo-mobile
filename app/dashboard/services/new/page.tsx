@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Save, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -22,6 +23,8 @@ export default function NewServicePage() {
     description: '',
     duration: 30,
     price: '',
+    showPriceOnBooking: false,
+    priceIsStartingFrom: false,
     requiresDeposit: false,
     depositAmount: ''
   })
@@ -140,6 +143,28 @@ export default function NewServicePage() {
                 placeholder="0.00"
               />
             </div>
+            <div className="md:col-span-2 flex items-center justify-between pt-2 border-t">
+              <div className="space-y-0.5">
+                <Label>Exibir preço na página pública de agendamento</Label>
+                <p className="text-sm text-gray-500">Se desativado, o preço fica visível só internamente</p>
+              </div>
+              <Switch
+                checked={formData.showPriceOnBooking}
+                onCheckedChange={(checked) => setFormData({ ...formData, showPriceOnBooking: checked, priceIsStartingFrom: checked ? formData.priceIsStartingFrom : false })}
+              />
+            </div>
+            {formData.showPriceOnBooking && (
+              <div className="md:col-span-2 flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Preço "a partir de"</Label>
+                  <p className="text-sm text-gray-500">O valor exibido é um preço de partida e pode variar para cima</p>
+                </div>
+                <Switch
+                  checked={formData.priceIsStartingFrom}
+                  onCheckedChange={(checked) => setFormData({ ...formData, priceIsStartingFrom: checked })}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 

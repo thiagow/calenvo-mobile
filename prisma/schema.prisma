@@ -298,6 +298,8 @@ model Service {
   description String?
   duration    Int     @default(30) // em minutos
   price       Float?
+  showPriceOnBooking  Boolean @default(false)
+  priceIsStartingFrom Boolean @default(false)
   category    String? // Ex: "Consultas", "Cortes", "Coloração"
   isActive    Boolean @default(true)
 
