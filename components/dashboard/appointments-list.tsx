@@ -95,7 +95,7 @@ export function AppointmentsList() {
   const handleDeleteAppointment = async (id: string) => {
     const confirmed = await confirm({
       title: 'Excluir Agendamento',
-      description: 'Tem certeza que deseja excluir este agendamento?',
+      description: 'O agendamento será removido da agenda e dos relatórios. Esta ação não pode ser desfeita pela interface.',
       variant: 'destructive',
       confirmText: 'Excluir'
     })

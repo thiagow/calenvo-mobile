@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
         },
         status: {
           notIn: ['CANCELLED', 'NO_SHOW'] // Não conta cancelados e faltas
-        }
+        },
+        deletedAt: null
       }
     })
 

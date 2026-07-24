@@ -24,6 +24,7 @@ export async function checkAppointmentQuota(userId: string, planType: PlanType):
       userId,
       date: { gte: firstDayOfMonth, lte: lastDayOfMonth },
       status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      deletedAt: null,
     },
   })
 
@@ -53,6 +54,7 @@ export async function checkScheduleConflict(params: {
     scheduleId,
     date: { lt: appointmentEnd },
     status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+    deletedAt: null,
   }
 
   if (professionalId) {

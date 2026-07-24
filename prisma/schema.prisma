@@ -370,6 +370,7 @@ model Appointment {
   price     Float? // Preço final (pode sobrescrever o do serviço)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Exclusão lógica (agendamento cadastrado por engano)
 
   userId   String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)

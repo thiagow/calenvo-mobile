@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
         date: {
           gte: today,
           lte: endOfToday
-        }
+        },
+        deletedAt: null
       }
     })
 
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
         date: {
           gte: startOfWeek,
           lte: endOfWeek
-        }
+        },
+        deletedAt: null
       }
     })
 
@@ -65,7 +67,8 @@ export async function GET(request: NextRequest) {
     const appointmentsByStatus = await prisma.appointment.groupBy({
       by: ['status'],
       where: {
-        userId: userId
+        userId: userId,
+        deletedAt: null
       },
       _count: {
         id: true

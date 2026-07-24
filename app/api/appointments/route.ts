@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const currentDate = searchParams.get('currentDate')
 
     // Se for profissional, busca agendamentos do master mas filtrados pelo professionalId
-    let whereConditions: any = {}
+    let whereConditions: any = { deletedAt: null }
     if (userRole === 'PROFESSIONAL' && masterId) {
       whereConditions.userId = masterId
       whereConditions.professionalId = userId

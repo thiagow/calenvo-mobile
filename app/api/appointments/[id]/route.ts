@@ -27,7 +27,8 @@ export async function GET(
     const appointment = await prisma.appointment.findFirst({
       where: {
         id: params.id,
-        userId: userId
+        userId: userId,
+        deletedAt: null
       },
       include: {
         client: {
@@ -104,7 +105,8 @@ export async function PUT(
     const existingAppointment = await prisma.appointment.findFirst({
       where: {
         id: params.id,
-        userId: userId
+        userId: userId,
+        deletedAt: null
       }
     })
 
@@ -347,11 +349,12 @@ export async function DELETE(
 
     const userId = (session.user as any).id
 
-    // Verify appointment exists and belongs to user
+    // Verify appointment exists, belongs to user, and isn't already deleted
     const existingAppointment = await prisma.appointment.findFirst({
       where: {
         id: params.id,
-        userId: userId
+        userId: userId,
+        deletedAt: null
       }
     })
 
@@ -359,9 +362,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    // Delete appointment
-    await prisma.appointment.delete({
-      where: { id: params.id }
+    // Soft delete: mantém o registro para histórico/auditoria, mas some das listagens
+    await prisma.appointment.update({
+      where: { id: params.id },
+      data: { deletedAt: new Date() }
     })
 
     return NextResponse.json({ message: 'Appointment deleted successfully' })

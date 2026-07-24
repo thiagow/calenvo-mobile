@@ -34,7 +34,7 @@ export async function GET(
                 },
                 _count: {
                     select: {
-                        appointments: true,
+                        appointments: { where: { deletedAt: null } },
                         clients: true,
                         services: true,
                         schedules: true

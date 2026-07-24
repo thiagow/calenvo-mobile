@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
             gte: windowStart,
             lte: windowEnd,
           },
+          deletedAt: null,
           // Ideally we would check a flag: reminderSent: false
         },
         include: {

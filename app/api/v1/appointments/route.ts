@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   const dateFrom = searchParams.get('dateFrom')
   const dateTo = searchParams.get('dateTo')
 
-  const where: any = { userId: auth.userId }
+  const where: any = { userId: auth.userId, deletedAt: null }
   if (dateFrom || dateTo) {
     where.date = {}
     if (dateFrom) where.date.gte = new Date(dateFrom)

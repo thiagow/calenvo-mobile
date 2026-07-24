@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
       date: {
         gte: startDate,
         lte: endDate
-      }
+      },
+      deletedAt: null
     }
 
     // Total de agendamentos
@@ -134,7 +135,8 @@ export async function GET(request: NextRequest) {
         date: {
           gte: evolutionStartDate,
           lte: endDate
-        }
+        },
+        deletedAt: null
       },
       _count: {
         id: true

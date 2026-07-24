@@ -43,7 +43,8 @@ export async function GET(req: NextRequest) {
                 where: {
                     createdAt: {
                         gte: firstDayOfMonth
-                    }
+                    },
+                    deletedAt: null
                 }
             }),
             // Novos tenants nos últimos 30 dias

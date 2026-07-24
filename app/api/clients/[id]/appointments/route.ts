@@ -44,7 +44,8 @@ export async function GET(
 
         const whereConditions: any = {
             clientId: clientId,
-            userId: userId
+            userId: userId,
+            deletedAt: null
         }
 
         if (status && status !== 'all') {

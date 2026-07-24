@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
       },
       status: {
         notIn: ['CANCELLED', 'NO_SHOW']
-      }
+      },
+      deletedAt: null
     }
 
     // Se profissional específico, verificar apenas conflitos deste profissional

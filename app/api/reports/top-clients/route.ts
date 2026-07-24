@@ -51,7 +51,8 @@ export async function GET(request: NextRequest) {
                 date: {
                     gte: startDate,
                     lte: endDate
-                }
+                },
+                deletedAt: null
             },
             select: {
                 clientId: true,

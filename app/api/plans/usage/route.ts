@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
         date: {
           gte: startOfMonth,
           lte: endOfMonth
-        }
+        },
+        deletedAt: null
       }
     })
 

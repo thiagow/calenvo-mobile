@@ -48,18 +48,18 @@ export async function GET(request: NextRequest) {
     // Definir filtros baseados no role
     // For general dashboard stats, professional sees the global ecosystem data
     // to match the master/manager view as requested
-    const appointmentFilter = { userId: masterId }
+    const appointmentFilter = { userId: masterId, deletedAt: null }
 
     const clientFilter = { userId: masterId }
 
     // This filter is for the "Recent Appointments" list - we'll keep this PERSONAL
     // so the professional still sees their own upcoming work
     const recentAppointmentFilter = userRole === 'PROFESSIONAL'
-      ? { professionalId: userId }
-      : { userId }
+      ? { professionalId: userId, deletedAt: null }
+      : { userId, deletedAt: null }
 
     // This filter is SPECIFICALLY for plan usage calculation (global ecosystem)
-    const globalAppointmentFilter = { userId: masterId }
+    const globalAppointmentFilter = { userId: masterId, deletedAt: null }
 
     // Buscar estatísticas em paralelo
     const [

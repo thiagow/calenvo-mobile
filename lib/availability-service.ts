@@ -126,6 +126,7 @@ export async function getAvailableSlots(params: {
       scheduleId,
       date: { gte: dateStart, lte: dateEnd },
       status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+      deletedAt: null,
       ...(professionalId && { professionalId }),
     },
   })
