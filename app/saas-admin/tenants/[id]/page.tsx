@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Lock, Unlock, Zap, Gift, Users, CalendarDays, UserRound, Briefcase, CalendarRange } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { ArrowLeft, Lock, Unlock, Zap, Gift, Users, CalendarDays, UserRound, Briefcase, CalendarRange, Trash2, AlertTriangle } from 'lucide-react'
 import {
     Select,
     SelectContent,
@@ -13,8 +14,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useDialog } from '@/components/providers/dialog-provider'
 import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
+import { toast } from 'sonner'
 
 function MetricTile({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
     return (
@@ -38,6 +49,10 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
     const [updatingPlan, setUpdatingPlan] = useState(false)
     const [editingSegments, setEditingSegments] = useState<string[]>([])
     const [savingSegments, setSavingSegments] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [deletePassword, setDeletePassword] = useState('')
+    const [deleteError, setDeleteError] = useState('')
+    const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
         fetchTenantDetails()
@@ -224,6 +239,36 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
         }
     }
 
+    const handleDeleteTenant = async () => {
+        if (!tenant || !deletePassword.trim()) return
+
+        setIsDeleting(true)
+        setDeleteError('')
+
+        try {
+            const res = await fetch(`/api/saas-admin/tenants/${params.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: deletePassword })
+            })
+
+            if (!res.ok) {
+                const data = await res.json()
+                setDeleteError(data.error || 'Erro ao excluir tenant')
+                return
+            }
+
+            setDeleteDialogOpen(false)
+            toast.success('Tenant excluído permanentemente')
+            router.push('/saas-admin/tenants')
+        } catch (error) {
+            console.error('Error deleting tenant:', error)
+            setDeleteError('Erro ao excluir tenant. Tente novamente.')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     if (loading) {
         return <div className="text-center py-8">Carregando...</div>
     }
@@ -372,6 +417,93 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                     </CardContent>
                 </Card>
             )}
+
+            <Card className="border-destructive/20 bg-destructive/5">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-destructive" />
+                        <CardTitle className="text-destructive">Zona de Perigo</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                        Ações irreversíveis. Tenha cuidado ao proceder.
+                    </p>
+                    <Button
+                        variant="destructive"
+                        onClick={() => {
+                            setDeletePassword('')
+                            setDeleteError('')
+                            setDeleteDialogOpen(true)
+                        }}
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir Conta Permanentemente
+                    </Button>
+                </CardContent>
+            </Card>
+
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir conta permanentemente</AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-3 mt-4">
+                            <div>
+                                <p className="font-medium text-destructive mb-2">Esta ação é irreversível.</p>
+                                <p className="text-sm">
+                                    Você está prestes a excluir permanentemente a conta de <strong>{tenant.businessName || tenant.name}</strong>.
+                                </p>
+                            </div>
+                            <div className="rounded-lg bg-muted p-3">
+                                <p className="text-xs font-medium mb-2">Será removido:</p>
+                                <ul className="text-xs space-y-1 text-muted-foreground list-disc list-inside">
+                                    <li>Todos os agendamentos</li>
+                                    <li>Todos os clientes</li>
+                                    <li>Todos os serviços</li>
+                                    <li>Todas as agendas</li>
+                                    <li>Todos os profissionais da equipe</li>
+                                    <li>Configurações (WhatsApp, fidelidade, etc.)</li>
+                                </ul>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">
+                                    Confirme sua senha para continuar
+                                </label>
+                                <Input
+                                    type="password"
+                                    placeholder="Sua senha"
+                                    value={deletePassword}
+                                    onChange={(e) => {
+                                        setDeletePassword(e.target.value)
+                                        setDeleteError('')
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && deletePassword.trim() && !isDeleting) {
+                                            handleDeleteTenant()
+                                        }
+                                    }}
+                                    disabled={isDeleting}
+                                />
+                                {deleteError && (
+                                    <p className="text-xs text-destructive">{deleteError}</p>
+                                )}
+                            </div>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>
+                            Cancelar
+                        </AlertDialogCancel>
+                        <button
+                            onClick={handleDeleteTenant}
+                            disabled={!deletePassword.trim() || isDeleting}
+                            className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2"
+                        >
+                            {isDeleting ? 'Excluindo...' : 'Excluir Permanentemente'}
+                        </button>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
