@@ -120,7 +120,7 @@ export async function PUT(
 
     if (professionalIds !== undefined && professionalIds.length > 0) {
       const ownedProfessionals = await prisma.user.findMany({
-        where: { id: { in: professionalIds }, OR: [{ masterId: userId }, { id: userId }] },
+        where: { id: { in: professionalIds }, masterId: userId },
         select: { id: true }
       })
       if (ownedProfessionals.length !== professionalIds.length) {

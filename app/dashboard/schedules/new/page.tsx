@@ -49,7 +49,6 @@ export default function NewSchedulePage() {
     minNoticeHours: 2,
     selectedServices: [] as string[],
     selectedProfessionals: [] as string[],
-    selfAsProfessional: false,
   })
   const [dayConfigs, setDayConfigs] = useState<DayConfig[]>(DEFAULT_DAY_CONFIGS)
 
@@ -113,13 +112,10 @@ export default function NewSchedulePage() {
         return
       }
 
-      const professionalIds = [
-        ...(formData.selfAsProfessional && session?.user ? [(session.user as any).id] : []),
-        ...formData.selectedProfessionals,
-      ]
+      const professionalIds = formData.selectedProfessionals
 
       if (professionalIds.length === 0) {
-        toast.error('Selecione "Eu mesmo atendo" ou pelo menos um profissional para esta agenda')
+        toast.error('Selecione pelo menos um profissional para esta agenda')
         setLoading(false)
         return
       }
@@ -284,16 +280,6 @@ export default function NewSchedulePage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="self-as-professional"
-                  checked={formData.selfAsProfessional}
-                  onCheckedChange={(checked) => setFormData({ ...formData, selfAsProfessional: checked === true })}
-                />
-                <label htmlFor="self-as-professional" className="text-sm font-medium leading-none cursor-pointer flex-1">
-                  Eu mesmo atendo
-                </label>
-              </div>
               {professionals.map((professional) => (
                 <div key={professional.id} className="flex items-center space-x-2">
                   <Checkbox
@@ -306,6 +292,9 @@ export default function NewSchedulePage() {
                     className="text-sm font-medium leading-none cursor-pointer flex-1"
                   >
                     {professional.name}
+                    {professional.email === session?.user?.email && (
+                      <span className="text-xs text-gray-500 ml-2">(Você)</span>
+                    )}
                   </label>
                 </div>
               ))}

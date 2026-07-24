@@ -49,7 +49,6 @@ export default function EditSchedulePage() {
     acceptWalkIn: false,
     selectedServices: [] as string[],
     selectedProfessionals: [] as string[],
-    selfAsProfessional: false,
   })
 
   useEffect(() => {
@@ -69,7 +68,6 @@ export default function EditSchedulePage() {
 
       if (scheduleRes.ok) {
         const scheduleData = await scheduleRes.json()
-        const ownUserId = (session?.user as any)?.id
         const professionalIds = scheduleData.professionals?.map((p: any) => p.professionalId) || []
 
         setFormData({
@@ -82,8 +80,7 @@ export default function EditSchedulePage() {
           isActive: scheduleData.isActive,
           acceptWalkIn: scheduleData.acceptWalkIn || false,
           selectedServices: scheduleData.services?.map((s: any) => s.serviceId) || [],
-          selectedProfessionals: professionalIds.filter((id: string) => id !== ownUserId),
-          selfAsProfessional: professionalIds.includes(ownUserId),
+          selectedProfessionals: professionalIds,
         })
 
         if (dayConfigRes.ok) {
@@ -151,13 +148,10 @@ export default function EditSchedulePage() {
         return
       }
 
-      const professionalIds = [
-        ...(formData.selfAsProfessional && session?.user ? [(session.user as any).id] : []),
-        ...formData.selectedProfessionals,
-      ]
+      const professionalIds = formData.selectedProfessionals
 
       if (professionalIds.length === 0) {
-        toast.error('Selecione "Eu mesmo atendo" ou pelo menos um profissional para esta agenda')
+        toast.error('Selecione pelo menos um profissional para esta agenda')
         setLoading(false)
         return
       }
@@ -332,16 +326,6 @@ export default function EditSchedulePage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="self-as-professional"
-                      checked={formData.selfAsProfessional}
-                      onCheckedChange={(checked) => setFormData({ ...formData, selfAsProfessional: checked === true })}
-                    />
-                    <label htmlFor="self-as-professional" className="text-sm font-medium cursor-pointer flex-1">
-                      Eu mesmo atendo
-                    </label>
-                  </div>
                   {professionals.map((professional) => (
                     <div key={professional.id} className="flex items-center space-x-2">
                       <Checkbox
@@ -351,6 +335,9 @@ export default function EditSchedulePage() {
                       />
                       <label htmlFor={`professional-${professional.id}`} className="text-sm font-medium cursor-pointer flex-1">
                         {professional.name}
+                        {professional.email === session?.user?.email && (
+                          <span className="text-xs text-gray-500 ml-2">(Você)</span>
+                        )}
                         {professional.email && <span className="text-xs text-gray-500 block">{professional.email}</span>}
                       </label>
                     </div>

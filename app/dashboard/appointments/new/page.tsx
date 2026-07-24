@@ -75,8 +75,8 @@ export default function NewAppointmentPage() {
     if (allowsMultipleProfessionals && schedule?.professionals) {
       // Usa os profissionais vinculados na própria agenda (schedule.professionals já
       // traz o objeto `professional` completo) em vez de cruzar com a lista de
-      // /api/professionals (só equipe) — essa lista nunca inclui o próprio MASTER,
-      // então "Eu mesmo atendo" ficava invisível aqui mesmo estando vinculado à agenda.
+      // /api/professionals — evita depender de outra chamada e garante que só
+      // apareçam profissionais realmente vinculados a esta agenda.
       setAvailableProfessionals(schedule.professionals.map((sp: any) => sp.professional).filter((p: any) => p.isActive))
       setFormData(p => ({ ...p, professionalId: '' }))
     } else { setAvailableProfessionals([]) }

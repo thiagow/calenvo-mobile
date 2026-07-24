@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
     if (!professionalIds || professionalIds.length === 0) {
       console.log('❌ Validation error - No professionals selected')
       return NextResponse.json(
-        { error: 'Selecione ao menos "Eu mesmo atendo" ou um profissional da equipe para esta agenda' },
+        { error: 'Selecione ao menos um profissional para esta agenda' },
         { status: 400 }
       )
     }
@@ -178,9 +178,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Um ou mais serviços não foram encontrados' }, { status: 400 })
     }
 
-    // Confirmar que os profissionais pertencem ao tenant (equipe) OU são o próprio MASTER ("eu mesmo atendo")
+    // Confirmar que os profissionais pertencem ao tenant (equipe)
     const ownedProfessionals = await prisma.user.findMany({
-      where: { id: { in: professionalIds }, OR: [{ masterId: userId }, { id: userId }] },
+      where: { id: { in: professionalIds }, masterId: userId },
       select: { id: true }
     })
     if (ownedProfessionals.length !== professionalIds.length) {
