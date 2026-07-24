@@ -111,8 +111,8 @@ export const SEGMENT_CONFIGS: Record<SegmentType, SegmentConfig> = {
 
   AESTHETIC_CLINIC: {
     terminology: {
-      client: 'Paciente',
-      clients: 'Pacientes',
+      client: 'Cliente',
+      clients: 'Clientes',
       appointment: 'Consulta',
       appointments: 'Consultas',
       professional: 'Profissional',
@@ -132,7 +132,7 @@ export const SEGMENT_CONFIGS: Record<SegmentType, SegmentConfig> = {
       showDepositRequired: true,
     },
     placeholders: {
-      clientName: 'Nome completo do paciente',
+      clientName: 'Nome completo do cliente',
       clientPhone: '(11) 99999-9999',
       serviceName: 'Ex: Limpeza de Pele, Botox, Preenchimento',
       scheduleDescription: 'Descreva os procedimentos oferecidos nesta agenda',
@@ -235,8 +235,8 @@ export const SEGMENT_CONFIGS: Record<SegmentType, SegmentConfig> = {
 
   PHYSIOTHERAPY: {
     terminology: {
-      client: 'Paciente',
-      clients: 'Pacientes',
+      client: 'Cliente',
+      clients: 'Clientes',
       appointment: 'Sessão',
       appointments: 'Sessões',
       professional: 'Fisioterapeuta',
@@ -256,7 +256,7 @@ export const SEGMENT_CONFIGS: Record<SegmentType, SegmentConfig> = {
       showDepositRequired: false,
     },
     placeholders: {
-      clientName: 'Nome completo do paciente',
+      clientName: 'Nome completo do cliente',
       clientPhone: '(11) 99999-9999',
       serviceName: 'Ex: RPG, Pilates Clínico, Reabilitação',
       scheduleDescription: 'Descreva os procedimentos oferecidos nesta agenda',

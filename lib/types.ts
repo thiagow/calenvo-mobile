@@ -145,8 +145,8 @@ export const SEGMENT_CONFIGS = {
   [SegmentType.PHYSIOTHERAPY]: {
     name: 'Fisioterapia',
     icon: '🏥',
-    clientLabel: 'Paciente',
-    clientsLabel: 'Pacientes'
+    clientLabel: 'Cliente',
+    clientsLabel: 'Clientes'
   },
   [SegmentType.EDUCATION]: {
     name: 'Aulas e Educação',

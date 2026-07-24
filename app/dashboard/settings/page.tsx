@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle } from 'lucide-react'
+import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useUserRole } from '@/hooks/use-user-role'
@@ -62,6 +63,7 @@ function Section({ title, icon: Icon, iconColor, children, defaultOpen = false }
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { data: session } = useSession()
   const { isProfessional } = useUserRole()
   const [loading, setLoading] = useState(true)
@@ -214,6 +216,12 @@ export default function SettingsPage() {
 
   if (isProfessional) return (
     <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold">Configurações</h1>
+      </div>
       <div className="flex items-start gap-3 bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
         <Info className="h-5 w-5 text-violet-500 mt-0.5 flex-shrink-0" />
         <div>
@@ -236,6 +244,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Button variant="outline" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-3xl font-bold">Configurações</h1>
+      </div>
       {/* Perfil */}
       <Section title="Perfil da Empresa" icon={Store} iconColor="bg-primary/10 text-primary" defaultOpen>
         <div className="flex items-center gap-4 pb-2">

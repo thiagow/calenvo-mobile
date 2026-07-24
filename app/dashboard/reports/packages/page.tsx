@@ -132,7 +132,7 @@ export default async function PackagesReport() {
                             <table className="w-full text-sm text-left">
                                 <thead className="text-xs text-gray-600 uppercase bg-gray-50 border-b">
                                     <tr>
-                                        <th className="px-4 py-3 font-medium">Paciente / Cliente</th>
+                                        <th className="px-4 py-3 font-medium">Cliente</th>
                                         <th className="px-4 py-3 font-medium">Pacote</th>
                                         <th className="px-4 py-3 font-medium">Andamento das Sessões</th>
                                         <th className="px-4 py-3 font-medium text-right">Ação</th>
