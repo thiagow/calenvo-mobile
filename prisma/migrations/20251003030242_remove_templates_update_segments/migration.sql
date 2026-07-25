@@ -14,14 +14,15 @@ ALTER TYPE "SegmentType" RENAME TO "SegmentType_old";
 CREATE TYPE "SegmentType" AS ENUM ('BEAUTY_SALON', 'BARBERSHOP', 'AESTHETIC_CLINIC', 'TECH_SAAS', 'PROFESSIONAL_SERVICES', 'HR', 'PHYSIOTHERAPY', 'EDUCATION', 'PET_SHOP', 'OTHER');
 
 -- Converter os valores antigos para os novos com tratamento adequado
-ALTER TABLE "User" 
-  ALTER COLUMN "segmentType" TYPE "SegmentType" 
+ALTER TABLE "User" ALTER COLUMN "segmentType" DROP DEFAULT;
+ALTER TABLE "User"
+  ALTER COLUMN "segmentType" TYPE "SegmentType"
   USING (
     CASE "segmentType"::text
-      WHEN 'MEDICAL_CLINIC' THEN 'BEAUTY_SALON'::SegmentType
-      WHEN 'MAINTENANCE_SERVICE' THEN 'OTHER'::SegmentType
-      WHEN 'VETERINARY_CLINIC' THEN 'PET_SHOP'::SegmentType
-      ELSE "segmentType"::text::SegmentType
+      WHEN 'MEDICAL_CLINIC' THEN 'BEAUTY_SALON'::"SegmentType"
+      WHEN 'MAINTENANCE_SERVICE' THEN 'OTHER'::"SegmentType"
+      WHEN 'VETERINARY_CLINIC' THEN 'PET_SHOP'::"SegmentType"
+      ELSE "segmentType"::text::"SegmentType"
     END
   );
   
