@@ -130,8 +130,10 @@ export const authOptions: NextAuthOptions = {
         return token
       } catch (error) {
         console.error('❌ JWT callback error:', error)
-        // Return a minimal valid token to prevent cascade errors
-        return { sub: token.sub }
+        // Preserva o token existente (role/planType/etc.) em vez de descartá-lo —
+        // uma falha transitória na checagem de passwordChangedAt não deve degradar
+        // uma sessão que já era válida.
+        return token
       }
     },
     async session({ session, token }) {

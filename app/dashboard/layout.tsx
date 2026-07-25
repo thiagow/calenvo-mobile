@@ -48,7 +48,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <DashboardLayoutClient sessionData={sessionData}>
+    <DashboardLayoutClient sessionData={sessionData} session={session}>
       {children}
     </DashboardLayoutClient>
   )

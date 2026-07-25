@@ -1,5 +1,6 @@
 'use client'
 
+import { Session } from 'next-auth'
 import { SessionProvider } from 'next-auth/react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { BottomNav } from '@/components/layout/bottom-nav'
@@ -15,11 +16,12 @@ interface DashboardLayoutClientProps {
       businessName?: string | null
     }
   }
+  session: Session
 }
 
-export function DashboardLayoutClient({ children, sessionData }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, sessionData, session }: DashboardLayoutClientProps) {
   return (
-    <SessionProvider>
+    <SessionProvider session={session}>
       <SegmentProvider>
         <div className="min-h-screen bg-background flex flex-col">
           <DashboardHeader sessionData={sessionData} />
