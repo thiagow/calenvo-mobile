@@ -89,12 +89,14 @@ export default function AgendaPage() {
       variant: 'destructive',
       confirmText: 'Excluir',
     })
-    if (!confirmed) return
+    if (!confirmed) return false
     try {
       await deleteAppointment(id)
       toast.success('Agendamento excluído!')
+      return true
     } catch {
       toast.error('Erro ao excluir agendamento')
+      return false
     }
   }
 
@@ -181,6 +183,14 @@ export default function AgendaPage() {
           onClose={() => { setShowEditDialog(false); setEditingAppointment(null) }}
           appointment={editingAppointment}
           onUpdate={handleUpdateAppointment}
+          onDelete={async (id) => {
+            const deleted = await handleDeleteAppointment(id)
+            if (deleted) {
+              setShowEditDialog(false)
+              setEditingAppointment(null)
+              await refetch()
+            }
+          }}
         />
       )}
     </div>

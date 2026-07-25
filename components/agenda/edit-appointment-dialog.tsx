@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Clock, User, Loader2, AlertCircle, DollarSign } from 'lucide-react'
+import { Calendar, Clock, User, Loader2, AlertCircle, DollarSign, Trash2 } from 'lucide-react'
 import { AppointmentStatus } from '@prisma/client'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import toast from 'react-hot-toast'
@@ -19,6 +19,7 @@ interface EditAppointmentDialogProps {
   onClose: () => void
   appointment: any
   onUpdate: (id: string, data: any) => Promise<void>
+  onDelete?: (id: string) => Promise<void>
 }
 
 const STATUS_OPTIONS: AppointmentStatus[] = [
@@ -34,9 +35,11 @@ export function EditAppointmentDialog({
   isOpen,
   onClose,
   appointment,
-  onUpdate
+  onUpdate,
+  onDelete
 }: EditAppointmentDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [services, setServices] = useState<any[]>([])
   const [professionals, setProfessionals] = useState<any[]>([])
@@ -157,6 +160,16 @@ export function EditAppointmentDialog({
       toast.error('Erro ao atualizar agendamento')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    setDeleting(true)
+    try {
+      await onDelete(appointment.id)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -315,6 +328,21 @@ export function EditAppointmentDialog({
           </div>
 
           <DialogFooter className="flex gap-2">
+            {onDelete && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting || loading}
+                className="mr-auto"
+              >
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -326,7 +354,7 @@ export function EditAppointmentDialog({
             <Button
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-auto"
-              disabled={loading}
+              disabled={loading || deleting}
             >
               {loading ? (
                 <>
