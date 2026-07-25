@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireSaasAdmin } from '@/lib/saas-admin-guard'
-import { PLAN_CONFIGS } from '@/lib/types'
+import { getPlanPrice } from '@/lib/types'
 
 /**
  * GET /api/saas-admin/stats
@@ -63,10 +63,11 @@ export async function GET(req: NextRequest) {
                 where: { role: 'MASTER' },
                 _count: true
             }),
-            // Distribuição por plano só de contas pagantes (base do cálculo de receita —
-            // contas isentas não devem contribuir para a receita mensal estimada)
+            // Distribuição por plano/intervalo de cobrança só de contas pagantes
+            // (base do cálculo de receita — contas isentas não contribuem, e o
+            // preço anual precisa ser diferenciado do mensal)
             prisma.user.groupBy({
-                by: ['planType'],
+                by: ['planType', 'billingInterval'],
                 where: { role: 'MASTER', isPaymentExempt: false },
                 _count: true
             }),
@@ -85,10 +86,12 @@ export async function GET(req: NextRequest) {
         }
         const tenantsBySegment = Array.from(segmentCounts.entries()).map(([segmentType, count]) => ({ segmentType, _count: count }))
 
-        // Calcular receita mensal estimada (só contas pagantes, exclui isentas)
+        // Calcular receita mensal estimada (só contas pagantes, exclui isentas,
+        // e usa o preço mensal equivalente correto para cobrança anual)
         const monthlyRevenue = payingTenantsByPlan.reduce((total, group) => {
-            const planConfig = PLAN_CONFIGS[group.planType as keyof typeof PLAN_CONFIGS]
-            return total + (planConfig.priceMonthly * group._count)
+            if (!group.planType) return total
+            const price = getPlanPrice(group.planType, group.billingInterval ?? 'MONTHLY', 'BRL')
+            return total + (price * group._count)
         }, 0)
 
         return NextResponse.json({
