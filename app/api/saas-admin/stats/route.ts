@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
             appointmentsThisMonth,
             newTenantsLast30Days,
             tenantsByPlan,
+            payingTenantsByPlan,
             tenantSegments
         ] = await Promise.all([
             // Total de tenants
@@ -56,10 +57,17 @@ export async function GET(req: NextRequest) {
                     }
                 }
             }),
-            // Distribuição por plano
+            // Distribuição por plano (todos os tenants, informativo)
             prisma.user.groupBy({
                 by: ['planType'],
                 where: { role: 'MASTER' },
+                _count: true
+            }),
+            // Distribuição por plano só de contas pagantes (base do cálculo de receita —
+            // contas isentas não devem contribuir para a receita mensal estimada)
+            prisma.user.groupBy({
+                by: ['planType'],
+                where: { role: 'MASTER', isPaymentExempt: false },
                 _count: true
             }),
             // Distribuição por segmento (contagem em memória: segmentTypes é array, não dá pra usar groupBy)
@@ -77,8 +85,8 @@ export async function GET(req: NextRequest) {
         }
         const tenantsBySegment = Array.from(segmentCounts.entries()).map(([segmentType, count]) => ({ segmentType, _count: count }))
 
-        // Calcular receita mensal estimada
-        const monthlyRevenue = tenantsByPlan.reduce((total, group) => {
+        // Calcular receita mensal estimada (só contas pagantes, exclui isentas)
+        const monthlyRevenue = payingTenantsByPlan.reduce((total, group) => {
             const planConfig = PLAN_CONFIGS[group.planType as keyof typeof PLAN_CONFIGS]
             return total + (planConfig.priceMonthly * group._count)
         }, 0)
