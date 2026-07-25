@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Calendar, Clock, User, Loader2, AlertCircle, DollarSign } from 'lucide-react'
-import { AppointmentStatus, ModalityType } from '@prisma/client'
-import { STATUS_LABELS, STATUS_COLORS, MODALITY_LABELS } from '@/lib/types'
+import { AppointmentStatus } from '@prisma/client'
+import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import toast from 'react-hot-toast'
 
 interface EditAppointmentDialogProps {
@@ -30,8 +30,6 @@ const STATUS_OPTIONS: AppointmentStatus[] = [
   'NO_SHOW'
 ]
 
-const MODALITY_OPTIONS: ModalityType[] = ['PRESENCIAL', 'TELECONSULTA']
-
 export function EditAppointmentDialog({
   isOpen,
   onClose,
@@ -48,7 +46,6 @@ export function EditAppointmentDialog({
     time: '',
     duration: 30,
     status: 'SCHEDULED' as AppointmentStatus,
-    modality: 'PRESENCIAL' as ModalityType,
     serviceId: '',
     professionalId: '',
     notes: '',
@@ -97,7 +94,6 @@ export function EditAppointmentDialog({
         time: timeStr,
         duration: appointment.duration || 30,
         status: appointment.status || 'SCHEDULED',
-        modality: appointment.modality || 'PRESENCIAL',
         serviceId: appointment.serviceId || (appointment.service?.id) || '',
         professionalId: appointment.professionalId || (appointment.professionalRelation?.id) || '',
         notes: appointment.notes || '',
@@ -145,7 +141,6 @@ export function EditAppointmentDialog({
         date: dateTime.toISOString(),
         duration: Number(formData.duration),
         status: formData.status,
-        modality: formData.modality,
         serviceId: formData.serviceId || null,
         professionalId: formData.professionalId || null,
         specialty: formData.serviceId ? (services.find(s => s.id === formData.serviceId)?.name || null) : null,
@@ -238,38 +233,26 @@ export function EditAppointmentDialog({
             />
           </div>
 
-          {/* Status and Modality */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value as AppointmentStatus })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      <Badge className={STATUS_COLORS[status]}>
-                        {STATUS_LABELS[status]}
-                      </Badge>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="modality">Modalidade</Label>
-              <Input
-                id="modality"
-                value={formData.modality}
-                readOnly
-                className="bg-gray-100"
-              />
-            </div>
+          {/* Status */}
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <Select
+              value={formData.status}
+              onValueChange={(value) => setFormData({ ...formData, status: value as AppointmentStatus })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    <Badge className={STATUS_COLORS[status]}>
+                      {STATUS_LABELS[status]}
+                    </Badge>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Service and Professional */}
