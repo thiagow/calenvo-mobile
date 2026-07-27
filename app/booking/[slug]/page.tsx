@@ -262,7 +262,7 @@ export default function PublicBookingPage() {
           <div className="min-w-0 flex-1 text-center">
             {businessInfo?.businessLogo && (
               <div className="mb-1 flex justify-center">
-                <div className="relative h-10 w-10 overflow-hidden rounded-full bg-white shadow-sm">
+                <div className="relative h-20 w-20 overflow-hidden rounded-full bg-white shadow-sm">
                   <Image
                     src={`/api/files/logo?key=${businessInfo.businessLogo}`}
                     alt={businessInfo.businessName || 'Logo'}
