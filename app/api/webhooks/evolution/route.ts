@@ -92,6 +92,9 @@ async function handleConnectionUpdate(instanceName: string, data: any) {
         isConnected,
         qrCode: !isConnected ? null : config.qrCode, // Clear QR code when disconnected
         updatedAt: new Date(),
+        // Conectar liga o "disjuntor mestre" de notificações automaticamente —
+        // sem isso, enabled nunca é setado e nenhum trigger dispara de verdade.
+        ...(isConnected && !config.enabled ? { enabled: true } : {}),
       },
     });
 

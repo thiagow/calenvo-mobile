@@ -733,7 +733,9 @@ export async function checkConnectionStatusAction(): Promise<ActionState<{ isCon
     if (isConnected !== config.isConnected) {
       await prisma.whatsAppConfig.update({
         where: { id: config.id },
-        data: { isConnected },
+        // Conectar liga o "disjuntor mestre" de notificações automaticamente —
+        // sem isso, enabled nunca é setado e nenhum trigger dispara de verdade.
+        data: { isConnected, ...(isConnected && !config.enabled ? { enabled: true } : {}) },
       });
     }
 
