@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import { NotificationCard } from './notification-card';
-import { Bell, CalendarCheck, CalendarX, Clock, AlertCircle, Send, Loader2 } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarX, Clock, AlertCircle, Send, Loader2, CheckCircle2, Star } from 'lucide-react';
 import { FeedbackDialog } from './feedback-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { updateWhatsAppSettingsAction, sendTestMessageAction } from '@/app/actions/whatsapp';
@@ -50,6 +51,15 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
   const [reminderHours, setReminderHours] = useState(config.reminderHours);
   const [reminderMessage, setReminderMessage] = useState(config.reminderMessage || '');
 
+  // Completed (on marking appointment as attended)
+  const [notifyOnCompleted, setNotifyOnCompleted] = useState(config.notifyOnCompleted);
+  const [completedMessage, setCompletedMessage] = useState(config.completedMessage || '');
+  const [reviewLink, setReviewLink] = useState(config.reviewLink || '');
+
+  // Completed Test State
+  const [showCompletedTestDialog, setShowCompletedTestDialog] = useState(false);
+  const [sendingCompletedTest, setSendingCompletedTest] = useState(false);
+
   // Track if there are unsaved changes
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -65,7 +75,10 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
       confirmationMessage !== (config.confirmationMessage || '') ||
       notifyReminder !== config.notifyReminder ||
       reminderHours !== config.reminderHours ||
-      reminderMessage !== (config.reminderMessage || '');
+      reminderMessage !== (config.reminderMessage || '') ||
+      notifyOnCompleted !== config.notifyOnCompleted ||
+      completedMessage !== (config.completedMessage || '') ||
+      reviewLink !== (config.reviewLink || '');
 
     setHasChanges(changed);
   }, [
@@ -80,6 +93,9 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
     notifyReminder,
     reminderHours,
     reminderMessage,
+    notifyOnCompleted,
+    completedMessage,
+    reviewLink,
     config,
   ]);
 
@@ -100,6 +116,9 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
         notifyReminder,
         reminderHours,
         reminderMessage,
+        notifyOnCompleted,
+        completedMessage,
+        reviewLink,
       });
 
       if (result.success) {
@@ -142,6 +161,24 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
       setShowFeedback(true);
     } finally {
       setSendingCancelTest(false);
+    }
+  };
+
+  const handleSendCompletedTest = async (phoneNumber: string) => {
+    setSendingCompletedTest(true);
+    try {
+      const result = await sendTestMessageAction('completed', phoneNumber, completedMessage);
+
+      setFeedbackSuccess(result.success);
+      setShowCompletedTestDialog(false);
+      setShowFeedback(true);
+    } catch (error) {
+      console.error('Test message error:', error);
+      setFeedbackSuccess(false);
+      setShowCompletedTestDialog(false);
+      setShowFeedback(true);
+    } finally {
+      setSendingCompletedTest(false);
     }
   };
 
@@ -261,6 +298,83 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
         defaultPhone={config.phoneNumber || undefined}
       />
 
+      {/* 5. Completed (on marking appointment as attended) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-1" />
+              <div className="space-y-1">
+                <CardTitle className="text-base">Notificação de Atendimento</CardTitle>
+                <CardDescription>
+                  Enviada imediatamente quando o agendamento é marcado como "Atendido"
+                </CardDescription>
+              </div>
+            </div>
+            <Switch
+              checked={notifyOnCompleted}
+              onCheckedChange={setNotifyOnCompleted}
+              disabled={disabled}
+            />
+          </div>
+        </CardHeader>
+        {notifyOnCompleted && (
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Esta notificação é enviada em tempo real, sem atraso configurável.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-1">
+                <Star className="h-3.5 w-3.5 text-amber-500" />
+                Link de avaliação (Google Meu Negócio)
+              </label>
+              <Input
+                type="url"
+                value={reviewLink}
+                onChange={(e) => setReviewLink(e.target.value)}
+                placeholder="https://g.page/r/seu-negocio/review"
+                disabled={disabled}
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Se preenchido, use a variável <code className="font-mono">{'{{link_avaliacao}}'}</code> na mensagem para incluí-lo. Deixe em branco para não enviar link algum.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mensagem personalizada</label>
+              <Textarea
+                value={completedMessage}
+                onChange={(e) => setCompletedMessage(e.target.value)}
+                placeholder="Digite a mensagem de agradecimento e, se quiser, peça a avaliação"
+                disabled={disabled}
+                rows={3}
+                maxLength={1000}
+              />
+              <p className="text-xs text-muted-foreground">
+                Máximo 1000 caracteres
+              </p>
+            </div>
+
+            <VariableHelper />
+            <MessagePreview message={completedMessage} />
+
+            <Button
+              variant="outline"
+              onClick={() => setShowCompletedTestDialog(true)}
+              disabled={disabled || sendingCompletedTest || !completedMessage}
+              className="w-full"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Enviar Mensagem de Teste
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Save Button */}
       {hasChanges && (
         <div className="sticky bottom-4 bg-background pt-4 border-t">
@@ -281,6 +395,15 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
         loading={sendingCancelTest}
         defaultPhone={config.phoneNumber || undefined}
         typeLabel="Cancelamento"
+      />
+
+      <TestMessageDialog
+        open={showCompletedTestDialog}
+        onOpenChange={setShowCompletedTestDialog}
+        onSend={handleSendCompletedTest}
+        loading={sendingCompletedTest}
+        defaultPhone={config.phoneNumber || undefined}
+        typeLabel="Atendimento"
       />
 
       <FeedbackDialog

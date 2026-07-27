@@ -31,6 +31,7 @@ export class WhatsAppTriggerService {
       serviceName?: string;
       professionalName?: string;
       businessName?: string;
+      reviewLink?: string;
     }
   ): string {
     const dateFormatted = new Date(data.appointmentDate).toLocaleDateString('pt-BR');
@@ -45,7 +46,8 @@ export class WhatsAppTriggerService {
       .replace(/\{\{hora\}\}/g, timeFormatted)
       .replace(/\{\{servico\}\}/g, data.serviceName || 'Agendamento')
       .replace(/\{\{profissional\}\}/g, data.professionalName || 'Equipe')
-      .replace(/\{\{empresa\}\}/g, data.businessName || 'Nossa Empresa');
+      .replace(/\{\{empresa\}\}/g, data.businessName || 'Nossa Empresa')
+      .replace(/\{\{link_avaliacao\}\}/g, data.reviewLink || '');
   }
 
   /**
@@ -215,6 +217,37 @@ export class WhatsAppTriggerService {
       await this.sendToN8n(config.instanceName, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentReminder:', error);
+    }
+  }
+
+  /**
+   * Trigger notification on appointment completion (with optional review link)
+   */
+  static async onAppointmentCompleted(
+    appointment: Appointment & { client: Client; user: { businessName?: string | null } },
+    serviceName?: string,
+    professionalName?: string
+  ): Promise<void> {
+    try {
+      const config = await prisma.whatsAppConfig.findUnique({
+        where: { userId: appointment.userId },
+      });
+
+      if (!config || !config.enabled || !config.isConnected || !config.notifyOnCompleted) return;
+      if (!appointment.client.phone) return;
+
+      const message = this.replaceVariables(config.completedMessage || '', {
+        clientName: appointment.client.name,
+        appointmentDate: appointment.date,
+        serviceName,
+        professionalName,
+        businessName: appointment.user.businessName || undefined,
+        reviewLink: config.reviewLink || undefined,
+      });
+
+      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+    } catch (error) {
+      console.error('[WhatsAppTrigger] Error in onAppointmentCompleted:', error);
     }
   }
 }

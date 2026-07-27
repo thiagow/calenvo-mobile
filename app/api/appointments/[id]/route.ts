@@ -287,6 +287,12 @@ export async function PUT(
               serviceName,
               updatedAppointment.date
             )
+            // Enviar notificação via WhatsApp (com link de avaliação opcional)
+            await WhatsAppTriggerService.onAppointmentCompleted(
+              updatedAppointment as any,
+              serviceName,
+              updatedAppointment.professional || undefined
+            )
             break
         }
       }

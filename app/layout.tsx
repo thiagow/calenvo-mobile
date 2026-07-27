@@ -7,6 +7,7 @@ import { DialogProvider } from '@/components/providers/dialog-provider'
 import { Toaster as ShadcnToaster } from '@/components/ui/toaster'
 import { Toaster as SonnerToaster } from '@/components/ui/sonner'
 import { Toaster } from 'react-hot-toast'
+import { IosInstallBanner } from '@/components/pwa/ios-install-banner'
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -55,6 +56,7 @@ export default function RootLayout({
               <Toaster />
               <ShadcnToaster />
               <SonnerToaster />
+              <IosInstallBanner />
             </DialogProvider>
           </ThemeProvider>
         </Providers>

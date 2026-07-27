@@ -5,6 +5,9 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { prisma } from './db'
 
+const REMEMBER_ME_MAX_AGE = 30 * 24 * 60 * 60 // 30 dias
+const SESSION_MAX_AGE = 24 * 60 * 60 // 1 dia, quando "manter sessão" não é marcado
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   cookies: {
@@ -23,7 +26,8 @@ export const authOptions: NextAuthOptions = {
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
+        rememberMe: { label: 'Remember me', type: 'text' }
       },
       async authorize(credentials) {
         console.log('🔐 Auth: authorize called')
@@ -71,7 +75,8 @@ export const authOptions: NextAuthOptions = {
           businessName: user.businessName,
           segmentTypes: user.segmentTypes,
           planType: user.planType,
-          masterId: user.masterId
+          masterId: user.masterId,
+          rememberMe: credentials.rememberMe !== 'false'
         }
       }
     })
@@ -83,9 +88,10 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     // Add custom encode/decode to handle errors gracefully
     async encode(params) {
-      // Use default encoding
+      // Use default encoding, mas com duração dependente de "manter sessão" (rememberMe)
       const { encode } = await import('next-auth/jwt')
-      return encode(params)
+      const maxAge = params.token?.rememberMe === false ? SESSION_MAX_AGE : REMEMBER_ME_MAX_AGE
+      return encode({ ...params, maxAge })
     },
     async decode(params) {
       try {
@@ -111,6 +117,7 @@ export const authOptions: NextAuthOptions = {
           token.businessName = (user as any).businessName
           token.segmentTypes = (user as any).segmentTypes
           token.masterId = (user as any).masterId
+          token.rememberMe = (user as any).rememberMe ?? true
         }
 
         // Invalida sessões emitidas antes da senha ter sido trocada (ex.: via "esqueci senha").

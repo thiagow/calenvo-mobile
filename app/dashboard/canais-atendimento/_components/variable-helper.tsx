@@ -45,6 +45,11 @@ const AVAILABLE_VARIABLES: Variable[] = [
     description: 'Nome da empresa',
     example: 'Minha Empresa',
   },
+  {
+    name: '{{link_avaliacao}}',
+    description: 'Link de avaliação (Google Meu Negócio), se configurado',
+    example: 'https://g.page/r/exemplo/review',
+  },
 ];
 
 interface VariableHelperProps {

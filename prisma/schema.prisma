@@ -588,6 +588,12 @@ model WhatsAppConfig {
   reminderHours   Int     @default(24)
   reminderMessage String? @db.Text
 
+  // Atendido (logo após marcar o agendamento como concluído)
+  notifyOnCompleted Boolean @default(false)
+  completedMessage  String? @db.Text
+  /// Link opcional de avaliação (ex.: Google Meu Negócio) inserido via {{link_avaliacao}}
+  reviewLink        String? @db.Text
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

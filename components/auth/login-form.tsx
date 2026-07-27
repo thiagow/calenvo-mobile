@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 
@@ -15,6 +16,7 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -31,6 +33,7 @@ export function LoginForm() {
       const result = await signIn('credentials', {
         email,
         password,
+        rememberMe: String(rememberMe),
         redirect: false
       })
 
@@ -129,6 +132,18 @@ export function LoginForm() {
             Esqueceu sua senha?
           </Link>
         </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="rememberMe"
+          checked={rememberMe}
+          onCheckedChange={(checked) => setRememberMe(checked === true)}
+          disabled={isLoading}
+        />
+        <Label htmlFor="rememberMe" className="text-sm font-normal text-gray-600 cursor-pointer">
+          Manter sessão neste navegador
+        </Label>
       </div>
 
       <Button
