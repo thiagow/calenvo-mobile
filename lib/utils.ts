@@ -50,7 +50,11 @@ export function formatCurrencyByCurrency(value: number, currency: 'BRL' | 'USD')
 }
 
 export function formatPhone(phone: string): string {
-  const cleaned = phone.replace(/\D/g, '')
+  let cleaned = phone.replace(/\D/g, '')
+  // Remove o DDI 55, se presente (números salvos via formatWhatsAppNumber vêm com ele)
+  if (cleaned.length > 11 && cleaned.startsWith('55')) {
+    cleaned = cleaned.slice(2)
+  }
   const match = cleaned.match(/^(\d{2})(\d{4,5})(\d{4})$/)
   if (match) {
     return `(${match[1]}) ${match[2]}-${match[3]}`

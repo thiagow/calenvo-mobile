@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Search, Plus, Phone, History, Package, Edit, Users, MoreVertical } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatPhone, applyPhoneMask } from '@/lib/utils'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { BRAZILIAN_STATES } from '@/lib/brazilian-states'
 
@@ -73,7 +73,13 @@ export default function ClientsPage() {
 
   const openNew = () => { setFormData(emptyForm); setIsEditMode(false); setSelectedClient(null); setSheetOpen(true) }
   const openEdit = (p: Client) => {
-    setFormData({ name: p.name, email: p.email || '', phone: p.phone, cpf: p.cpf || '', birthDate: p.birthDate ? new Date(p.birthDate).toISOString().split('T')[0] : '', address: p.address || '', city: p.city || '', state: p.state || '', gender: '', notes: p.notes || '' })
+    // Números salvos via formatWhatsAppNumber vêm com DDI 55 (12-13 dígitos) — remove
+    // antes de aplicar a máscara local. Não confundir com DDD 55 (RS), que tem 10-11 dígitos.
+    const localDigits = p.phone.replace(/\D/g, '')
+    const phoneForEdit = localDigits.length > 11 && localDigits.startsWith('55')
+      ? localDigits.slice(2)
+      : p.phone
+    setFormData({ name: p.name, email: p.email || '', phone: applyPhoneMask(phoneForEdit), cpf: p.cpf || '', birthDate: p.birthDate ? new Date(p.birthDate).toISOString().split('T')[0] : '', address: p.address || '', city: p.city || '', state: p.state || '', gender: '', notes: p.notes || '' })
     setSelectedClient(p); setIsEditMode(true); setSheetOpen(true)
   }
 
@@ -155,7 +161,7 @@ export default function ClientsPage() {
                     <p className="font-semibold text-sm truncate">{client.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      <span className="text-xs text-muted-foreground">{client.phone}</span>
+                      <span className="text-xs text-muted-foreground">{formatPhone(client.phone)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0">
@@ -228,7 +234,7 @@ export default function ClientsPage() {
             </div>
             <div>
               <Label>WhatsApp *</Label>
-              <Input className="mt-1" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => set('phone', e.target.value)} />
+              <Input className="mt-1" placeholder="(11) 99999-9999" value={formData.phone} onChange={e => set('phone', applyPhoneMask(e.target.value))} />
             </div>
             <div>
               <Label>E-mail</Label>

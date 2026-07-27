@@ -7,6 +7,7 @@ import { NotificationService } from '@/lib/notification-service'
 import { checkAppointmentQuota, resolveBookingTarget } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 import { parseCalendarDate } from '@/lib/availability-service'
+import { formatWhatsAppNumber } from '@/lib/utils'
 
 export async function POST(
   request: NextRequest,
@@ -64,22 +65,35 @@ export async function POST(
     }
 
     // Buscar ou criar cliente
+    // Normaliza pro mesmo formato usado no chat e no cadastro manual — sem
+    // isso, a máscara do formulário ("(11) 98765-4321") nunca bate com o
+    // telefone salvo por outro canal, e cria um Client duplicado.
+    const normalizedPhone = formatWhatsAppNumber(clientPhone) || clientPhone
+
     let client = await prisma.client.findFirst({
       where: {
         userId: user.id,
-        phone: clientPhone
+        phone: normalizedPhone
       }
     })
 
     if (!client) {
-      client = await prisma.client.create({
-        data: {
-          name: clientName,
-          email: clientEmail || null,
-          phone: clientPhone,
-          userId: user.id
+      try {
+        client = await prisma.client.create({
+          data: {
+            name: clientName,
+            email: clientEmail || null,
+            phone: normalizedPhone,
+            userId: user.id
+          }
+        })
+      } catch (error: any) {
+        // Corrida rara: outra requisição criou o mesmo cliente entre o findFirst e o create.
+        if (error?.code === 'P2002') {
+          client = await prisma.client.findFirst({ where: { userId: user.id, phone: normalizedPhone } })
         }
-      })
+        if (!client) throw error
+      }
     }
 
     // Buscar serviço (escopado ao tenant resolvido pelo slug)

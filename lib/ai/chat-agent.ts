@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { prisma } from '@/lib/db'
 import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
 import { getAvailableSlots, parseCalendarDate } from '@/lib/availability-service'
+import { formatWhatsAppNumber } from '@/lib/utils'
 import type { User, BusinessConfig } from '@prisma/client'
 
 const MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
@@ -230,16 +231,29 @@ export async function executeTool(
         })
         if (resolution.error) return { error: resolution.error }
 
-        let clientRecord = await prisma.client.findFirst({ where: { userId: tenant.id, phone: input.clientPhone } })
+        // Normaliza pro mesmo formato usado no agendamento público e no cadastro
+        // manual — sem isso, o mesmo cliente digitando o telefone de formas
+        // diferentes em cada canal vira um Client duplicado a cada vez.
+        const normalizedPhone = formatWhatsAppNumber(input.clientPhone) || input.clientPhone
+
+        let clientRecord = await prisma.client.findFirst({ where: { userId: tenant.id, phone: normalizedPhone } })
         if (!clientRecord) {
-          clientRecord = await prisma.client.create({
-            data: {
-              name: input.clientName,
-              phone: input.clientPhone,
-              email: input.clientEmail || null,
-              userId: tenant.id,
-            },
-          })
+          try {
+            clientRecord = await prisma.client.create({
+              data: {
+                name: input.clientName,
+                phone: normalizedPhone,
+                email: input.clientEmail || null,
+                userId: tenant.id,
+              },
+            })
+          } catch (error: any) {
+            // Corrida rara: outra requisição criou o mesmo cliente entre o findFirst e o create.
+            if (error?.code === 'P2002') {
+              clientRecord = await prisma.client.findFirst({ where: { userId: tenant.id, phone: normalizedPhone } })
+            }
+            if (!clientRecord) throw error
+          }
         }
 
         const initialStatus = tenant.businessConfig.autoConfirm ? 'CONFIRMED' : 'SCHEDULED'

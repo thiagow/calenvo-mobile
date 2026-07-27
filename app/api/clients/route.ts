@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { formatWhatsAppNumber } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normaliza pro mesmo formato usado no agendamento público e no chat —
+    // sem isso, o mesmo telefone digitado de formas diferentes em cada canal
+    // vira um Client duplicado.
+    const normalizedPhone = formatWhatsAppNumber(phone) || phone
+
     // Check if client already exists by phone or cpf (to avoid duplicates)
     let client = null
 
@@ -97,7 +103,7 @@ export async function POST(request: NextRequest) {
         where: {
           userId: userId,
           OR: [
-            { phone: phone },
+            { phone: normalizedPhone },
             { cpf: cpf }
           ]
         }
@@ -106,31 +112,39 @@ export async function POST(request: NextRequest) {
       client = await prisma.client.findFirst({
         where: {
           userId: userId,
-          phone: phone
+          phone: normalizedPhone
         }
       })
     }
 
     if (!client) {
       // Create new client if doesn't exist
-      client = await prisma.client.create({
-        data: {
-          name,
-          email,
-          phone,
-          cpf,
-          birthDate: birthDate ? new Date(birthDate) : null,
-          address,
-          city,
-          state,
-          notes,
-          user: {
-            connect: {
-              id: userId
+      try {
+        client = await prisma.client.create({
+          data: {
+            name,
+            email,
+            phone: normalizedPhone,
+            cpf,
+            birthDate: birthDate ? new Date(birthDate) : null,
+            address,
+            city,
+            state,
+            notes,
+            user: {
+              connect: {
+                id: userId
+              }
             }
           }
+        })
+      } catch (error: any) {
+        // Corrida rara: outra requisição criou o mesmo cliente entre o findFirst e o create.
+        if (error?.code === 'P2002') {
+          client = await prisma.client.findFirst({ where: { userId, phone: normalizedPhone } })
         }
-      })
+        if (!client) throw error
+      }
     } else {
       // Update existing client with any new information provided
       client = await prisma.client.update({
@@ -139,7 +153,7 @@ export async function POST(request: NextRequest) {
         },
         data: {
           email: email || client.email,
-          phone: phone || client.phone,
+          phone: normalizedPhone || client.phone,
           cpf: cpf || client.cpf,
           birthDate: birthDate ? new Date(birthDate) : client.birthDate,
           address: address || client.address,

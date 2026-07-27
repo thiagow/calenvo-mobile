@@ -187,6 +187,7 @@ model Client {
   loyaltyTransactions LoyaltyTransaction[]  @relation("ClientLoyaltyTransactions")
 
   @@unique([cpf, userId])
+  @@unique([userId, phone])
 }
 
 enum AppointmentStatus {
