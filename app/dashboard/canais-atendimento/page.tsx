@@ -4,11 +4,10 @@ import { prisma } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Lock, MessageSquare, Bot } from 'lucide-react'
+import { Lock, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { WhatsAppConnection } from './_components/whatsapp-connection'
 import { NotificationSettings } from './_components/notification-settings'
-import { AiAgentSettings } from './_components/ai-agent-settings'
 
 interface ExtendedUser { id: string; email: string; planType?: string }
 interface ExtendedSession { user: ExtendedUser }
@@ -50,7 +49,6 @@ export default async function CanaisAtendimentoPage() {
             <ul className="text-xs text-muted-foreground space-y-1.5 pl-1">
               {[
                 'Lembretes automáticos pelo WhatsApp',
-                'Agente IA respondendo clientes 24/7',
                 'Confirmações de agendamento instantâneas',
                 'Mensagens personalizadas com variáveis',
               ].map(b => (
@@ -90,27 +88,13 @@ export default async function CanaisAtendimentoPage() {
                 </div>
                 <NotificationSettings config={whatsAppConfig} disabled={!whatsAppConfig.isConnected} />
               </div>
-
-              {/* Agente IA */}
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Bot className="h-3.5 w-3.5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">Agente IA de Atendimento</p>
-                    <p className="text-xs text-muted-foreground">IA que responde clientes pelo n8n, 24/7</p>
-                  </div>
-                </div>
-                <AiAgentSettings config={whatsAppConfig} />
-              </div>
             </div>
           ) : (
             <Card className="border border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-8 gap-2 text-center">
                 <MessageSquare className="h-8 w-8 text-muted-foreground/40" />
                 <p className="text-sm text-muted-foreground">
-                  Conecte seu WhatsApp acima para liberar Notificações e Agente IA
+                  Conecte seu WhatsApp acima para liberar as Notificações
                 </p>
               </CardContent>
             </Card>
