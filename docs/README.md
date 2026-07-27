@@ -25,6 +25,7 @@ Esta pasta contém a documentação de contexto completa das funcionalidades exi
   - [whatsapp.md](./features/whatsapp.md) - Integração WhatsApp
 - **[data-models.md](./data-models.md)** - Modelos de dados e relacionamentos
 - **[api-reference.md](./api-reference.md)** - Referência de APIs e endpoints
+- **[ROADMAP.md](./ROADMAP.md)** - Possíveis novas funcionalidades em avaliação
 
 ## 🎯 Como Usar Esta Documentação
 
