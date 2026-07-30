@@ -162,6 +162,16 @@ export async function PATCH(
                 })
             }
 
+            // Plano é uma propriedade do negócio como um todo — sincroniza com os
+            // profissionais vinculados (incluindo o clone "self professional" do
+            // MASTER), igual já é feito pela sincronização de assinatura do Stripe.
+            if (dataToUpdate.planType) {
+                await tx.user.updateMany({
+                    where: { masterId: id, role: 'PROFESSIONAL' },
+                    data: { planType: dataToUpdate.planType }
+                })
+            }
+
             // Segmentos são uma propriedade do negócio como um todo — sincroniza
             // com todos os profissionais vinculados, igual à criação da conta.
             if (dataToUpdate.segmentTypes) {

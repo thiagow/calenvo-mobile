@@ -39,18 +39,23 @@ export const authOptions: NextAuthOptions = {
         }
 
         console.log('🔍 Auth: Looking for user in database...')
-        // Use findFirst since email is no longer unique (we have email_role unique constraint)
-        // Allow MASTER, PROFESSIONAL, and SAAS_ADMIN users to login
-        const user = await prisma.user.findFirst({
+        // Email não é único (constraint é email+role): um MASTER e o seu clone
+        // "self professional" (criado em app/api/stripe/webhook/route.ts) compartilham
+        // o mesmo email/senha. Buscamos todas as linhas e priorizamos explicitamente
+        // SAAS_ADMIN > MASTER > PROFESSIONAL, em vez de depender da ordem arbitrária
+        // que findFirst retornaria sem orderBy.
+        const candidates = await prisma.user.findMany({
           where: {
             email: credentials.email,
-            // SAAS_ADMIN can login even if inactive
             OR: [
               { role: 'SAAS_ADMIN' },
               { AND: [{ role: { in: ['MASTER', 'PROFESSIONAL'] } }, { isActive: true }] }
             ]
           }
         })
+
+        const rolePriority: Record<string, number> = { SAAS_ADMIN: 0, MASTER: 1, PROFESSIONAL: 2 }
+        const user = candidates.sort((a, b) => rolePriority[a.role] - rolePriority[b.role])[0]
 
         if (!user) {
           console.log('❌ Auth: User not found')
