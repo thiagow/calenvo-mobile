@@ -34,6 +34,7 @@ interface ListAppointment {
   insurance: string
   notes?: string
   professional?: string
+  isOverbooked?: boolean
 }
 
 interface AgendaListViewProps {
@@ -187,6 +188,11 @@ export function AgendaListView({
                           <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
                             {MODALITY_LABELS[appointment.modality]}
                           </Badge>
+                          {appointment.isOverbooked && (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                              ⚡ Encaixe
+                            </Badge>
+                          )}
                         </div>
 
                         {/* Content */}

@@ -201,7 +201,8 @@ export async function GET(request: NextRequest) {
       serviceId: appointment.serviceId,
       professionalId: appointment.professionalId,
       service: appointment.service,
-      professionalRelation: appointment.professionalUser
+      professionalRelation: appointment.professionalUser,
+      isOverbooked: appointment.isOverbooked
     }))
 
     return NextResponse.json(transformedAppointments)
@@ -238,7 +239,8 @@ export async function POST(request: NextRequest) {
       serviceType,
       professional,
       notes,
-      price
+      price,
+      forceOverbook
     } = body
 
     if (!clientId || !date) {
@@ -252,7 +254,9 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        planType: true
+        planType: true,
+        role: true,
+        canForceOverbook: true
       }
     })
 
@@ -262,6 +266,12 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    // "Encaixe": ignora conflito de horário. Só é aceito aqui (dashboard) e só
+    // quando o usuário autenticado é MASTER ou tem permissão explícita
+    // (canForceOverbook) — nunca confiar só na claim de role da sessão/JWT
+    // para uma ação sensível, recarregamos do banco acima.
+    const allowOverbook = Boolean(forceOverbook) && (user.role === 'MASTER' || user.canForceOverbook === true)
 
     // Verificar limite de agendamentos do mês atual
     const quota = await checkAppointmentQuota(userId, user.planType ?? 'BASICO')
@@ -286,6 +296,7 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         duration,
         requestedProfessionalId: professionalId || null,
+        allowOverbook,
       })
 
       if (resolution.error) {
@@ -310,7 +321,8 @@ export async function POST(request: NextRequest) {
         serviceType,
         professional,
         notes,
-        price: price ? parseFloat(price) : null
+        price: price ? parseFloat(price) : null,
+        isOverbooked: allowOverbook
       },
       include: {
         client: {

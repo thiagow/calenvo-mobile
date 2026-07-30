@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         segmentTypes: true,
         planType: true,
         isActive: true,
+        canForceOverbook: true,
         createdAt: true,
       }
     })

@@ -21,6 +21,7 @@ interface Professional {
   whatsapp: string
   image?: string
   isActive: boolean
+  canForceOverbook: boolean
 }
 
 interface ProfessionalForm {
@@ -29,6 +30,7 @@ interface ProfessionalForm {
   whatsapp: string
   image: string
   isActive: boolean
+  canForceOverbook: boolean
 }
 
 export default function EditProfessionalPage() {
@@ -48,7 +50,8 @@ export default function EditProfessionalPage() {
     email: '',
     whatsapp: '',
     image: '',
-    isActive: true
+    isActive: true,
+    canForceOverbook: false
   })
 
   useEffect(() => {
@@ -85,7 +88,8 @@ export default function EditProfessionalPage() {
         email: data.email || '',
         whatsapp: data.whatsapp || '',
         image: data.image || '',
-        isActive: data.isActive
+        isActive: data.isActive,
+        canForceOverbook: data.canForceOverbook || false
       })
     } catch (error) {
       console.error('Error fetching professional:', error)
@@ -151,7 +155,8 @@ export default function EditProfessionalPage() {
           email: formData.email,
           whatsapp: formData.whatsapp,
           image: formData.image || null,
-          isActive: formData.isActive
+          isActive: formData.isActive,
+          canForceOverbook: formData.canForceOverbook
         }),
       })
 
@@ -305,6 +310,35 @@ export default function EditProfessionalPage() {
                 id="isActive"
                 checked={formData.isActive}
                 onCheckedChange={(checked) => handleInputChange('isActive', checked)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Encaixe */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Encaixes</CardTitle>
+            <CardDescription>
+              Permite criar agendamentos em horários já ocupados
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50">
+              <div className="space-y-0.5">
+                <Label htmlFor="canForceOverbook" className="text-base font-medium">
+                  Pode criar encaixes
+                </Label>
+                <p className="text-xs text-gray-600">
+                  {formData.canForceOverbook
+                    ? 'O profissional pode agendar em horários já reservados, criando um encaixe'
+                    : 'O profissional não pode agendar em horários já reservados'}
+                </p>
+              </div>
+              <Switch
+                id="canForceOverbook"
+                checked={formData.canForceOverbook}
+                onCheckedChange={(checked) => handleInputChange('canForceOverbook', checked)}
               />
             </div>
           </CardContent>

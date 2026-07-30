@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Calendar, Clock, User, Phone, ArrowLeft, Save, Search, X, UserPlus, Loader2, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, User, Phone, ArrowLeft, Save, Search, X, UserPlus, Loader2, AlertCircle, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { applyPhoneMask } from '@/lib/utils'
+import { Switch } from '@/components/ui/switch'
+import { useDialog } from '@/components/providers/dialog-provider'
 
 interface NewAppointmentForm {
   clientId: string; scheduleId: string; serviceId: string; professionalId: string
@@ -35,6 +37,7 @@ export default function NewAppointmentPage() {
   const router = useRouter()
   const { status } = useSession()
   const { config: segmentConfig } = useSegmentConfig()
+  const { confirm } = useDialog()
   const [loading, setLoading] = useState(false)
   const [schedules, setSchedules] = useState<any[]>([])
   const [services, setServices] = useState<any[]>([])
@@ -43,6 +46,9 @@ export default function NewAppointmentPage() {
   const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [allowsMultipleProfessionals, setAllowsMultipleProfessionals] = useState(false)
+  const [canOverbook, setCanOverbook] = useState(false)
+  const [overbookMode, setOverbookMode] = useState(false)
+  const [overbookTime, setOverbookTime] = useState('')
   const [clientSearchText, setClientSearchText] = useState('')
   const [clientSearchResults, setClientSearchResults] = useState<any[]>([])
   const [isSearchingClients, setIsSearchingClients] = useState(false)
@@ -53,7 +59,10 @@ export default function NewAppointmentPage() {
     if (status === 'unauthenticated') { router.push('/login'); return }
     if (status !== 'authenticated') return
     fetch('/api/user/plan').then(r => r.ok ? r.json() : null).then(d => {
-      if (d) { const multi = d.planType === 'PRO' || d.planType === 'BUSINESS'; setAllowsMultipleProfessionals(multi) }
+      if (d) {
+        const multi = d.planType === 'PRO' || d.planType === 'BUSINESS'; setAllowsMultipleProfessionals(multi)
+        setCanOverbook(d.role === 'MASTER' || d.canForceOverbook === true)
+      }
     })
     Promise.all([fetch('/api/schedules'), fetch('/api/services')])
       .then(async ([sRes, svRes]) => {
@@ -82,6 +91,7 @@ export default function NewAppointmentPage() {
     } else { setAvailableProfessionals([]) }
     setAvailableTimeSlots([])
     setFormData(p => ({ ...p, time: '' }))
+    setOverbookTime('')
   }, [formData.scheduleId, schedules, services, allowsMultipleProfessionals])
 
   useEffect(() => {
@@ -126,9 +136,24 @@ export default function NewAppointmentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const time = overbookMode ? overbookTime : formData.time
     if (!formData.scheduleId) { toast.error('Selecione uma agenda'); return }
     if (!formData.serviceId) { toast.error('Selecione um serviço'); return }
-    if (!formData.patientName || !formData.patientPhone || !formData.date || !formData.time) { toast.error('Preencha todos os campos obrigatórios'); return }
+    if (!formData.patientName || !formData.patientPhone || !formData.date || !time) { toast.error('Preencha todos os campos obrigatórios'); return }
+
+    // Encaixe manual: se o horário digitado não está entre os livres, pede
+    // confirmação explícita antes de forçar a criação sobre o conflito.
+    const isForcedSlot = overbookMode && !availableSlots.some((s: any) => s.time === time)
+    if (isForcedSlot) {
+      const ok = await confirm({
+        title: 'Criar encaixe?',
+        description: `O horário ${time} já está ocupado. Deseja criar este agendamento mesmo assim, como um encaixe?`,
+        confirmText: 'Criar encaixe',
+        variant: 'destructive'
+      })
+      if (!ok) return
+    }
+
     setLoading(true)
     try {
       let clientId = formData.clientId
@@ -139,7 +164,7 @@ export default function NewAppointmentPage() {
       }
       const res = await fetch('/api/appointments', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, scheduleId: formData.scheduleId, serviceId: formData.serviceId, professionalId: formData.professionalId || null, date: new Date(`${formData.date}T${formData.time}:00`).toISOString(), duration: parseInt(formData.duration), status: 'SCHEDULED', modality: formData.appointmentType === 'presencial' ? 'PRESENCIAL' : 'TELECONSULTA', specialty: formData.specialty || null, insurance: formData.insuranceType === 'convenio' ? formData.insuranceName : 'Particular', notes: formData.notes || null })
+        body: JSON.stringify({ clientId, scheduleId: formData.scheduleId, serviceId: formData.serviceId, professionalId: formData.professionalId || null, date: new Date(`${formData.date}T${time}:00`).toISOString(), duration: parseInt(formData.duration), status: 'SCHEDULED', modality: formData.appointmentType === 'presencial' ? 'PRESENCIAL' : 'TELECONSULTA', specialty: formData.specialty || null, insurance: formData.insuranceType === 'convenio' ? formData.insuranceName : 'Particular', notes: formData.notes || null, forceOverbook: isForcedSlot })
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Erro ao criar agendamento')
       toast.success('Agendamento criado!')
@@ -333,8 +358,8 @@ export default function NewAppointmentPage() {
                     <button
                       key={slot.time}
                       type="button"
-                      onClick={() => set('time', slot.time)}
-                      className={`h-9 rounded-lg text-xs font-medium transition-colors ${formData.time === slot.time ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'}`}
+                      onClick={() => { set('time', slot.time); setOverbookTime('') }}
+                      className={`h-9 rounded-lg text-xs font-medium transition-colors ${!overbookMode && formData.time === slot.time ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'}`}
                     >
                       {slot.time}
                     </button>
@@ -342,6 +367,36 @@ export default function NewAppointmentPage() {
                 </div>
               )}
             </div>
+
+            {/* Encaixe: só para quem tem permissão, permite escolher um horário fora da grade de livres */}
+            {canOverbook && formData.date && formData.serviceId && (
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="overbookMode" className="text-xs font-medium flex items-center gap-1.5">
+                    <Zap className="h-3.5 w-3.5 text-amber-500" /> Criar encaixe
+                  </Label>
+                  <Switch
+                    id="overbookMode"
+                    checked={overbookMode}
+                    onCheckedChange={(checked) => { setOverbookMode(checked); if (!checked) setOverbookTime('') }}
+                  />
+                </div>
+                {overbookMode && (
+                  <div>
+                    <Label className="text-xs">Horário do encaixe *</Label>
+                    <Input
+                      className="mt-1"
+                      type="time"
+                      value={overbookTime}
+                      onChange={e => { setOverbookTime(e.target.value); set('time', '') }}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Permite escolher um horário mesmo que já esteja ocupado por outro agendamento.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {fields.showModality && (
               <div>

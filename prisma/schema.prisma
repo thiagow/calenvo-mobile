@@ -87,6 +87,9 @@ model User {
   role               UserRole    @default(MASTER)
   whatsapp           String?
   isActive           Boolean     @default(true)
+  // Permite a um profissional (role PROFESSIONAL) criar agendamentos em horário já ocupado ("encaixe").
+  // MASTER sempre pode, independente deste campo.
+  canForceOverbook   Boolean     @default(false)
   businessName       String? // Nome do negócio
   phone              String?
   segmentTypes       SegmentType[] @default([BEAUTY_SALON])
@@ -344,6 +347,9 @@ model Appointment {
   duration Int               @default(30) // em minutos
   status   AppointmentStatus @default(SCHEDULED)
   modality ModalityType      @default(PRESENCIAL)
+
+  // Encaixe: criado propositalmente sobre um horário já ocupado (somente dashboard interno)
+  isOverbooked Boolean @default(false)
 
   // Vinculação com Agenda e Serviço (novo sistema)
   scheduleId String?

@@ -34,6 +34,7 @@ export async function GET(
         whatsapp: true,
         image: true,
         isActive: true,
+        canForceOverbook: true,
         createdAt: true,
         role: true,
         scheduleProfessionals: {
@@ -79,7 +80,7 @@ export async function PATCH(
     const userId = (session.user as any).id
     const { id } = params
     const body = await request.json()
-    const { name, email, whatsapp, password, image, isActive } = body
+    const { name, email, whatsapp, password, image, isActive, canForceOverbook } = body
 
     // Verificar se o profissional pertence ao master
     const professional = await prisma.user.findFirst({
@@ -118,6 +119,7 @@ export async function PATCH(
     if (whatsapp !== undefined) updateData.whatsapp = whatsapp
     if (image !== undefined) updateData.image = image
     if (isActive !== undefined) updateData.isActive = isActive
+    if (canForceOverbook !== undefined) updateData.canForceOverbook = Boolean(canForceOverbook)
     
     // Hash da nova senha se fornecida
     if (password) {

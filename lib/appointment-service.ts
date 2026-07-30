@@ -94,8 +94,15 @@ export async function resolveProfessionalForBooking(params: {
   date: Date
   duration: number
   requestedProfessionalId?: string | null
+  /**
+   * "Encaixe": ignora conflito de horário e força o profissional pedido (ou
+   * a agenda legada) mesmo já ocupado. Só deve vir `true` a partir do
+   * dashboard interno, nunca do booking público ou da API v1/chat — quem
+   * chama esta função é responsável por checar a permissão antes.
+   */
+  allowOverbook?: boolean
 }): Promise<ProfessionalResolution> {
-  const { scheduleId, date, duration, requestedProfessionalId } = params
+  const { scheduleId, date, duration, requestedProfessionalId, allowOverbook } = params
 
   const schedule = await prisma.schedule.findUnique({
     where: { id: scheduleId },
@@ -107,6 +114,9 @@ export async function resolveProfessionalForBooking(params: {
     if (!linkedIds.includes(requestedProfessionalId)) {
       return { professionalId: null, error: 'Profissional não vinculado a esta agenda' }
     }
+    if (allowOverbook) {
+      return { professionalId: requestedProfessionalId }
+    }
     const conflict = await checkScheduleConflict({ scheduleId, professionalId: requestedProfessionalId, date, duration })
     if (conflict) {
       return { professionalId: null, error: 'Este profissional já está ocupado nesse horário' }
@@ -117,10 +127,17 @@ export async function resolveProfessionalForBooking(params: {
   // Agenda legada sem nenhum profissional vinculado: mantém o comportamento
   // histórico (sem atribuição, conflito checado pra agenda inteira).
   if (linkedIds.length === 0) {
+    if (allowOverbook) {
+      return { professionalId: null }
+    }
     const conflict = await checkScheduleConflict({ scheduleId, date, duration })
     return conflict
       ? { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
       : { professionalId: null }
+  }
+
+  if (allowOverbook) {
+    return { professionalId: linkedIds[0] }
   }
 
   for (const id of linkedIds) {

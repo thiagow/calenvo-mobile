@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
       where: { id: userId },
       select: {
         planType: true,
-        role: true
+        role: true,
+        canForceOverbook: true
       }
     })
 
@@ -30,7 +31,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       planType: user.planType,
-      role: user.role
+      role: user.role,
+      canForceOverbook: user.canForceOverbook
     })
   } catch (error) {
     console.error('Error fetching user plan:', error)
