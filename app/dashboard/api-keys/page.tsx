@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Key, Plus, Trash2, Copy, Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface ApiKey {
   id: string
@@ -109,6 +110,7 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      <BackButton />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Chaves de API</h1>

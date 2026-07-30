@@ -8,6 +8,7 @@ import { Lock, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { WhatsAppConnection } from './_components/whatsapp-connection'
 import { NotificationSettings } from './_components/notification-settings'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface ExtendedUser { id: string; email: string; planType?: string }
 interface ExtendedSession { user: ExtendedUser }
@@ -32,6 +33,7 @@ export default async function CanaisAtendimentoPage() {
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {/* Plano Básico — bloqueio */}
       {isWhatsappGated && (
         <Card className="border border-amber-500/20 bg-amber-500/5">

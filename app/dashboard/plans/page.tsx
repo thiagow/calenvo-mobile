@@ -11,6 +11,7 @@ import { CheckCircle, Star, CreditCard, Zap, Loader2 } from 'lucide-react'
 import { PLAN_CONFIGS } from '@/lib/types'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface PlanUsageData {
   appointmentsThisMonth: number
@@ -72,6 +73,7 @@ export default function PlansPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <BackButton />
       {/* Header */}
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center gap-2">

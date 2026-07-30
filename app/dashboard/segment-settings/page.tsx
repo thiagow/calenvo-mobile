@@ -10,6 +10,7 @@ import { Building2, Check, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { SegmentMultiSelect } from '@/components/shared/segment-multi-select'
 import { SEGMENT_CONFIGS } from '@/lib/types'
+import { BackButton } from '@/components/dashboard/back-button'
 
 export default function SegmentSettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -84,6 +85,7 @@ export default function SegmentSettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <BackButton />
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Segmentos do Negócio</h1>
         <p className="text-gray-600">Define a terminologia e os campos exibidos no sistema</p>

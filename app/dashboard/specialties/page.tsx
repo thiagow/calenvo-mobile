@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface Specialty {
   id: string
@@ -197,6 +198,7 @@ export default function SpecialtiesPage() {
 
   return (
     <div className="space-y-6">
+      <BackButton />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

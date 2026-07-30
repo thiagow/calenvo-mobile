@@ -13,6 +13,7 @@ import {
     Award
 } from 'lucide-react'
 import { useSegmentConfig } from '@/contexts/segment-context'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface GlobalStats {
     averageLTV: number
@@ -84,6 +85,7 @@ export default function LTVPage() {
 
     return (
         <div className="space-y-6">
+            <BackButton />
             {loading ? (
                 <div className="flex items-center justify-center py-12">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>

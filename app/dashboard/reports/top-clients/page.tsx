@@ -17,6 +17,7 @@ import {
     Filter
 } from 'lucide-react'
 import { useSegmentConfig } from '@/contexts/segment-context'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface TopClient {
     clientId: string
@@ -80,6 +81,7 @@ export default function TopClientsPage() {
 
     return (
         <div className="space-y-6">
+            <BackButton />
             {/* Filtros */}
             <Card>
                 <CardHeader>

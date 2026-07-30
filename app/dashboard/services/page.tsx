@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Briefcase, Plus, Edit, Trash2, Clock, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface Service {
   id: string; name: string; description: string | null; duration: number
@@ -62,6 +63,7 @@ export default function ServicesPage() {
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {services.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
           <Briefcase className="h-10 w-10 text-muted-foreground/40" />

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Package, Plus, Trash2, Minus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface Service { id: string; name: string; price: number | null }
 interface PackageItem { id: string; serviceId: string; totalSessions: number; service: Service }
@@ -91,6 +92,7 @@ export default function PackagesPage() {
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {templates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
           <Package className="h-10 w-10 text-muted-foreground/40" />

@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Gift, Users, Edit, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { toast } from 'sonner'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface LoyaltyConfig {
   id: string; name: string; mode: 'FREQUENCY' | 'VALUE'
@@ -50,7 +51,9 @@ export default function LoyaltyPage() {
   )
 
   if (!config) return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
+    <div className="space-y-4">
+      <BackButton />
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center space-y-4">
       <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center">
         <Gift className="h-10 w-10 text-amber-500" />
       </div>
@@ -61,11 +64,13 @@ export default function LoyaltyPage() {
       <Button onClick={() => router.push('/dashboard/loyalty/edit')} className="bg-amber-500 hover:bg-amber-600 text-white">
         <Plus className="h-4 w-4 mr-2" />Criar Programa
       </Button>
+      </div>
     </div>
   )
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {/* Header do programa */}
       <Card className="border border-border">
         <CardContent className="p-4">

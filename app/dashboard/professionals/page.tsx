@@ -12,6 +12,7 @@ import { Users, Plus, Search, Edit, Trash2, UserCheck, UserX, Phone } from 'luci
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { getProfessionalLimit } from '@/lib/plan-limits'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface Professional {
   id: string; name: string; email: string; whatsapp: string
@@ -79,6 +80,7 @@ export default function ProfessionalsPage() {
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

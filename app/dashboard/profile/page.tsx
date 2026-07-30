@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { User, Mail, Building, Stethoscope, Crown } from 'lucide-react'
 import { PLAN_CONFIGS } from '@/lib/types'
+import { BackButton } from '@/components/dashboard/back-button'
 
 export default function ProfilePage() {
   const { data: session, status } = useSession() || {}
@@ -36,6 +37,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
+      <BackButton />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Perfil</h1>

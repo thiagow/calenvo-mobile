@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Calendar, Plus, Edit, Trash2, Clock, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface Schedule {
   id: string; name: string; description: string | null; color: string
@@ -53,6 +54,7 @@ export default function SchedulesPage() {
 
   return (
     <div className="space-y-4">
+      <BackButton />
       {schedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
           <Calendar className="h-10 w-10 text-muted-foreground/40" />

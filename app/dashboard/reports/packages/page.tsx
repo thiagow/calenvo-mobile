@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Package, CheckCircle2, CircleDashed, Users } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { BackButton } from '@/components/dashboard/back-button'
 
 export default async function PackagesReport() {
     const session = await getServerSession(authOptions)
@@ -61,6 +62,7 @@ export default async function PackagesReport() {
 
     return (
         <div className="space-y-6">
+            <BackButton />
             {/* KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="border-violet-100 bg-violet-50/50">

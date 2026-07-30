@@ -18,6 +18,7 @@ import {
     MessageCircle
 } from 'lucide-react'
 import { useSegmentConfig } from '@/contexts/segment-context'
+import { BackButton } from '@/components/dashboard/back-button'
 
 interface InactiveClient {
     clientId: string
@@ -97,6 +98,7 @@ export default function InactiveClientsPage() {
 
     return (
         <div className="space-y-6">
+            <BackButton />
             {/* Filtros */}
             <Card>
                 <CardHeader>
