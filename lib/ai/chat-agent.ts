@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db'
 import { checkAppointmentQuota, resolveProfessionalForBooking, getClientOpenAppointments, cancelAppointmentAsClient } from '@/lib/appointment-service'
 import { getAvailableSlots, parseCalendarDate } from '@/lib/availability-service'
 import { formatWhatsAppNumber } from '@/lib/utils'
+import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import type { User, BusinessConfig } from '@prisma/client'
 
 const MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o-mini'
@@ -305,6 +306,16 @@ export async function executeTool(
         const professional = resolution.professionalId
           ? await prisma.user.findUnique({ where: { id: resolution.professionalId }, select: { name: true } })
           : null
+
+        try {
+          await WhatsAppTriggerService.onAppointmentCreated(
+            { ...appointment, client: clientRecord, user: { businessName: tenant.businessName } } as any,
+            service.name,
+            professional?.name ?? undefined
+          )
+        } catch (error) {
+          console.error('[chat-agent] Erro ao enviar notificação de agendamento criado:', { input, tenantId: tenant.id, error })
+        }
 
         return {
           success: true,

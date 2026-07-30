@@ -8,6 +8,7 @@ import { checkAppointmentQuota, resolveBookingTarget } from '@/lib/appointment-s
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 import { parseCalendarDate } from '@/lib/availability-service'
 import { formatWhatsAppNumber } from '@/lib/utils'
+import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 
 export async function POST(
   request: NextRequest,
@@ -167,6 +168,18 @@ export async function POST(
     const professional = resolution.professionalId
       ? await prisma.user.findUnique({ where: { id: resolution.professionalId }, select: { name: true } })
       : null
+
+    // Enviar notificação via WhatsApp se configurado
+    try {
+      await WhatsAppTriggerService.onAppointmentCreated(
+        { ...appointment, client, user: { businessName: user.businessName } } as any,
+        service.name,
+        professional?.name ?? undefined
+      )
+    } catch (error) {
+      console.error('Erro ao enviar notificação de agendamento criado:', error)
+      // Não falhar a criação do agendamento se houver erro na notificação
+    }
 
     return NextResponse.json({
       success: true,
