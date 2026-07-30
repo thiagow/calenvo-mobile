@@ -4,9 +4,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, CalendarSearch, ChevronRight } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { BookingStepper, type StepDefinition } from './_components/booking-stepper'
@@ -15,6 +16,7 @@ import { ProfessionalStep } from './_components/professional-step'
 import { DateTimeStep } from './_components/datetime-step'
 import { ConfirmStep } from './_components/confirm-step'
 import { SuccessScreen } from './_components/success-screen'
+import { MyAppointmentsStep } from './_components/my-appointments-step'
 import type { BookingProfessional, BookingService, BookingTimeSlot } from './_components/types'
 
 const STEPS: StepDefinition[] = [
@@ -37,6 +39,8 @@ export default function PublicBookingPage() {
   const [loading, setLoading] = useState(true)
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null)
   const [services, setServices] = useState<BookingService[]>([])
+
+  const [mode, setMode] = useState<'entry' | 'new' | 'existing'>('entry')
 
   const [stepIndex, setStepIndex] = useState(0)
   const [selectedService, setSelectedService] = useState<BookingService | null>(null)
@@ -162,6 +166,14 @@ export default function PublicBookingPage() {
   }
 
   const handleBack = () => {
+    if (mode === 'existing') {
+      setMode('entry')
+      return
+    }
+    if (stepIndex === 0) {
+      setMode('entry')
+      return
+    }
     if (stepIndex === 2 && professionals.length === 0) {
       setStepIndex(0)
       return
@@ -210,6 +222,7 @@ export default function PublicBookingPage() {
 
   const handleNewBooking = () => {
     setSuccess(false)
+    setMode('entry')
     setStepIndex(0)
     setSelectedService(null)
     setProfessionals([])
@@ -245,7 +258,7 @@ export default function PublicBookingPage() {
     )
   }
 
-  const canGoBack = stepIndex > 0
+  const canGoBack = mode !== 'entry'
   const canConfirmDateTime = Boolean(selectedDate && selectedTime)
 
   return (
@@ -279,64 +292,105 @@ export default function PublicBookingPage() {
           <div className="w-9" />
         </div>
 
-        <div className="mb-8">
-          <BookingStepper steps={STEPS} currentIndex={stepIndex} />
-        </div>
+        {mode === 'entry' && (
+          <div className="space-y-3">
+            <Card
+              className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+              onClick={() => setMode('new')}
+            >
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <CalendarPlus className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">Novo agendamento</p>
+                  <p className="text-xs text-muted-foreground">Escolher serviço, horário e agendar</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </CardContent>
+            </Card>
+            <Card
+              className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+              onClick={() => setMode('existing')}
+            >
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <CalendarSearch className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground">Já sou cliente</p>
+                  <p className="text-xs text-muted-foreground">Ver ou cancelar meu agendamento</p>
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={STEPS[stepIndex].key}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -12 }}
-            transition={{ duration: 0.18 }}
-          >
-            {stepIndex === 0 && (
-              <ServiceStep services={services} onSelect={handleSelectService} />
-            )}
+        {mode === 'existing' && <MyAppointmentsStep slug={slug} />}
 
-            {stepIndex === 1 && (
-              <ProfessionalStep
-                professionals={professionals}
-                loading={loadingProfessionals}
-                onSelect={handleSelectProfessional}
-              />
-            )}
+        {mode === 'new' && (
+          <>
+            <div className="mb-8">
+              <BookingStepper steps={STEPS} currentIndex={stepIndex} />
+            </div>
 
-            {stepIndex === 2 && (
-              <DateTimeStep
-                selectedDate={selectedDate}
-                onSelectDate={(date) => {
-                  setSelectedDate(date)
-                  setSelectedTime('')
-                }}
-                slots={slots}
-                loadingSlots={loadingSlots}
-                selectedTime={selectedTime}
-                onSelectTime={setSelectedTime}
-              />
-            )}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={STEPS[stepIndex].key}
+                initial={{ opacity: 0, x: 12 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.18 }}
+              >
+                {stepIndex === 0 && (
+                  <ServiceStep services={services} onSelect={handleSelectService} />
+                )}
 
-            {stepIndex === 3 && selectedService && selectedDate && (
-              <ConfirmStep
-                service={selectedService}
-                professional={professionalChosen ? selectedProfessional : null}
-                date={selectedDate}
-                time={selectedTime}
-                address={businessInfo?.address || null}
-                clientName={clientName}
-                clientPhone={clientPhone}
-                clientEmail={clientEmail}
-                onChangeName={setClientName}
-                onChangePhone={setClientPhone}
-                onChangeEmail={setClientEmail}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+                {stepIndex === 1 && (
+                  <ProfessionalStep
+                    professionals={professionals}
+                    loading={loadingProfessionals}
+                    onSelect={handleSelectProfessional}
+                  />
+                )}
+
+                {stepIndex === 2 && (
+                  <DateTimeStep
+                    selectedDate={selectedDate}
+                    onSelectDate={(date) => {
+                      setSelectedDate(date)
+                      setSelectedTime('')
+                    }}
+                    slots={slots}
+                    loadingSlots={loadingSlots}
+                    selectedTime={selectedTime}
+                    onSelectTime={setSelectedTime}
+                  />
+                )}
+
+                {stepIndex === 3 && selectedService && selectedDate && (
+                  <ConfirmStep
+                    service={selectedService}
+                    professional={professionalChosen ? selectedProfessional : null}
+                    date={selectedDate}
+                    time={selectedTime}
+                    address={businessInfo?.address || null}
+                    clientName={clientName}
+                    clientPhone={clientPhone}
+                    clientEmail={clientEmail}
+                    onChangeName={setClientName}
+                    onChangePhone={setClientPhone}
+                    onChangeEmail={setClientEmail}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </>
+        )}
       </div>
 
-      {(stepIndex === 2 || stepIndex === 3) && (
+      {mode === 'new' && (stepIndex === 2 || stepIndex === 3) && (
         <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 p-4 backdrop-blur">
           <div className="mx-auto max-w-lg">
             {stepIndex === 2 && (

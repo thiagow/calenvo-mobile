@@ -1,7 +1,12 @@
 import { prisma } from '@/lib/db'
 import { canCreateAppointment, getRemainingAppointments } from '@/lib/plan-limits'
 import { resolveCandidateSchedules } from '@/lib/availability-service'
-import { PlanType } from '@prisma/client'
+import { PlanType, AppointmentStatus } from '@prisma/client'
+import { formatWhatsAppNumber } from '@/lib/utils'
+import { NotificationService } from '@/lib/notification-service'
+import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
+
+const OPEN_APPOINTMENT_STATUSES: AppointmentStatus[] = ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']
 
 export interface QuotaCheckResult {
   allowed: boolean
@@ -196,4 +201,148 @@ export async function resolveBookingTarget(params: {
   }
 
   return { scheduleId: null, professionalId: null, error: lastError || 'Este horário acabou de ficar indisponível' }
+}
+
+export interface OpenAppointmentSummary {
+  id: string
+  date: Date
+  duration: number
+  status: string
+  serviceName: string
+  professionalName: string | null
+  canCancel: boolean
+}
+
+/**
+ * Regra única de "o cliente ainda pode cancelar este agendamento?" — usada tanto
+ * pela consulta (pra decidir se mostra o botão) quanto pelo cancelamento em si
+ * (pra revalidar no servidor, nunca confiando só na UI).
+ */
+function isCancellableByClient(
+  appointment: { date: Date; status: AppointmentStatus },
+  businessConfig: { allowClientCancellation: boolean; cancellationHours: number } | null
+): boolean {
+  if (!businessConfig?.allowClientCancellation) return false
+  if (!OPEN_APPOINTMENT_STATUSES.includes(appointment.status)) return false
+  const cutoff = new Date(Date.now() + businessConfig.cancellationHours * 60 * 60 * 1000)
+  return appointment.date >= cutoff
+}
+
+/**
+ * Busca os agendamentos abertos (não concluídos/cancelados) de um cliente pelo
+ * telefone, escopados ao tenant — usado tanto pelo booking público quanto pelo
+ * tool do chat widget.
+ */
+export async function getClientOpenAppointments(tenantId: string, phone: string): Promise<OpenAppointmentSummary[]> {
+  const normalizedPhone = formatWhatsAppNumber(phone) || phone
+
+  const client = await prisma.client.findFirst({
+    where: { userId: tenantId, phone: normalizedPhone },
+    select: { id: true },
+  })
+  if (!client) return []
+
+  const businessConfig = await prisma.businessConfig.findUnique({
+    where: { userId: tenantId },
+    select: { allowClientCancellation: true, cancellationHours: true },
+  })
+
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      userId: tenantId,
+      clientId: client.id,
+      status: { in: OPEN_APPOINTMENT_STATUSES },
+      deletedAt: null,
+    },
+    include: {
+      service: { select: { name: true } },
+      professionalUser: { select: { name: true } },
+    },
+    orderBy: { date: 'asc' },
+  })
+
+  return appointments.map((a) => ({
+    id: a.id,
+    date: a.date,
+    duration: a.duration,
+    status: a.status,
+    serviceName: a.service?.name || a.specialty || 'Agendamento',
+    professionalName: a.professionalUser?.name || a.professional || null,
+    canCancel: isCancellableByClient(a, businessConfig),
+  }))
+}
+
+export interface CancelAsClientResult {
+  success: boolean
+  error?: string
+}
+
+/**
+ * Cancela um agendamento em nome do cliente (booking público / chat widget) —
+ * sempre revalida no servidor: telefone é dono do agendamento, cancelamento
+ * habilitado pelo negócio, e ainda dentro da janela de antecedência mínima.
+ */
+export async function cancelAppointmentAsClient(params: {
+  tenantId: string
+  phone: string
+  appointmentId: string
+}): Promise<CancelAsClientResult> {
+  const { tenantId, phone, appointmentId } = params
+  const normalizedPhone = formatWhatsAppNumber(phone) || phone
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, userId: tenantId, deletedAt: null },
+    include: {
+      client: true,
+      service: { select: { name: true } },
+      professionalUser: { select: { name: true, whatsapp: true, phone: true } },
+      user: { select: { businessName: true, whatsapp: true, phone: true } },
+    },
+  })
+  if (!appointment) return { success: false, error: 'Agendamento não encontrado' }
+  if (appointment.client.phone !== normalizedPhone) {
+    return { success: false, error: 'Este agendamento não pertence a este telefone' }
+  }
+
+  const businessConfig = await prisma.businessConfig.findUnique({
+    where: { userId: tenantId },
+    select: { allowClientCancellation: true, cancellationHours: true },
+  })
+
+  if (!businessConfig?.allowClientCancellation) {
+    return { success: false, error: 'O cancelamento pelo cliente não está habilitado para este negócio' }
+  }
+  if (!OPEN_APPOINTMENT_STATUSES.includes(appointment.status)) {
+    return { success: false, error: 'Este agendamento não pode mais ser cancelado' }
+  }
+  if (!isCancellableByClient(appointment, businessConfig)) {
+    return {
+      success: false,
+      error: `Cancelamento permitido apenas até ${businessConfig.cancellationHours}h antes do agendamento`,
+    }
+  }
+
+  const updated = await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: { status: 'CANCELLED' },
+    include: {
+      client: true,
+      service: { select: { name: true } },
+      professionalUser: { select: { name: true, whatsapp: true, phone: true } },
+      user: { select: { businessName: true, whatsapp: true, phone: true } },
+    },
+  })
+
+  const serviceName = updated.service?.name || updated.specialty || 'Agendamento'
+  const professionalName = updated.professionalUser?.name || updated.professional || undefined
+
+  try {
+    await NotificationService.notifyAppointmentCancelled(tenantId, updated.id, updated.client.name, serviceName, updated.date)
+    await WhatsAppTriggerService.onAppointmentCancelled(updated as any, serviceName, professionalName)
+    await WhatsAppTriggerService.onAppointmentCancelledByClient(updated as any, serviceName, professionalName)
+  } catch (error) {
+    console.error('[cancelAppointmentAsClient] Erro ao notificar cancelamento:', error)
+  }
+
+  return { success: true }
 }

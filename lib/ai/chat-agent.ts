@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import { prisma } from '@/lib/db'
-import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking, getClientOpenAppointments, cancelAppointmentAsClient } from '@/lib/appointment-service'
 import { getAvailableSlots, parseCalendarDate } from '@/lib/availability-service'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import type { User, BusinessConfig } from '@prisma/client'
@@ -99,6 +99,35 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           professionalId: { type: 'string', description: 'Opcional — id do profissional escolhido pelo cliente; omita se ele não tiver preferência' },
         },
         required: ['scheduleId', 'serviceId', 'date', 'time', 'clientName', 'clientPhone'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_my_appointments',
+      description: 'Lista os agendamentos em aberto (não concluídos nem cancelados) de um cliente, a partir do telefone dele. Use quando o cliente pedir para ver, consultar ou cancelar o próprio agendamento. Peça o telefone antes de chamar, nunca invente um valor.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clientPhone: { type: 'string', description: 'Telefone/WhatsApp do cliente' },
+        },
+        required: ['clientPhone'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'cancel_appointment',
+      description: 'Cancela um agendamento do cliente, depois que ele confirmou qual (via list_my_appointments) e confirmou explicitamente que deseja cancelar. Pode falhar se o negócio não permitir auto-cancelamento ou se estiver fora do prazo mínimo de antecedência — nesse caso, explique o motivo ao cliente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clientPhone: { type: 'string', description: 'Telefone/WhatsApp do cliente' },
+          appointmentId: { type: 'string', description: 'Id do agendamento a cancelar, obtido via list_my_appointments' },
+        },
+        required: ['clientPhone', 'appointmentId'],
       },
     },
   },
@@ -290,6 +319,54 @@ export async function executeTool(
       }
     }
 
+    case 'list_my_appointments': {
+      try {
+        if (typeof input.clientPhone !== 'string' || !input.clientPhone.trim() || !/\d/.test(input.clientPhone)) {
+          return { error: 'Telefone inválido ou não informado. Peça o telefone real ao cliente antes de consultar.' }
+        }
+        const appointments = await getClientOpenAppointments(tenant.id, input.clientPhone)
+        if (appointments.length === 0) {
+          return { appointments: [], message: 'Nenhum agendamento em aberto encontrado para esse telefone.' }
+        }
+        return {
+          appointments: appointments.map((a) => ({
+            appointmentId: a.id,
+            serviceName: a.serviceName,
+            professionalName: a.professionalName,
+            date: a.date,
+            status: a.status,
+            canCancel: a.canCancel,
+          })),
+        }
+      } catch (error) {
+        console.error('[chat-agent] Erro em list_my_appointments:', { input, tenantId: tenant.id, error })
+        return { error: 'Não foi possível consultar os agendamentos agora. Tente novamente em instantes.' }
+      }
+    }
+
+    case 'cancel_appointment': {
+      try {
+        if (typeof input.clientPhone !== 'string' || !input.clientPhone.trim() || !/\d/.test(input.clientPhone)) {
+          return { error: 'Telefone inválido ou não informado. Peça o telefone real ao cliente antes de cancelar.' }
+        }
+        if (typeof input.appointmentId !== 'string' || !input.appointmentId.trim()) {
+          return { error: 'Informe qual agendamento cancelar (use list_my_appointments primeiro).' }
+        }
+        const result = await cancelAppointmentAsClient({
+          tenantId: tenant.id,
+          phone: input.clientPhone,
+          appointmentId: input.appointmentId,
+        })
+        if (!result.success) {
+          return { error: result.error || 'Não foi possível cancelar este agendamento.' }
+        }
+        return { success: true }
+      } catch (error) {
+        console.error('[chat-agent] Erro em cancel_appointment:', { input, tenantId: tenant.id, error })
+        return { error: 'Não foi possível cancelar o agendamento agora. Tente novamente em instantes.' }
+      }
+    }
+
     default:
       return { error: `Ferramenta desconhecida: ${toolName}` }
   }
@@ -317,6 +394,8 @@ Seu objetivo é ajudar o visitante a marcar um horário. Fluxo recomendado:
 5. Confirme com a pessoa qual horário ela quer, e peça nome e telefone.
 6. Só chame create_appointment depois que o cliente tiver informado, na conversa, o nome e o telefone reais dele — nunca antes disso. Se ele confirmar o horário mas não tiver dito nome/telefone ainda, pergunte e espere a resposta antes de chamar a ferramenta.
 7. Depois de criar, confirme o agendamento de forma clara (data, horário, serviço, e o nome do profissional quando houver um definido).
+
+Se o cliente disser que já tem agendamento e quiser consultar ou cancelar: peça o telefone dele e chame list_my_appointments. Mostre os agendamentos em aberto retornados. Se ele quiser cancelar um deles, confirme explicitamente qual (e que ele tem certeza) antes de chamar cancel_appointment — nunca cancele sem essa confirmação. Se a ferramenta retornar erro (ex.: negócio não permite auto-cancelamento, ou fora do prazo mínimo de antecedência), explique o motivo com educação e sugira que ele entre em contato diretamente.
 
 Nunca invente serviços, horários ou disponibilidade — sempre use as ferramentas. Nunca invente ou "lembre de cor" o scheduleId/serviceId de mensagens antigas: se você não tiver o resultado de list_services desta própria conversa disponível agora, chame list_services de novo antes de check_availability ou create_appointment — nunca use um ID que você não obteve de uma resposta real da ferramenta. Nunca invente clientName ou clientPhone (ex.: não use valores de preenchimento como "Cliente" ou "Telefone") — use exatamente o nome e o telefone que o cliente escreveu na conversa; se ele não escreveu esses dados ainda, pergunte antes de chamar create_appointment. Se não conseguir ajudar, sugira que a pessoa entre em contato diretamente.
 

@@ -485,7 +485,11 @@ model BusinessConfig {
   // Campos específicos para salões
   multipleServices  Boolean @default(false) // Permitir múltiplos serviços por agendamento
   requiresDeposit   Boolean @default(false) // Exigir sinal/depósito
-  cancellationHours Int     @default(24) // Horas mínimas para cancelamento
+  cancellationHours Int     @default(24) // Horas mínimas de antecedência para cancelamento
+
+  // Permite que o próprio cliente cancele um agendamento (booking público / chat),
+  // respeitando cancellationHours como antecedência mínima.
+  allowClientCancellation Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -584,6 +588,10 @@ model WhatsAppConfig {
   notifyOnCancel     Boolean @default(true)
   cancelDelayMinutes Int     @default(0)
   cancelMessage      String? @db.Text
+
+  // Aviso ao profissional quando o próprio cliente cancela (booking público / chat)
+  notifyProfessionalOnCancel Boolean @default(false)
+  professionalCancelMessage  String? @db.Text
 
   // Confirmação de Presença (X dias antes)
   notifyConfirmation  Boolean @default(true)

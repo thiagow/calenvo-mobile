@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { NotificationCard } from './notification-card';
-import { Bell, CalendarCheck, CalendarX, Clock, AlertCircle, Send, Loader2, CheckCircle2, Star } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarX, Clock, AlertCircle, Send, Loader2, CheckCircle2, Star, UserCog } from 'lucide-react';
 import { FeedbackDialog } from './feedback-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { updateWhatsAppSettingsAction, sendTestMessageAction } from '@/app/actions/whatsapp';
@@ -34,6 +34,10 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
   // Cancellation notification
   const [notifyOnCancel, setNotifyOnCancel] = useState(config.notifyOnCancel);
   const [cancelMessage, setCancelMessage] = useState(config.cancelMessage || '');
+
+  // Notify professional when the client cancels their own appointment
+  const [notifyProfessionalOnCancel, setNotifyProfessionalOnCancel] = useState(config.notifyProfessionalOnCancel);
+  const [professionalCancelMessage, setProfessionalCancelMessage] = useState(config.professionalCancelMessage || '');
 
   // Confirmation (days before)
   const [notifyConfirmation, setNotifyConfirmation] = useState(config.notifyConfirmation);
@@ -70,6 +74,8 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
       createMessage !== (config.createMessage || '') ||
       notifyOnCancel !== config.notifyOnCancel ||
       cancelMessage !== (config.cancelMessage || '') ||
+      notifyProfessionalOnCancel !== config.notifyProfessionalOnCancel ||
+      professionalCancelMessage !== (config.professionalCancelMessage || '') ||
       notifyConfirmation !== config.notifyConfirmation ||
       confirmationDays !== config.confirmationDays ||
       confirmationMessage !== (config.confirmationMessage || '') ||
@@ -87,6 +93,8 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
     createMessage,
     notifyOnCancel,
     cancelMessage,
+    notifyProfessionalOnCancel,
+    professionalCancelMessage,
     notifyConfirmation,
     confirmationDays,
     confirmationMessage,
@@ -110,6 +118,8 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
         notifyOnCancel,
         cancelDelayMinutes: 0, // v3.0: Always send immediately
         cancelMessage,
+        notifyProfessionalOnCancel,
+        professionalCancelMessage,
         notifyConfirmation,
         confirmationDays,
         confirmationMessage,
@@ -258,6 +268,56 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
               <Send className="h-4 w-4 mr-2" />
               Enviar Mensagem de Teste
             </Button>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* 2b. Notify professional when the client cancels their own appointment */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <UserCog className="h-5 w-5 text-destructive mt-1" />
+              <div className="space-y-1">
+                <CardTitle className="text-base">Avisar Profissional sobre Cancelamento</CardTitle>
+                <CardDescription>
+                  Enviada ao profissional quando o próprio cliente cancela o agendamento (página pública ou chat)
+                </CardDescription>
+              </div>
+            </div>
+            <Switch
+              checked={notifyProfessionalOnCancel}
+              onCheckedChange={setNotifyProfessionalOnCancel}
+              disabled={disabled}
+            />
+          </div>
+        </CardHeader>
+        {notifyProfessionalOnCancel && (
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Enviada para o WhatsApp do profissional responsável (ou para o seu, se não houver um definido).
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mensagem personalizada</label>
+              <Textarea
+                value={professionalCancelMessage}
+                onChange={(e) => setProfessionalCancelMessage(e.target.value)}
+                placeholder="Digite a mensagem para o profissional"
+                disabled={disabled}
+                rows={3}
+                maxLength={1000}
+              />
+              <p className="text-xs text-muted-foreground">
+                Máximo 1000 caracteres
+              </p>
+            </div>
+
+            <VariableHelper />
+            <MessagePreview message={professionalCancelMessage} />
           </CardContent>
         )}
       </Card>

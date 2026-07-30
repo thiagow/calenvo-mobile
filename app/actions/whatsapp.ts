@@ -58,6 +58,8 @@ const WhatsAppSettingsSchema = z.object({
   notifyOnCancel: z.boolean(),
   cancelDelayMinutes: z.number().min(0),
   cancelMessage: z.string().max(120).optional(),
+  notifyProfessionalOnCancel: z.boolean(),
+  professionalCancelMessage: z.string().max(1000).optional(),
   notifyConfirmation: z.boolean(),
   confirmationDays: z.number().min(0),
   confirmationMessage: z.string().max(120).optional(),
@@ -75,6 +77,7 @@ const WhatsAppSettingsSchema = z.object({
 const DEFAULT_TEMPLATES = {
   createMessage: 'Olá {{nome_cliente}}! Seu agendamento foi confirmado para {{data}} às {{hora}}. Serviço: {{servico}}. Até breve!',
   cancelMessage: 'Olá {{nome_cliente}}, seu agendamento do dia {{data}} às {{hora}} foi cancelado. Entre em contato para reagendar.',
+  professionalCancelMessage: 'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.',
   confirmationMessage: 'Olá {{nome_cliente}}! Lembrete: você tem agendamento em {{data}} às {{hora}}. Confirme sua presença respondendo SIM.',
   reminderMessage: 'Oi {{nome_cliente}}! Seu atendimento é daqui a poucas horas ({{hora}}). Te esperamos!',
   completedMessage: 'Olá {{nome_cliente}}, obrigado pela visita! Se puder, deixe sua avaliação: {{link_avaliacao}}',

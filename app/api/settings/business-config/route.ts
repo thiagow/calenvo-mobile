@@ -42,6 +42,8 @@ export async function GET(request: NextRequest) {
       businessLogo: config.businessLogo,
       autoConfirm: config.autoConfirm,
       allowOnlineBooking: config.allowOnlineBooking,
+      allowClientCancellation: config.allowClientCancellation,
+      cancellationHours: config.cancellationHours,
       publicUrl: config.publicUrl,
       address: config.address,
       description: config.description
@@ -81,7 +83,11 @@ export async function POST(request: NextRequest) {
       lunchStart,
       lunchEnd,
       address,
-      description
+      description,
+      autoConfirm,
+      allowOnlineBooking,
+      allowClientCancellation,
+      cancellationHours
     } = body
 
     // Validate working days
@@ -118,7 +124,11 @@ export async function POST(request: NextRequest) {
           lunchStart,
           lunchEnd,
           address,
-          description
+          description,
+          ...(autoConfirm !== undefined && { autoConfirm: Boolean(autoConfirm) }),
+          ...(allowOnlineBooking !== undefined && { allowOnlineBooking: Boolean(allowOnlineBooking) }),
+          ...(allowClientCancellation !== undefined && { allowClientCancellation: Boolean(allowClientCancellation) }),
+          ...(cancellationHours !== undefined && { cancellationHours: Number(cancellationHours) })
         }
       })
     } else {
@@ -133,7 +143,11 @@ export async function POST(request: NextRequest) {
           lunchStart,
           lunchEnd,
           address,
-          description
+          description,
+          ...(autoConfirm !== undefined && { autoConfirm: Boolean(autoConfirm) }),
+          ...(allowOnlineBooking !== undefined && { allowOnlineBooking: Boolean(allowOnlineBooking) }),
+          ...(allowClientCancellation !== undefined && { allowClientCancellation: Boolean(allowClientCancellation) }),
+          ...(cancellationHours !== undefined && { cancellationHours: Number(cancellationHours) })
         }
       })
     }
@@ -148,6 +162,8 @@ export async function POST(request: NextRequest) {
       businessLogo: config.businessLogo,
       autoConfirm: config.autoConfirm,
       allowOnlineBooking: config.allowOnlineBooking,
+      allowClientCancellation: config.allowClientCancellation,
+      cancellationHours: config.cancellationHours,
       publicUrl: config.publicUrl,
       address: config.address,
       description: config.description

@@ -19,6 +19,8 @@ import { useUserRole } from '@/hooks/use-user-role'
 interface BusinessConfig {
   autoConfirm: boolean
   allowOnlineBooking: boolean
+  allowClientCancellation: boolean
+  cancellationHours: number
   businessLogo: string | null
   publicUrl: string | null
   workingDays: number[]
@@ -71,7 +73,8 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
   const [config, setConfig] = useState<BusinessConfig>({
-    autoConfirm: false, allowOnlineBooking: true, businessLogo: null, publicUrl: null,
+    autoConfirm: false, allowOnlineBooking: true, allowClientCancellation: false, cancellationHours: 24,
+    businessLogo: null, publicUrl: null,
     workingDays: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '18:00',
     lunchStart: '12:00', lunchEnd: '13:00', address: '', description: ''
   })
@@ -88,7 +91,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/settings/business-config')
     if (res.ok) {
       const d = await res.json()
-      setConfig({ autoConfirm: d.autoConfirm || false, allowOnlineBooking: d.allowOnlineBooking ?? true, businessLogo: d.businessLogo || null, publicUrl: d.publicUrl || null, workingDays: d.workingDays || [1,2,3,4,5], startTime: d.startTime || '08:00', endTime: d.endTime || '18:00', lunchStart: d.lunchStart || '12:00', lunchEnd: d.lunchEnd || '13:00', address: d.address || '', description: d.description || '' })
+      setConfig({ autoConfirm: d.autoConfirm || false, allowOnlineBooking: d.allowOnlineBooking ?? true, allowClientCancellation: d.allowClientCancellation || false, cancellationHours: d.cancellationHours ?? 24, businessLogo: d.businessLogo || null, publicUrl: d.publicUrl || null, workingDays: d.workingDays || [1,2,3,4,5], startTime: d.startTime || '08:00', endTime: d.endTime || '18:00', lunchStart: d.lunchStart || '12:00', lunchEnd: d.lunchEnd || '13:00', address: d.address || '', description: d.description || '' })
     }
   }
 
@@ -392,6 +395,7 @@ export default function SettingsPage() {
           {[
             { id: 'allowOnlineBooking', label: 'Agendamento Online', desc: 'Clientes podem agendar pela URL pública', field: 'allowOnlineBooking' as const },
             { id: 'autoConfirm', label: 'Confirmação Automática', desc: config.autoConfirm ? 'Agendamentos confirmados e bloqueiam o horário automaticamente' : 'Requer aprovação manual antes de bloquear', field: 'autoConfirm' as const },
+            { id: 'allowClientCancellation', label: 'Cliente pode cancelar', desc: 'Permite que o próprio cliente cancele um agendamento pela página pública ou pelo chat', field: 'allowClientCancellation' as const },
           ].map(item => (
             <div key={item.id} className="flex items-center justify-between gap-3 bg-muted/50 rounded-lg px-3 py-3">
               <div className="flex-1 min-w-0">
@@ -404,6 +408,20 @@ export default function SettingsPage() {
               />
             </div>
           ))}
+          {config.allowClientCancellation && (
+            <div className="bg-muted/50 rounded-lg px-3 py-3">
+              <Label htmlFor="cancellationHours" className="text-sm font-medium">Cancelamento permitido até quantas horas antes</Label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">Depois desse prazo, o cliente não consegue mais cancelar sozinho</p>
+              <Input
+                id="cancellationHours"
+                type="number"
+                min={0}
+                className="w-24"
+                value={config.cancellationHours}
+                onChange={e => setConfig(c => ({ ...c, cancellationHours: Number(e.target.value) }))}
+              />
+            </div>
+          )}
         </div>
         <Button className="w-full" variant="outline" onClick={saveConfig} disabled={saving}>
           {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</> : <><Save className="mr-2 h-4 w-4" />Salvar Preferências</>}

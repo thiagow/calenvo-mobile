@@ -161,6 +161,48 @@ export class WhatsAppTriggerService {
   }
 
   /**
+   * Trigger notification to the PROFESSIONAL (not the client) when the client
+   * cancels their own appointment via public booking or the chat widget.
+   */
+  static async onAppointmentCancelledByClient(
+    appointment: Appointment & {
+      client: Client;
+      user: { businessName?: string | null; whatsapp?: string | null; phone?: string | null };
+      professionalUser?: { whatsapp?: string | null; phone?: string | null } | null;
+    },
+    serviceName?: string,
+    professionalName?: string
+  ): Promise<void> {
+    try {
+      const config = await prisma.whatsAppConfig.findUnique({
+        where: { userId: appointment.userId },
+      });
+
+      if (!config || !config.enabled || !config.isConnected || !config.notifyProfessionalOnCancel) return;
+
+      const recipient =
+        appointment.professionalUser?.whatsapp ||
+        appointment.professionalUser?.phone ||
+        appointment.user.whatsapp ||
+        appointment.user.phone;
+      if (!recipient) return;
+
+      const defaultMessage = 'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.';
+      const message = this.replaceVariables(config.professionalCancelMessage || defaultMessage, {
+        clientName: appointment.client.name,
+        appointmentDate: appointment.date,
+        serviceName,
+        professionalName,
+        businessName: appointment.user.businessName || undefined,
+      });
+
+      await this.sendToN8n(config.instanceName, recipient, message);
+    } catch (error) {
+      console.error('[WhatsAppTrigger] Error in onAppointmentCancelledByClient:', error);
+    }
+  }
+
+  /**
    * Trigger notification on appointment confirmation
    */
   static async onAppointmentConfirmed(
