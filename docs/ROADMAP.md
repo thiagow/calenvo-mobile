@@ -52,15 +52,7 @@ Candidato natural a ser o primeiro item implementado — escopo pequeno e bem de
 
 ## 4. Cancelamento de agendamento pelo cliente (página pública e chat)
 
-**Status:** 🔍 A analisar
-
-Hoje o cancelamento só existe pelo lado do negócio (dashboard). Avaliar como permitir que o próprio cliente cancele um agendamento que ele fez, tanto pela página pública de booking quanto pelo chat (agente de IA).
-
-**Pontos a analisar:**
-- Autenticação/identificação do cliente na página pública: não há login de cliente hoje — precisa ser por link único (token no link de confirmação enviado por WhatsApp?) ou por telefone + confirmação de identidade.
-- No chat, o agente de IA (`lib/ai/chat-agent.ts`) precisaria de uma nova tool de cancelamento, com as mesmas validações de segurança (não deixar cancelar agendamento de outro cliente).
-- Reaproveitar a rota `DELETE /api/appointments/[id]` (soft delete) já existente — hoje ela exige sessão autenticada do dono do negócio; precisa de um caminho público equivalente, escopado e com validação de posse do agendamento.
-- Regra de negócio: até quanto tempo antes do horário o cliente pode cancelar sozinho? Notificar o negócio quando o cliente cancela (reaproveitar `WhatsAppTriggerService.onAppointmentCancelled` e `NotificationService`).
+**Status:** ✅ Concluído — ver seção "Concluído" no fim do documento.
 
 ---
 
@@ -139,4 +131,8 @@ Permitir que o dono da conta consulte e insira agendamentos por comando de voz, 
 
 ## Concluído
 
-_(nenhum item movido para cá ainda)_
+### 4. Cancelamento de agendamento pelo cliente (página pública e chat)
+
+**Concluído em:** 2026-07-30 — commit `0443282` ("feat: allow clients to self-cancel appointments (public booking + chat widget)")
+
+Business owner pode habilitar auto-cancelamento com prazo mínimo de antecedência configurável (`BusinessConfig.allowClientCancellation` / `cancellationHours`). Disponível tanto na página pública de booking (fluxo "Já sou cliente": telefone → agendamentos em aberto → cancelar) quanto no chat via IA (`list_my_appointments`/`cancel_appointment` em `lib/ai/chat-agent.ts`), compartilhando a mesma regra de elegibilidade em `lib/appointment-service.ts` para os dois canais não poderem contornar a regra do negócio. Profissional pode ser notificado por WhatsApp quando o cliente cancela sozinho.
