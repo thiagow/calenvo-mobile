@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { MessageCircle, Copy, Check, Loader2, Upload, ArrowLeft } from 'lucide-react'
+import { MessageCircle, Copy, Check, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+
+const DEFAULT_AVATAR_SRC = '/chat-agent-avatar.jpg'
 
 interface ChatWidgetConfig {
   enabled: boolean
@@ -117,16 +119,16 @@ export default function ChatWidgetPage() {
         <CardContent className="space-y-5">
           <div className="flex items-center gap-4 pb-1">
             <div className="w-16 h-16 rounded-full border border-border flex items-center justify-center bg-muted overflow-hidden flex-shrink-0">
-              {avatarPreview || config.avatarUrl ? (
-                <img src={avatarPreview || `/api/files/logo?key=${config.avatarUrl}`} alt="Avatar do chat" className="w-full h-full object-cover" />
-              ) : (
-                <Upload className="h-6 w-6 text-muted-foreground" />
-              )}
+              <img
+                src={avatarPreview || (config.avatarUrl ? `/api/files/logo?key=${config.avatarUrl}` : DEFAULT_AVATAR_SRC)}
+                alt="Avatar do chat"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="flex-1 min-w-0">
               <Label>Foto de perfil no chat</Label>
               <Input type="file" accept="image/*" onChange={handleAvatarChange} disabled={uploadingAvatar} className="text-xs mt-1" />
-              <p className="text-[10px] text-muted-foreground mt-1">PNG/JPG, máx 5MB. Aparece no ícone flutuante, no cabeçalho e nas respostas do chat.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">PNG/JPG, máx 5MB. Aparece no ícone flutuante, no cabeçalho e nas respostas do chat. Sem upload, usamos a foto padrão.</p>
             </div>
           </div>
 
