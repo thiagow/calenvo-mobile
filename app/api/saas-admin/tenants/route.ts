@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { requireSaasAdmin } from '@/lib/saas-admin-guard'
 import bcrypt from 'bcryptjs'
 import { PlanType, SegmentType } from '@prisma/client'
+import { normalizeEmail } from '@/lib/utils'
 
 const VALID_PLANS: PlanType[] = ['BASICO', 'PRO', 'BUSINESS']
 const VALID_INTERVALS = ['MONTHLY', 'ANNUAL']
@@ -124,9 +125,9 @@ export async function POST(req: NextRequest) {
     try {
         const session = await requireSaasAdmin()
         const body = await req.json()
-        const { name, email, password, businessName, segmentTypes, phone, planType, billingInterval, isPaymentExempt } = body
+        const { name, email: rawEmail, password, businessName, segmentTypes, phone, planType, billingInterval, isPaymentExempt } = body
 
-        if (!name || !email || !password || !businessName || !phone || !Array.isArray(segmentTypes) || segmentTypes.length === 0) {
+        if (!name || !rawEmail || !password || !businessName || !phone || !Array.isArray(segmentTypes) || segmentTypes.length === 0) {
             return NextResponse.json(
                 { error: 'Todos os campos são obrigatórios (selecione ao menos um segmento)' },
                 { status: 400 }
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
         }
 
         const paymentExempt = isPaymentExempt !== false
+        const email = normalizeEmail(rawEmail)
 
         const existingUser = await prisma.user.findUnique({
             where: { email_role: { email, role: 'MASTER' } }

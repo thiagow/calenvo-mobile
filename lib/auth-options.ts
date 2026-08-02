@@ -4,6 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
 import { prisma } from './db'
+import { normalizeEmail } from './utils'
 
 const REMEMBER_ME_MAX_AGE = 30 * 24 * 60 * 60 // 30 dias
 const SESSION_MAX_AGE = 24 * 60 * 60 // 1 dia, quando "manter sessão" não é marcado
@@ -44,9 +45,11 @@ export const authOptions: NextAuthOptions = {
         // o mesmo email/senha. Buscamos todas as linhas e priorizamos explicitamente
         // SAAS_ADMIN > MASTER > PROFESSIONAL, em vez de depender da ordem arbitrária
         // que findFirst retornaria sem orderBy.
+        // Comparação case-insensitive: autocapitalize de teclado mobile e autofill
+        // podem mudar a grafia do email digitado em relação ao salvo.
         const candidates = await prisma.user.findMany({
           where: {
-            email: credentials.email,
+            email: { equals: normalizeEmail(credentials.email), mode: 'insensitive' },
             OR: [
               { role: 'SAAS_ADMIN' },
               { AND: [{ role: { in: ['MASTER', 'PROFESSIONAL'] } }, { isActive: true }] }

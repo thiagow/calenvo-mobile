@@ -8,7 +8,7 @@ import { sendWelcomeEmail, sendPaymentFailedEmail } from '@/lib/email-templates'
 import { getTemporaryData, deleteTemporaryData, type TemporaryData } from '@/lib/temporary-storage'
 import { SegmentType, PlanType } from '@prisma/client'
 import { PLAN_CONFIGS, getPlanPrice } from '@/lib/types'
-import { formatCurrencyByCurrency } from '@/lib/utils'
+import { formatCurrencyByCurrency, normalizeEmail } from '@/lib/utils'
 import Stripe from 'stripe'
 
 export async function POST(req: NextRequest) {
@@ -109,13 +109,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     timestamp: Date.now(),
   }
 
+  // Normaliza para manter consistência com o lookup case-insensitive do login
+  // e evitar contas duplicadas por diferença de maiúscula/espaço.
+  userData.email = normalizeEmail(userData.email)
+
   // Verificar se o usuário já existe (idempotência)
   const existingUser = await prisma.user.findFirst({
     where: {
       OR: [
         {
           AND: [
-            { email: userData.email },
+            { email: { equals: userData.email, mode: 'insensitive' } },
             { role: 'MASTER' }
           ]
         },

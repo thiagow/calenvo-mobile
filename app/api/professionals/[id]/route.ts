@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
+import { normalizeEmail } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,22 +100,24 @@ export async function PATCH(
     
     if (name !== undefined) updateData.name = name
     if (email !== undefined) {
+      const normalizedEmail = normalizeEmail(email)
+
       // Verificar se o novo e-mail já existe em outro usuário
       const existingUser = await prisma.user.findFirst({
         where: {
-          email,
+          email: { equals: normalizedEmail, mode: 'insensitive' },
           id: { not: id }
         }
       })
-      
+
       if (existingUser) {
         return NextResponse.json(
           { error: 'Este e-mail já está em uso' },
           { status: 400 }
         )
       }
-      
-      updateData.email = email
+
+      updateData.email = normalizedEmail
     }
     if (whatsapp !== undefined) updateData.whatsapp = whatsapp
     if (image !== undefined) updateData.image = image

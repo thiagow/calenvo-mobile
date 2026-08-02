@@ -119,6 +119,15 @@ export function formatCPF(cpf: string): string {
   return cpf
 }
 
+/**
+ * Normaliza e-mail para persistência/comparação (trim + lowercase).
+ * Evita que autocapitalize de teclado mobile ou espaços de autofill
+ * façam login/lookup falharem contra um e-mail salvo com outra grafia.
+ */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
 export function validateEmail(email: string): boolean {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)

@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/db'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { sendResetPasswordEmail } from '@/lib/email-templates'
+import { normalizeEmail } from '@/lib/utils'
 
 const GENERIC_MESSAGE = 'Se esse e-mail estiver cadastrado, você receberá um link para redefinir sua senha.'
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hora
@@ -24,10 +25,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'E-mail é obrigatório' }, { status: 400 })
     }
 
+    const normalizedEmail = normalizeEmail(email)
+
     const ip = getClientIp(req)
     const [ipRate, emailRate] = await Promise.all([
       checkRateLimit(`forgot-password:ip:${ip}`, { failClosed: true }),
-      checkRateLimit(`forgot-password:email:${email.toLowerCase()}`, { failClosed: true }),
+      checkRateLimit(`forgot-password:email:${normalizedEmail}`, { failClosed: true }),
     ])
 
     if (!ipRate.success || !emailRate.success) {
@@ -38,8 +41,9 @@ export async function POST(req: NextRequest) {
     }
 
     // SAAS_ADMIN não usa o fluxo público de recuperação de senha (só reset manual).
+    // Comparação case-insensitive: o e-mail salvo pode divergir em grafia do digitado aqui.
     const users = await prisma.user.findMany({
-      where: { email, role: { in: ['MASTER', 'PROFESSIONAL'] } }
+      where: { email: { equals: normalizedEmail, mode: 'insensitive' }, role: { in: ['MASTER', 'PROFESSIONAL'] } }
     })
 
     if (users.length > 0) {
@@ -47,10 +51,13 @@ export async function POST(req: NextRequest) {
       const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex')
       const expires = new Date(Date.now() + RESET_TOKEN_TTL_MS)
 
-      // Remove qualquer token pendente anterior para esse e-mail antes de criar um novo
-      await prisma.verificationToken.deleteMany({ where: { identifier: email } })
+      // Remove qualquer token pendente anterior para esse e-mail antes de criar um novo.
+      // Usa o e-mail exatamente como está salvo (users[0].email), para casar com o
+      // updateMany por e-mail exato feito em reset-password/route.ts.
+      const storedEmail = users[0].email
+      await prisma.verificationToken.deleteMany({ where: { identifier: storedEmail } })
       await prisma.verificationToken.create({
-        data: { identifier: email, token: hashedToken, expires }
+        data: { identifier: storedEmail, token: hashedToken, expires }
       })
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'https://calenvo.app'
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
 
       await sendResetPasswordEmail({
         name: users[0].name || 'usuário',
-        email,
+        email: storedEmail,
         resetUrl,
         locale,
       })

@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { canAddProfessional } from '@/lib/plan-limits'
+import { normalizeEmail } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,15 +83,17 @@ export async function POST(request: NextRequest) {
 
     const userId = (session.user as any).id
     const body = await request.json()
-    const { name, email, whatsapp, password, image } = body
+    const { name, email: rawEmail, whatsapp, password, image } = body
 
     // Validações
-    if (!name || !email || !whatsapp || !password) {
+    if (!name || !rawEmail || !whatsapp || !password) {
       return NextResponse.json(
         { error: 'Nome, e-mail, WhatsApp e senha são obrigatórios' },
         { status: 400 }
       )
     }
+
+    const email = normalizeEmail(rawEmail)
 
     // Buscar o usuário master
     const masterUser = await prisma.user.findUnique({
@@ -121,8 +124,8 @@ export async function POST(request: NextRequest) {
 
     // Verificar se o e-mail já existe para um profissional
     const existingUser = await prisma.user.findFirst({
-      where: { 
-        email,
+      where: {
+        email: { equals: email, mode: 'insensitive' },
         role: 'PROFESSIONAL'
       }
     })

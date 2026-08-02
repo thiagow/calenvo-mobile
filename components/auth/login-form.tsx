@@ -31,7 +31,7 @@ export function LoginForm() {
     try {
       console.log('📞 LoginForm: Calling signIn...')
       const result = await signIn('credentials', {
-        email,
+        email: email.trim(),
         password,
         rememberMe: String(rememberMe),
         redirect: false
@@ -101,6 +101,9 @@ export function LoginForm() {
           className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
           required
           disabled={isLoading}
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
         />
       </div>
 

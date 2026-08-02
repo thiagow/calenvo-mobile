@@ -93,6 +93,9 @@ export function PaidSignupForm({ plan, interval }: PaidSignupFormProps) {
             onChange={(e) => handleChange('email', e.target.value)}
             className="pl-10 bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"
             required
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
           />
         </div>
       </div>
