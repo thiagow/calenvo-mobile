@@ -318,7 +318,7 @@ export default function PublicBookingPage() {
                   <CalendarSearch className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground">Já sou cliente</p>
+                  <p className="font-medium text-foreground">Já tenho agenda</p>
                   <p className="text-xs text-muted-foreground">Ver ou cancelar meu agendamento</p>
                 </div>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
