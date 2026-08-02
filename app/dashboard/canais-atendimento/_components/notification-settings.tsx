@@ -174,6 +174,23 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
     }
   };
 
+  const handleInsertCompletedVariable = (variable: string) => {
+    const textarea = document.getElementById('message-completed') as HTMLTextAreaElement;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newMessage = completedMessage.substring(0, start) + variable + completedMessage.substring(end);
+      setCompletedMessage(newMessage);
+
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    } else {
+      setCompletedMessage(completedMessage + variable);
+    }
+  };
+
   const handleSendCompletedTest = async (phoneNumber: string) => {
     setSendingCompletedTest(true);
     try {
@@ -405,11 +422,15 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Mensagem personalizada</label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="message-completed" className="text-sm font-medium">Mensagem personalizada</label>
+                <VariableHelper onInsert={handleInsertCompletedVariable} />
+              </div>
               <Textarea
+                id="message-completed"
                 value={completedMessage}
                 onChange={(e) => setCompletedMessage(e.target.value)}
-                placeholder="Digite a mensagem de agradecimento e, se quiser, peça a avaliação"
+                placeholder={'Ex: Olá {{nome_cliente}}! Obrigado por comparecer ao seu atendimento de {{servico}} hoje. Se puder, deixe sua avaliação: {{link_avaliacao}}'}
                 disabled={disabled}
                 rows={3}
                 maxLength={1000}
@@ -419,7 +440,6 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
               </p>
             </div>
 
-            <VariableHelper />
             <MessagePreview message={completedMessage} />
 
             <Button

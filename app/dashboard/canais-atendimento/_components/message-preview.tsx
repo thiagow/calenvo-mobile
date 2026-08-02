@@ -15,6 +15,7 @@ const EXAMPLE_VALUES = {
   '{{servico}}': 'Corte de Cabelo',
   '{{profissional}}': 'Dr. João',
   '{{empresa}}': 'Minha Empresa',
+  '{{link_avaliacao}}': 'https://g.page/r/exemplo/review',
 };
 
 export function MessagePreview({ message, title = 'Prévia da Mensagem' }: MessagePreviewProps) {
