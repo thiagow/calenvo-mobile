@@ -1,34 +1,23 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { prisma } from '@/lib/db';
-import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger';
+import { enqueueAccountJobs, type DispatchJob } from '@/lib/whatsapp-dispatch-queue';
 
 /**
- * Internal API to trigger appointment reminders.
- * This should be called by a CRON job (e.g., every hour).
- * 
- * It looks for appointments scheduled for the next X hours/days
- * based on each user's WhatsApp configuration.
+ * Disparado a cada hora pelo QStash (ver scripts/setup-qstash-schedules.ts).
+ * Só CONSULTA o banco e ENFILEIRA um job por agendamento em
+ * /api/internal/dispatch-whatsapp — quem envia de verdade é o dispatch,
+ * um de cada vez, espaçado (ver lib/whatsapp-dispatch-queue.ts).
+ *
+ * Assinado pelo QStash (verifySignatureAppRouter) — sem QSTASH_CURRENT_SIGNING_KEY/
+ * QSTASH_NEXT_SIGNING_KEY configuradas, a lib rejeita a requisição (fail closed).
  */
-export async function GET(request: NextRequest) {
+async function handler(_request: NextRequest) {
   try {
-    // 1. Security check — fail closed: sem CRON_SECRET configurado, a rota
-    // fica desabilitada em vez de aberta para qualquer chamador.
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (!cronSecret) {
-      console.error('[Internal:ScheduleReminders] CRON_SECRET não configurado — rota desabilitada');
-      return NextResponse.json({ error: 'Not configured' }, { status: 503 });
-    }
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const now = new Date();
-    
-    // 2. Find all active WhatsApp configurations
+
     const activeConfigs = await prisma.whatsAppConfig.findMany({
       where: {
         enabled: true,
@@ -37,61 +26,43 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    let totalSent = 0;
+    let totalQueued = 0;
 
-    // 3. Process reminders for each user
     for (const config of activeConfigs) {
       const reminderHours = config.reminderHours || 24;
-      
-      // Target window: exact hour of reminder
-      // To prevent duplicate messages, we could track 'reminderSent' in Appointment model.
-      // For now, we'll just find appointments in the next X hours.
+
+      // Janela alvo: hora exata do lembrete, com folga de 30min pra cada lado.
       const targetTime = new Date(now.getTime() + reminderHours * 60 * 60 * 1000);
-      const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000); // 30m before
-      const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000);   // 30m after
+      const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000);
+      const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000);
 
       const appointments = await prisma.appointment.findMany({
         where: {
           userId: config.userId,
           status: { in: ['SCHEDULED', 'CONFIRMED'] },
-          date: {
-            gte: windowStart,
-            lte: windowEnd,
-          },
+          date: { gte: windowStart, lte: windowEnd },
           deletedAt: null,
-          // Ideally we would check a flag: reminderSent: false
+          // Sem flag de dedupe própria ainda (gap pré-existente — ver TODO
+          // original) — fora do escopo desta migração, só o disparo mudou.
         },
-        include: {
-          client: true,
-          user: { select: { businessName: true } },
-          service: { select: { name: true } },
-          professionalUser: { select: { name: true } },
-        },
+        select: { id: true },
       });
 
-      for (const appointment of appointments) {
-        const serviceName = appointment.service?.name || appointment.specialty || 'Serviço';
-        const professionalName = appointment.professionalUser?.name || appointment.professional || undefined;
+      if (appointments.length === 0) continue;
 
-        await WhatsAppTriggerService.onAppointmentReminder(
-          appointment as any,
-          serviceName,
-          professionalName
-        );
-        totalSent++;
-      }
+      const jobs: DispatchJob[] = appointments.map((a) => ({ kind: 'reminder', appointmentId: a.id }));
+      totalQueued += await enqueueAccountJobs(jobs);
     }
 
     return NextResponse.json({
       success: true,
       processedConfigs: activeConfigs.length,
-      remindersTriggered: totalSent,
+      remindersQueued: totalQueued,
     });
   } catch (error) {
     console.error('[Internal:ScheduleReminders] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = verifySignatureAppRouter(handler);

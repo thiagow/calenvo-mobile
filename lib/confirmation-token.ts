@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { appBaseUrl } from '@/lib/app-url'
 
 export interface GeneratedConfirmationToken {
   token: string // texto puro — só existe neste momento, nunca é salvo
@@ -28,10 +29,6 @@ const TOKEN_SHAPE = /^[A-Za-z0-9_-]{22}$/
 
 export function isValidTokenShape(token: string): boolean {
   return TOKEN_SHAPE.test(token)
-}
-
-function appBaseUrl(): string {
-  return (process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
 }
 
 export function buildConfirmationUrl(token: string): string {
