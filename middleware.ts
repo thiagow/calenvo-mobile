@@ -61,6 +61,12 @@ export async function middleware(request: NextRequest) {
     return intlMiddleware(request)
   }
 
+  // Rotas públicas que não precisam de verificação de sessão — evita gastar
+  // uma verificação de JWT em toda visita à página de confirmação de agendamento.
+  if (pathname.startsWith('/c/') || pathname.startsWith('/api/c/')) {
+    return NextResponse.next()
+  }
+
   // Check if there's a JWT error in the URL
   if (pathname.startsWith('/api/auth') && url.searchParams.get('error')) {
     return NextResponse.redirect(new URL('/clear-session', request.url))

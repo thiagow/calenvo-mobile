@@ -218,7 +218,7 @@ export interface OpenAppointmentSummary {
  * pela consulta (pra decidir se mostra o botão) quanto pelo cancelamento em si
  * (pra revalidar no servidor, nunca confiando só na UI).
  */
-function isCancellableByClient(
+export function isCancellableByClient(
   appointment: { date: Date; status: AppointmentStatus },
   businessConfig: { allowClientCancellation: boolean; cancellationHours: number } | null
 ): boolean {
@@ -272,9 +272,18 @@ export async function getClientOpenAppointments(tenantId: string, phone: string)
   }))
 }
 
+export type CancelAsClientErrorCode =
+  | 'NOT_FOUND'
+  | 'PHONE_MISMATCH'
+  | 'POLICY_DISABLED'
+  | 'STATUS_CLOSED'
+  | 'POLICY_WINDOW'
+
 export interface CancelAsClientResult {
   success: boolean
   error?: string
+  /** Código estável para o chamador decidir o que fazer sem parsear a mensagem. */
+  code?: CancelAsClientErrorCode
 }
 
 /**
@@ -286,8 +295,9 @@ export async function cancelAppointmentAsClient(params: {
   tenantId: string
   phone: string
   appointmentId: string
+  reason?: string
 }): Promise<CancelAsClientResult> {
-  const { tenantId, phone, appointmentId } = params
+  const { tenantId, phone, appointmentId, reason } = params
   const normalizedPhone = formatWhatsAppNumber(phone) || phone
 
   const appointment = await prisma.appointment.findFirst({
@@ -299,9 +309,9 @@ export async function cancelAppointmentAsClient(params: {
       user: { select: { businessName: true, whatsapp: true, phone: true } },
     },
   })
-  if (!appointment) return { success: false, error: 'Agendamento não encontrado' }
+  if (!appointment) return { success: false, error: 'Agendamento não encontrado', code: 'NOT_FOUND' }
   if (appointment.client.phone !== normalizedPhone) {
-    return { success: false, error: 'Este agendamento não pertence a este telefone' }
+    return { success: false, error: 'Este agendamento não pertence a este telefone', code: 'PHONE_MISMATCH' }
   }
 
   const businessConfig = await prisma.businessConfig.findUnique({
@@ -310,21 +320,22 @@ export async function cancelAppointmentAsClient(params: {
   })
 
   if (!businessConfig?.allowClientCancellation) {
-    return { success: false, error: 'O cancelamento pelo cliente não está habilitado para este negócio' }
+    return { success: false, error: 'O cancelamento pelo cliente não está habilitado para este negócio', code: 'POLICY_DISABLED' }
   }
   if (!OPEN_APPOINTMENT_STATUSES.includes(appointment.status)) {
-    return { success: false, error: 'Este agendamento não pode mais ser cancelado' }
+    return { success: false, error: 'Este agendamento não pode mais ser cancelado', code: 'STATUS_CLOSED' }
   }
   if (!isCancellableByClient(appointment, businessConfig)) {
     return {
       success: false,
       error: `Cancelamento permitido apenas até ${businessConfig.cancellationHours}h antes do agendamento`,
+      code: 'POLICY_WINDOW',
     }
   }
 
   const updated = await prisma.appointment.update({
     where: { id: appointment.id },
-    data: { status: 'CANCELLED' },
+    data: { status: 'CANCELLED', cancellationReason: reason || null },
     include: {
       client: true,
       service: { select: { name: true } },
@@ -342,6 +353,62 @@ export async function cancelAppointmentAsClient(params: {
     await WhatsAppTriggerService.onAppointmentCancelledByClient(updated as any, serviceName, professionalName)
   } catch (error) {
     console.error('[cancelAppointmentAsClient] Erro ao notificar cancelamento:', error)
+  }
+
+  return { success: true }
+}
+
+export interface ConfirmAsClientResult {
+  success: boolean
+  error?: string
+  alreadyConfirmed?: boolean
+}
+
+/**
+ * Confirma um agendamento em nome do cliente (link de confirmação por WhatsApp).
+ * Diferente de cancelAppointmentAsClient, não precisa casar telefone: quem
+ * chama já resolveu o appointmentId a partir de um token de 128 bits — o
+ * token É a autorização. Idempotente: confirmar duas vezes (double-tap,
+ * reenvio de webhook) é sucesso silencioso, sem notificar de novo.
+ */
+export async function confirmAppointmentAsClient(params: {
+  tenantId: string
+  appointmentId: string
+}): Promise<ConfirmAsClientResult> {
+  const { tenantId, appointmentId } = params
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, userId: tenantId, deletedAt: null },
+    include: {
+      client: true,
+      service: { select: { name: true } },
+      professionalUser: { select: { name: true } },
+    },
+  })
+  if (!appointment) return { success: false, error: 'Agendamento não encontrado' }
+
+  if (appointment.status === 'CONFIRMED' || appointment.status === 'IN_PROGRESS') {
+    return { success: true, alreadyConfirmed: true }
+  }
+  if (!OPEN_APPOINTMENT_STATUSES.includes(appointment.status)) {
+    return { success: false, error: 'Este agendamento não pode mais ser confirmado' }
+  }
+  if (appointment.date < new Date()) {
+    return { success: false, error: 'Este agendamento já passou' }
+  }
+
+  const updated = await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: { status: 'CONFIRMED', confirmedAt: new Date() },
+    include: { client: true, service: { select: { name: true } } },
+  })
+
+  const serviceName = updated.service?.name || updated.specialty || 'Agendamento'
+
+  try {
+    await NotificationService.notifyAppointmentConfirmed(tenantId, updated.id, updated.client.name, serviceName, updated.date)
+  } catch (error) {
+    console.error('[confirmAppointmentAsClient] Erro ao notificar confirmação:', error)
   }
 
   return { success: true }

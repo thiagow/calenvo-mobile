@@ -164,6 +164,32 @@ export class NotificationService {
   }
 
   /**
+   * Notificação de pedido de cancelamento pelo cliente que a política do
+   * negócio não permitiu efetivar automaticamente (self-cancel desabilitado
+   * ou fora da janela de antecedência). Nunca deixa o cliente num dead-end:
+   * o dono é avisado e decide manualmente.
+   */
+  static async notifyCancellationRequested(
+    userId: string,
+    appointmentId: string,
+    clientName: string,
+    serviceName: string,
+    date: Date,
+    reason?: string | null
+  ) {
+    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+
+    return await this.createNotification({
+      userId,
+      title: 'Cliente avisou que não poderá comparecer',
+      message: `${clientName} pediu para cancelar o agendamento de ${serviceName} em ${formattedDate}${reason ? ` — motivo: ${reason}` : ''}`,
+      type: 'SYSTEM',
+      appointmentId,
+      metadata: { clientName, serviceName, date: date.toISOString(), reason: reason || null },
+    })
+  }
+
+  /**
    * Notificação de lembrete de agendamento
    */
   static async notifyAppointmentReminder(

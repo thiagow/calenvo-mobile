@@ -248,18 +248,15 @@ export async function PUT(
 
         switch (status) {
           case 'CONFIRMED':
+            // Notificação interna apenas — o WhatsApp de "confirme sua presença" é
+            // para o CLIENTE confirmar, não para avisar que o dono já confirmou
+            // (ver WhatsAppTriggerService.onAppointmentConfirmationRequest).
             await NotificationService.notifyAppointmentConfirmed(
               userId,
               updatedAppointment.id,
               updatedAppointment.client.name,
               serviceName,
               updatedAppointment.date
-            )
-            // Enviar notificação via WhatsApp
-            await WhatsAppTriggerService.onAppointmentConfirmed(
-              updatedAppointment as any,
-              serviceName,
-              updatedAppointment.professional || undefined
             )
             break
 

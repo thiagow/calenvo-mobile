@@ -50,6 +50,11 @@ const AVAILABLE_VARIABLES: Variable[] = [
     description: 'Link de avaliação (Google Meu Negócio), se configurado',
     example: 'https://g.page/r/exemplo/review',
   },
+  {
+    name: '{{link_confirmacao}}',
+    description: 'Link para o cliente confirmar presença em 1 toque (Confirmação de Presença)',
+    example: 'https://app.calenvo.com/c/aB3xY...',
+  },
 ];
 
 interface VariableHelperProps {

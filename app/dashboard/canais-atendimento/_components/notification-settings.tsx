@@ -342,7 +342,7 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
       {/* 3. Presence Confirmation (days before) */}
       <NotificationCard
         title="Confirmação de Presença"
-        description="Enviada alguns dias antes do agendamento"
+        description="Enviada X dias antes, com um link para o cliente confirmar em 1 toque"
         icon={<Bell className="h-5 w-5 text-violet-600" />}
         enabled={notifyConfirmation}
         onEnabledChange={setNotifyConfirmation}
@@ -355,6 +355,7 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
         testType="confirmation"
         disabled={disabled}
         defaultPhone={config.phoneNumber || undefined}
+        maxLength={400}
       />
 
       {/* 4. Reminder (hours before) */}

@@ -16,6 +16,7 @@ const EXAMPLE_VALUES = {
   '{{profissional}}': 'Dr. João',
   '{{empresa}}': 'Minha Empresa',
   '{{link_avaliacao}}': 'https://g.page/r/exemplo/review',
+  '{{link_confirmacao}}': 'https://app.calenvo.com/c/exemplo',
 };
 
 export function MessagePreview({ message, title = 'Prévia da Mensagem' }: MessagePreviewProps) {

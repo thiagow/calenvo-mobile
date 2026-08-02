@@ -29,6 +29,7 @@ interface NotificationCardProps {
   testType: 'create' | 'cancel' | 'confirmation' | 'reminder';
   disabled?: boolean;
   defaultPhone?: string;
+  maxLength?: number;
 }
 
 export function NotificationCard({
@@ -46,6 +47,7 @@ export function NotificationCard({
   testType,
   disabled = false,
   defaultPhone,
+  maxLength = 500,
 }: NotificationCardProps) {
   const [showTestDialog, setShowTestDialog] = useState(false);
   const [sending, setSending] = useState(false);
@@ -142,12 +144,12 @@ export function NotificationCard({
                 onChange={(e) => onMessageChange(e.target.value)}
                 placeholder="Digite sua mensagem usando variáveis como {{nome_cliente}}, {{data}}, {{hora}}..."
                 rows={4}
-                maxLength={500}
+                maxLength={maxLength}
                 disabled={disabled}
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Use variáveis para personalizar a mensagem</span>
-                <span>{message.length}/500</span>
+                <span>{message.length}/{maxLength}</span>
               </div>
             </div>
 

@@ -13,11 +13,16 @@ import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger';
  */
 export async function GET(request: NextRequest) {
   try {
-    // 1. Basic security check (could use a secret header)
+    // 1. Security check — fail closed: sem CRON_SECRET configurado, a rota
+    // fica desabilitada em vez de aberta para qualquer chamador.
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+
+    if (!cronSecret) {
+      console.error('[Internal:ScheduleReminders] CRON_SECRET não configurado — rota desabilitada');
+      return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+    }
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

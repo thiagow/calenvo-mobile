@@ -21,7 +21,7 @@ export class WhatsAppTriggerService {
 
   /**
    * Replace mustache-style variables in message templates.
-   * Supported: {{nome_cliente}}, {{data}}, {{hora}}, {{servico}}, {{profissional}}, {{empresa}}
+   * Supported: {{nome_cliente}}, {{data}}, {{hora}}, {{servico}}, {{profissional}}, {{empresa}}, {{link_avaliacao}}, {{link_confirmacao}}
    */
   private static replaceVariables(
     template: string,
@@ -32,6 +32,7 @@ export class WhatsAppTriggerService {
       professionalName?: string;
       businessName?: string;
       reviewLink?: string;
+      confirmationLink?: string;
     }
   ): string {
     const dateFormatted = new Date(data.appointmentDate).toLocaleDateString('pt-BR');
@@ -40,14 +41,23 @@ export class WhatsAppTriggerService {
       minute: '2-digit',
     });
 
-    return template
+    let message = template
       .replace(/\{\{nome_cliente\}\}/g, data.clientName)
       .replace(/\{\{data\}\}/g, dateFormatted)
       .replace(/\{\{hora\}\}/g, timeFormatted)
       .replace(/\{\{servico\}\}/g, data.serviceName || 'Agendamento')
       .replace(/\{\{profissional\}\}/g, data.professionalName || 'Equipe')
       .replace(/\{\{empresa\}\}/g, data.businessName || 'Nossa Empresa')
-      .replace(/\{\{link_avaliacao\}\}/g, data.reviewLink || '');
+      .replace(/\{\{link_avaliacao\}\}/g, data.reviewLink || '')
+      .replace(/\{\{link_confirmacao\}\}/g, data.confirmationLink || '');
+
+    // Degradação graciosa: templates salvos antes de {{link_confirmacao}} existir
+    // não têm a variável — anexa o link no fim pra ninguém precisar editar nada.
+    if (data.confirmationLink && !template.includes('{{link_confirmacao}}')) {
+      message += `\n\nConfirme sua presença aqui:\n${data.confirmationLink}`;
+    }
+
+    return message.trim();
   }
 
   /**
@@ -203,20 +213,24 @@ export class WhatsAppTriggerService {
   }
 
   /**
-   * Trigger notification on appointment confirmation
+   * Trigger the "please confirm attendance" request, sent X days before the
+   * appointment with a link to /c/<token>. Returns whether the send actually
+   * succeeded — unlike the other trigger methods — because the caller uses
+   * it to decide whether to keep or release the anti-duplicate claim row.
    */
-  static async onAppointmentConfirmed(
+  static async onAppointmentConfirmationRequest(
     appointment: Appointment & { client: Client; user: { businessName?: string | null } },
-    serviceName?: string,
-    professionalName?: string
-  ): Promise<void> {
+    serviceName: string | undefined,
+    professionalName: string | undefined,
+    confirmationLink: string
+  ): Promise<boolean> {
     try {
       const config = await prisma.whatsAppConfig.findUnique({
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyConfirmation) return;
-      if (!appointment.client.phone) return;
+      if (!config || !config.enabled || !config.isConnected || !config.notifyConfirmation) return false;
+      if (!appointment.client.phone) return false;
 
       const message = this.replaceVariables(config.confirmationMessage || '', {
         clientName: appointment.client.name,
@@ -224,11 +238,13 @@ export class WhatsAppTriggerService {
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
+        confirmationLink,
       });
 
-      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      return await this.sendToN8n(config.instanceName, appointment.client.phone, message);
     } catch (error) {
-      console.error('[WhatsAppTrigger] Error in onAppointmentConfirmed:', error);
+      console.error('[WhatsAppTrigger] Error in onAppointmentConfirmationRequest:', error);
+      return false;
     }
   }
 

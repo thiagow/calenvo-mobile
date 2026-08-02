@@ -137,6 +137,8 @@ model User {
 
   errorLogs ErrorLog[]
 
+  appointmentConfirmations AppointmentConfirmation[]
+
   @@unique([email, role])
 }
 
@@ -379,6 +381,12 @@ model Appointment {
   updatedAt DateTime @updatedAt
   deletedAt DateTime? // Exclusão lógica (agendamento cadastrado por engano)
 
+  // Confirmação de presença pelo cliente (link de WhatsApp) — null se o cliente
+  // nunca confirmou por esse canal, mesmo que o status já esteja CONFIRMED
+  // (autoConfirm e o dashboard também escrevem em status).
+  confirmedAt        DateTime?
+  cancellationReason String?   @db.Text
+
   userId   String
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   clientId String
@@ -390,7 +398,11 @@ model Appointment {
   // Transações de fidelidade geradas por este agendamento
   loyaltyTransactions LoyaltyTransaction[]
 
+  // Pedido de confirmação de presença enviado por WhatsApp (link)
+  confirmationRequest AppointmentConfirmation?
+
   @@index([userId, date])
+  @@index([userId, status, date])
 }
 
 enum PackageStatus {
@@ -614,6 +626,46 @@ model WhatsAppConfig {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ConfirmationOutcome {
+  PENDING          // enviado, sem resposta
+  CONFIRMED        // cliente confirmou pelo link
+  CANCELLED        // cliente cancelou pelo link e o cancelamento foi efetivado
+  CANCEL_REQUESTED // cliente pediu cancelamento pelo link, mas a política do negócio não permitiu
+  EXPIRED          // passou de expiresAt sem resposta
+}
+
+/// Pedido de confirmação de presença enviado por WhatsApp (link /c/<token>).
+/// Um registro por agendamento — a unique constraint em appointmentId é a
+/// trava anti-duplicata do envio agendado (claim-then-send).
+model AppointmentConfirmation {
+  id String @id @default(cuid())
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 do token. O texto puro só existe no processo de envio, nunca é persistido.
+  tokenHash   String @unique
+  /// Primeiros 8 caracteres do token, só para suporte/diagnóstico.
+  tokenPrefix String
+
+  sentAt      DateTime?
+  expiresAt   DateTime
+  resendCount Int       @default(0)
+
+  outcome     ConfirmationOutcome @default(PENDING)
+  respondedAt DateTime?
+
+  cancellationReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, outcome, expiresAt])
 }
 
 /// Logs de auditoria para ações administrativas do SaaS

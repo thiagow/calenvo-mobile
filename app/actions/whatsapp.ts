@@ -62,7 +62,7 @@ const WhatsAppSettingsSchema = z.object({
   professionalCancelMessage: z.string().max(1000).optional(),
   notifyConfirmation: z.boolean(),
   confirmationDays: z.number().min(0),
-  confirmationMessage: z.string().max(120).optional(),
+  confirmationMessage: z.string().max(400).optional(),
   notifyReminder: z.boolean(),
   reminderHours: z.number().min(0),
   reminderMessage: z.string().max(120).optional(),
@@ -78,7 +78,7 @@ const DEFAULT_TEMPLATES = {
   createMessage: 'Olá {{nome_cliente}}! Seu agendamento foi confirmado para {{data}} às {{hora}}. Serviço: {{servico}}. Até breve!',
   cancelMessage: 'Olá {{nome_cliente}}, seu agendamento do dia {{data}} às {{hora}} foi cancelado. Entre em contato para reagendar.',
   professionalCancelMessage: 'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.',
-  confirmationMessage: 'Olá {{nome_cliente}}! Lembrete: você tem agendamento em {{data}} às {{hora}}. Confirme sua presença respondendo SIM.',
+  confirmationMessage: 'Olá {{nome_cliente}}! Você tem {{servico}} em {{data}} às {{hora}}. Confirme sua presença: {{link_confirmacao}}',
   reminderMessage: 'Oi {{nome_cliente}}! Seu atendimento é daqui a poucas horas ({{hora}}). Te esperamos!',
   completedMessage: 'Olá {{nome_cliente}}, obrigado pela visita! Se puder, deixe sua avaliação: {{link_avaliacao}}',
 };
@@ -1019,7 +1019,8 @@ export async function sendTestMessageAction(
       .replace(/\{\{servico\}\}/g, 'Exemplo de Serviço')
       .replace(/\{\{profissional\}\}/g, 'Profissional Exemplo')
       .replace(/\{\{empresa\}\}/g, 'Sua Empresa')
-      .replace(/\{\{link_avaliacao\}\}/g, config.reviewLink || 'https://g.page/r/exemplo/review');
+      .replace(/\{\{link_avaliacao\}\}/g, config.reviewLink || 'https://g.page/r/exemplo/review')
+      .replace(/\{\{link_confirmacao\}\}/g, `${(process.env.NEXTAUTH_URL || 'https://app.calenvo.com').replace(/\/+$/, '')}/c/exemplo`);
 
     // Send using new real-time endpoint with retry
     const result = await sendMessageWithRetry(
