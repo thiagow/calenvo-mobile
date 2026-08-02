@@ -102,19 +102,21 @@ export async function PATCH(
     if (email !== undefined) {
       const normalizedEmail = normalizeEmail(email)
 
-      // Verificar se o novo e-mail já existe em outro usuário
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: { equals: normalizedEmail, mode: 'insensitive' },
-          id: { not: id }
-        }
-      })
+      // Só verifica conflito se o e-mail realmente mudou
+      if (normalizedEmail !== normalizeEmail(professional.email)) {
+        const existingUser = await prisma.user.findFirst({
+          where: {
+            email: { equals: normalizedEmail, mode: 'insensitive' },
+            id: { not: id }
+          }
+        })
 
-      if (existingUser) {
-        return NextResponse.json(
-          { error: 'Este e-mail já está em uso' },
-          { status: 400 }
-        )
+        if (existingUser) {
+          return NextResponse.json(
+            { error: 'Este e-mail já está em uso' },
+            { status: 400 }
+          )
+        }
       }
 
       updateData.email = normalizedEmail
