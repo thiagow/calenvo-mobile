@@ -118,3 +118,68 @@ export async function PUT(
     )
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+
+    if (!session || !session.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const userId = (session.user as any).id
+    const userRole = (session.user as any).role
+
+    // Exclusão de cliente é irreversível (apaga histórico, pacotes e fidelidade
+    // em cascata) — restrita ao Admin da Conta (MASTER), não a profissionais.
+    if (userRole !== 'MASTER') {
+      return NextResponse.json({ error: 'Apenas o administrador da conta pode excluir clientes' }, { status: 403 })
+    }
+
+    const existing = await prisma.client.findFirst({
+      where: { id: params.id, userId }
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+    }
+
+    const [appointmentsCount, packagesCount] = await Promise.all([
+      prisma.appointment.count({ where: { clientId: existing.id } }),
+      prisma.clientPackage.count({ where: { clientId: existing.id } })
+    ])
+
+    // Log de auditoria antes de excluir, com snapshot dos dados (registro sobrevive à exclusão).
+    await prisma.adminAuditLog.create({
+      data: {
+        action: 'CLIENT_DELETED',
+        adminId: userId,
+        targetId: existing.id,
+        details: {
+          name: existing.name,
+          phone: existing.phone,
+          email: existing.email,
+          cpf: existing.cpf,
+          appointmentsCount,
+          packagesCount
+        },
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined
+      }
+    })
+
+    // Exclui o cliente — appointments, pacotes e saldo/transações de fidelidade
+    // são removidos em cascata pelo schema (onDelete: Cascade).
+    await prisma.client.delete({ where: { id: existing.id } })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting client:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

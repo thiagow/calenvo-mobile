@@ -12,7 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
-import { Search, Plus, Phone, History, Package, Edit, Users, MoreVertical } from 'lucide-react'
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from '@/components/ui/alert-dialog'
+import { Search, Plus, Phone, History, Package, Edit, Users, MoreVertical, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatPhone, applyPhoneMask } from '@/lib/utils'
 import { useSegmentConfig } from '@/contexts/segment-context'
@@ -52,6 +53,10 @@ export default function ClientsPage() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [formData, setFormData] = useState(emptyForm)
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const isMaster = (session?.user as any)?.role === 'MASTER'
 
   const fetchClients = async () => {
     try {
@@ -101,6 +106,22 @@ export default function ClientsPage() {
       toast.error(e instanceof Error ? e.message : 'Erro ao salvar cliente')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/clients/${deleteTarget.id}`, { method: 'DELETE' })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Erro ao excluir cliente') }
+      toast.success('Cliente excluído')
+      setDeleteTarget(null)
+      await fetchClients()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Erro ao excluir cliente')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -195,6 +216,15 @@ export default function ClientsPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
+                        {isMaster && (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteTarget(client)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -283,6 +313,26 @@ export default function ClientsPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Confirmação de exclusão */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {t.client.toLowerCase()}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir <strong>{deleteTarget?.name}</strong>. Essa ação é
+              permanente e apaga todo o histórico do cliente: agendamentos, pacotes e pontos
+              de fidelidade. Não é possível desfazer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Excluindo...' : 'Excluir definitivamente'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
