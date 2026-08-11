@@ -24,7 +24,15 @@ const COLORS = [
   { value: '#EF4444', label: 'Vermelho' },
   { value: '#8B5CF6', label: 'Roxo' },
   { value: '#EC4899', label: 'Rosa' },
-  { value: '#06B6D4', label: 'Ciano' }
+  { value: '#06B6D4', label: 'Ciano' },
+  { value: '#6366F1', label: 'Índigo' },
+  { value: '#14B8A6', label: 'Teal' },
+  { value: '#EAB308', label: 'Amarelo' },
+  { value: '#84CC16', label: 'Lima' },
+  { value: '#D946EF', label: 'Fúcsia' },
+  { value: '#0EA5E9', label: 'Céu' },
+  { value: '#92400E', label: 'Marrom' },
+  { value: '#64748B', label: 'Cinza' }
 ]
 
 const WEEK_DAY_VALUES = [0, 1, 2, 3, 4, 5, 6]
@@ -270,7 +278,7 @@ export default function EditSchedulePage() {
                 </div>
                 <div>
                   <Label>Cor da Agenda</Label>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-2">
                     {COLORS.map((color) => (
                       <button
                         key={color.value}
