@@ -8,7 +8,7 @@ import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
-import { checkAppointmentQuota, resolveProfessionalForBooking } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveProfessionalForBooking, withBookingLock } from '@/lib/appointment-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       serviceId,
       professionalId,
       date,
-      duration = 30,
+      duration: bodyDuration,
       status = 'SCHEDULED',
       modality = 'PRESENCIAL',
       specialty,
@@ -243,9 +243,12 @@ export async function POST(request: NextRequest) {
       forceOverbook
     } = body
 
-    if (!clientId || !date) {
+    // scheduleId é obrigatório: sem ele, o bloco de checagem de conflito abaixo
+    // era pulado inteiro e o agendamento entrava sem validação nenhuma — o
+    // mesmo profissional podia ser reservado duas vezes no mesmo horário.
+    if (!clientId || !date || !scheduleId) {
       return NextResponse.json(
-        { error: 'Client ID and date are required' },
+        { error: 'Client ID, agenda e data são obrigatórios' },
         { status: 400 }
       )
     }
@@ -287,78 +290,101 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Validar conflito de horários e resolver o profissional (o escolhido, ou o
-    // primeiro livre entre os vinculados à agenda quando não especificado)
-    let resolvedProfessionalId: string | null = professionalId || null
-    if (scheduleId) {
+    // Duração vem do serviço no servidor, não do body — sem isso, um cliente
+    // malicioso da API podia mandar `duration: 5` pra escapar do teste de
+    // sobreposição e ainda assim gravar o valor curto no agendamento.
+    let duration = bodyDuration ? Number(bodyDuration) : 30
+    if (serviceId) {
+      const service = await prisma.service.findFirst({
+        where: { id: serviceId, userId },
+        select: { duration: true }
+      })
+      if (!service) {
+        return NextResponse.json({ error: 'Serviço não encontrado' }, { status: 404 })
+      }
+      duration = service.duration
+    }
+
+    // Checagem de conflito + criação são atômicas sob um advisory lock — sem
+    // isso, dois POSTs concorrentes pro mesmo profissional podiam ambos passar
+    // pelo check-then-write e empilhar no mesmo horário.
+    const lockKey = professionalId || scheduleId
+    const result = await withBookingLock(lockKey, async (tx) => {
       const resolution = await resolveProfessionalForBooking({
         scheduleId,
         date: new Date(date),
         duration,
         requestedProfessionalId: professionalId || null,
         allowOverbook,
+        tx,
       })
 
       if (resolution.error) {
-        return NextResponse.json({ error: resolution.error }, { status: 409 })
+        return { ok: false as const, error: resolution.error }
       }
-      resolvedProfessionalId = resolution.professionalId
-    }
 
-    const appointment = await prisma.appointment.create({
-      data: {
-        userId: userId,
-        clientId,
-        scheduleId: scheduleId || null,
-        serviceId: serviceId || null,
-        professionalId: resolvedProfessionalId,
-        date: new Date(date),
-        duration,
-        status,
-        modality,
-        specialty,
-        insurance,
-        serviceType,
-        professional,
-        notes,
-        price: price ? parseFloat(price) : null,
-        isOverbooked: allowOverbook
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
+      const created = await tx.appointment.create({
+        data: {
+          userId: userId,
+          clientId,
+          scheduleId,
+          serviceId: serviceId || null,
+          professionalId: resolution.professionalId,
+          date: new Date(date),
+          duration,
+          status,
+          modality,
+          specialty,
+          insurance,
+          serviceType,
+          professional,
+          notes,
+          price: price ? parseFloat(price) : null,
+          isOverbooked: allowOverbook
         },
-        professionalUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        },
-        service: {
-          select: {
-            name: true
-          }
-        },
-        user: {
-          select: {
-            businessName: true,
-            whatsappConfig: {
-              select: {
-                enabled: true,
-                isConnected: true,
-                notifyOnCreate: true
+        include: {
+          client: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true
+            }
+          },
+          professionalUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          service: {
+            select: {
+              name: true
+            }
+          },
+          user: {
+            select: {
+              businessName: true,
+              whatsappConfig: {
+                select: {
+                  enabled: true,
+                  isConnected: true,
+                  notifyOnCreate: true
+                }
               }
             }
           }
         }
-      }
+      })
+
+      return { ok: true as const, appointment: created }
     })
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 409 })
+    }
+    const appointment = result.appointment
 
     // Criar notificação interna
     try {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { checkBookingConflict } from '@/lib/appointment-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,11 +11,12 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const userId = (session.user as any).id
     const body = await request.json()
     const { scheduleId, professionalId, date, duration } = body
 
@@ -25,43 +27,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const appointmentDate = new Date(date)
-    const appointmentEnd = new Date(appointmentDate.getTime() + duration * 60000)
-
-    // Buscar conflitos
-    const whereClause: any = {
-      scheduleId: scheduleId,
-      date: {
-        lt: appointmentEnd // Data do agendamento existente é antes do fim do novo
-      },
-      status: {
-        notIn: ['CANCELLED', 'NO_SHOW']
-      },
-      deletedAt: null
-    }
-
-    // Se profissional específico, verificar apenas conflitos deste profissional
-    if (professionalId) {
-      whereClause.professionalId = professionalId
-    }
-
-    const conflictingAppointments = await prisma.appointment.findMany({
-      where: whereClause,
-      select: {
-        date: true,
-        duration: true
-      }
+    // Confirma que a agenda pertence ao tenant da sessão antes de expor
+    // ocupação — sem isso, qualquer usuário autenticado conseguia sondar a
+    // agenda de outro tenant só adivinhando/vazando um scheduleId.
+    const schedule = await prisma.schedule.findFirst({
+      where: { id: scheduleId, userId },
+      select: { id: true }
     })
+    if (!schedule) {
+      return NextResponse.json({ error: 'Agenda não encontrada' }, { status: 404 })
+    }
 
-    // Verificar sobreposição
-    const hasConflict = conflictingAppointments.some(appointment => {
-      const existingStart = appointment.date
-      const existingEnd = new Date(existingStart.getTime() + appointment.duration * 60000)
-      
-      // Há conflito se:
-      // - Novo agendamento começa antes do fim do existente E
-      // - Novo agendamento termina depois do início do existente
-      return appointmentDate < existingEnd && appointmentEnd > existingStart
+    const hasConflict = await checkBookingConflict({
+      scheduleId,
+      professionalId: professionalId || null,
+      date: new Date(date),
+      duration
     })
 
     if (hasConflict) {

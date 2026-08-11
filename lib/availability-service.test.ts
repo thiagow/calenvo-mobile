@@ -41,11 +41,16 @@ vi.mock('@/lib/db', () => ({
   prisma: {
     schedule: { findFirst: findFirstMock, findMany: findManyScheduleMock },
     appointment: {
-      findMany: vi.fn(async ({ where }: { where: { scheduleId: string; professionalId?: string } }) =>
-        mockAppointments.filter((a) =>
-          a.scheduleId === where.scheduleId && (!where.professionalId || a.professionalId === where.professionalId)
-        )
-      ),
+      // A ocupação real (getAvailableSlots) consulta por professionalId — sem
+      // scheduleId — sempre que a agenda tem algum profissional vinculado; só
+      // cai pro filtro por scheduleId em agenda legada (sem nenhum vinculado).
+      findMany: vi.fn(async ({ where }: any) => {
+        if (where.professionalId) {
+          const ids: string[] = where.professionalId.in
+          return mockAppointments.filter((a) => ids.includes(a.professionalId))
+        }
+        return mockAppointments.filter((a) => a.scheduleId === where.scheduleId)
+      }),
     },
   },
 }))
@@ -170,6 +175,55 @@ describe('getAvailableSlots', () => {
 
       expect(forP1!.find((s) => s.time === '09:00')?.available).toBe(true)
       expect(forP2!.find((s) => s.time === '09:00')?.available).toBe(false)
+    })
+
+    // Regressão principal: um profissional ocupado numa agenda tinha sua
+    // ocupação escondida ao consultar disponibilidade em OUTRA agenda a que
+    // também está vinculado — mesmo profissional, mesmo horário, serviço
+    // diferente. Era esse o bug reproduzido nos prints (John ocupado às 09:00
+    // na agenda "Mechas" ainda aparecia livre na agenda "Geral").
+    it('profissional ocupado numa agenda não aparece livre em outra agenda a que também está vinculado', async () => {
+      const date = futureDateStr(5)
+      mockSchedulesById = {
+        'schedule-1': baseSchedule({ id: 'schedule-1', professionals: [{ professionalId: 'john' }] }),
+        'schedule-2': baseSchedule({ id: 'schedule-2', professionals: [{ professionalId: 'john' }] }),
+      }
+      // Agendamento de John criado na agenda 1 (outro serviço/agenda).
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'john' }]
+
+      const { getAvailableSlots } = await import('@/lib/availability-service')
+      const resultOnOtherSchedule = await getAvailableSlots({
+        scheduleId: 'schedule-2',
+        serviceId: 'service-1',
+        date,
+        userId: 'tenant-a',
+        professionalId: 'john',
+      })
+
+      expect(resultOnOtherSchedule!.find((s) => s.time === '09:00')?.available).toBe(false)
+    })
+
+    it('agenda legada sem nenhum profissional vinculado mantém a checagem pela agenda inteira', async () => {
+      const date = futureDateStr(5)
+      mockSchedulesById['schedule-1'].professionals = []
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: null }]
+
+      const { getAvailableSlots } = await import('@/lib/availability-service')
+      const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+      expect(result!.find((s) => s.time === '09:00')?.available).toBe(false)
+    })
+
+    it('agendamento legado com professionalId nulo não bloqueia um profissional nomeado', async () => {
+      const date = futureDateStr(5)
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+      // Registro antigo sem profissional atribuído, na mesma agenda/horário.
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: null }]
+
+      const { getAvailableSlots } = await import('@/lib/availability-service')
+      const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p1' })
+
+      expect(result!.find((s) => s.time === '09:00')?.available).toBe(true)
     })
   })
 })

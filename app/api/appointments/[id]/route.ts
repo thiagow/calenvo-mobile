@@ -9,6 +9,7 @@ import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { processPackageDeduction } from '@/app/actions/packages'
 import { processLoyaltyEarn } from '@/app/actions/loyalty'
+import { checkBookingConflict, withBookingLock } from '@/lib/appointment-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,7 +99,8 @@ export async function PUT(
       professional,
       notes,
       price,
-      clientPackageItemId
+      clientPackageItemId,
+      forceOverbook
     } = body
 
     // Verify appointment exists and belongs to user
@@ -114,49 +116,105 @@ export async function PUT(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    // Update appointment
-    const updatedAppointment = await prisma.appointment.update({
-      where: { id: params.id },
-      data: {
-        ...(date && { date: new Date(date) }),
-        ...(duration && { duration: Number(duration) }),
-        ...(status && { status: status as AppointmentStatus }),
-        ...(modality && { modality: modality as ModalityType }),
-        ...(specialty !== undefined && { specialty }),
-        ...(insurance !== undefined && { insurance }),
-        ...(professional !== undefined && { professional }),
-        ...(notes !== undefined && { notes }),
-        ...(price !== undefined && { price: price ? parseFloat(price) : null }),
-        ...(clientPackageItemId !== undefined && { clientPackageItemId })
+    // Reagendamento: se data ou duração mudam, o novo horário não pode empilhar
+    // em cima de outro compromisso do mesmo profissional (ou da mesma agenda,
+    // pra agendas legadas sem profissional vinculado) — mesma regra aplicada na
+    // criação. "Encaixe" segue exigindo a mesma permissão do POST.
+    const dateChanged = Boolean(date) && new Date(date).getTime() !== existingAppointment.date.getTime()
+    const durationChanged = Boolean(duration) && Number(duration) !== existingAppointment.duration
+    const isReschedule = (dateChanged || durationChanged) && Boolean(existingAppointment.scheduleId)
+
+    let allowOverbook = false
+    if (isReschedule) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true, canForceOverbook: true }
+      })
+      allowOverbook = Boolean(forceOverbook) && (user?.role === 'MASTER' || user?.canForceOverbook === true)
+    }
+
+    const updateData = {
+      ...(date && { date: new Date(date) }),
+      ...(duration && { duration: Number(duration) }),
+      ...(status && { status: status as AppointmentStatus }),
+      ...(modality && { modality: modality as ModalityType }),
+      ...(specialty !== undefined && { specialty }),
+      ...(insurance !== undefined && { insurance }),
+      ...(professional !== undefined && { professional }),
+      ...(notes !== undefined && { notes }),
+      ...(price !== undefined && { price: price ? parseFloat(price) : null }),
+      ...(clientPackageItemId !== undefined && { clientPackageItemId }),
+      ...(allowOverbook && { isOverbooked: true })
+    }
+
+    const includeClause = {
+      client: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true
+        }
       },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
-        service: {
-          select: {
-            name: true
-          }
-        },
-        user: {
-          select: {
-            businessName: true,
-            whatsappConfig: {
-              select: {
-                enabled: true,
-                isConnected: true,
-                notifyOnCancel: true
-              }
+      service: {
+        select: {
+          name: true
+        }
+      },
+      user: {
+        select: {
+          businessName: true,
+          whatsappConfig: {
+            select: {
+              enabled: true,
+              isConnected: true,
+              notifyOnCancel: true
             }
           }
         }
       }
-    })
+    } as const
+
+    // Reagendamento sem encaixe: checagem + escrita precisam ficar atômicas —
+    // sem isso, dois PUTs concorrentes pro mesmo profissional podem ambos
+    // passar pelo check-then-write e empilhar no mesmo horário.
+    let updatedAppointment
+    if (isReschedule && !allowOverbook) {
+      const lockKey = existingAppointment.professionalId ?? existingAppointment.scheduleId!
+      const result = await withBookingLock(lockKey, async (tx) => {
+        const conflict = await checkBookingConflict({
+          scheduleId: existingAppointment.scheduleId!,
+          professionalId: existingAppointment.professionalId,
+          date: date ? new Date(date) : existingAppointment.date,
+          duration: duration ? Number(duration) : existingAppointment.duration,
+          excludeAppointmentId: params.id,
+          tx
+        })
+        if (conflict) {
+          return { ok: false as const }
+        }
+        const appointment = await tx.appointment.update({
+          where: { id: params.id },
+          data: updateData,
+          include: includeClause
+        })
+        return { ok: true as const, appointment }
+      })
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: 'Já existe um agendamento neste horário para este profissional' },
+          { status: 409 }
+        )
+      }
+      updatedAppointment = result.appointment
+    } else {
+      updatedAppointment = await prisma.appointment.update({
+        where: { id: params.id },
+        data: updateData,
+        include: includeClause
+      })
+    }
 
     // Criar notificações baseadas na mudança de status
     try {

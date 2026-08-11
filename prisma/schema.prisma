@@ -403,6 +403,7 @@ model Appointment {
 
   @@index([userId, date])
   @@index([userId, status, date])
+  @@index([professionalId, date])
 }
 
 enum PackageStatus {

@@ -1,8 +1,21 @@
 import { prisma } from '@/lib/db'
+import type { Prisma } from '@prisma/client'
 
 export interface AvailabilitySlot {
   time: string
   available: boolean
+}
+
+/**
+ * Testa sobreposição de dois intervalos [start, start+duration). Único ponto
+ * de verdade pra essa conta — reutilizado pelo motor de slots e pelo guard de
+ * conflito em `appointment-service.ts`, que antes reimplementava a mesma
+ * lógica com uma formulação de 3 termos equivalente a esta.
+ */
+export function overlaps(aStart: Date, aDuration: number, bStart: Date, bDuration: number): boolean {
+  const aEnd = new Date(aStart.getTime() + aDuration * 60000)
+  const bEnd = new Date(bStart.getTime() + bDuration * 60000)
+  return aStart < bEnd && aEnd > bStart
 }
 
 /**
@@ -121,46 +134,67 @@ export async function getAvailableSlots(params: {
   const dateEnd = new Date(date)
   dateEnd.setHours(23, 59, 59, 999)
 
-  const existingAppointments = await prisma.appointment.findMany({
-    where: {
-      scheduleId,
-      date: { gte: dateStart, lte: dateEnd },
-      status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-      deletedAt: null,
-      ...(professionalId && { professionalId }),
-    },
-  })
+  // Ocupação é por profissional, não por agenda: o mesmo User pode estar
+  // vinculado a várias agendas (ScheduleProfessional), e um agendamento dele
+  // criado numa agenda ocupa o profissional em qualquer outra também — antes,
+  // filtrar só por `scheduleId` deixava esse conflito invisível de uma agenda
+  // pra outra. Só cai de volta pro escopo da agenda inteira quando ela não tem
+  // nenhum profissional vinculado (agenda legada, sem ScheduleProfessional).
+  const relevantProfessionalIds = professionalId
+    ? [professionalId]
+    : schedule.professionals.map((p) => p.professionalId)
 
-  // Sem profissional específico ("qualquer um"), a agenda tem capacidade para até
-  // N atendimentos simultâneos — um por profissional vinculado — em vez de travar
-  // no primeiro agendamento existente. Com um profissional específico, a
-  // capacidade é sempre 1 (a query acima já filtrou só os agendamentos dele).
-  const capacity = professionalId ? 1 : Math.max(1, schedule.professionals.length)
+  const existingAppointments =
+    relevantProfessionalIds.length > 0
+      ? await prisma.appointment.findMany({
+          where: {
+            professionalId: { in: relevantProfessionalIds },
+            date: { gte: dateStart, lte: dateEnd },
+            status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+            deletedAt: null,
+          },
+        })
+      : await prisma.appointment.findMany({
+          where: {
+            scheduleId,
+            date: { gte: dateStart, lte: dateEnd },
+            status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+            deletedAt: null,
+          },
+        })
+
+  const appointmentsByProfessional = new Map<string, typeof existingAppointments>()
+  for (const apt of existingAppointments) {
+    if (!apt.professionalId) continue
+    const list = appointmentsByProfessional.get(apt.professionalId) ?? []
+    list.push(apt)
+    appointmentsByProfessional.set(apt.professionalId, list)
+  }
+
   const minBookingTime = new Date(now.getTime() + schedule.minNoticeHours * 60 * 60 * 1000)
 
   for (const slot of slots) {
     const [slotHour, slotMinute] = slot.time.split(':').map(Number)
     const slotDate = new Date(date)
     slotDate.setHours(slotHour, slotMinute, 0, 0)
-    const slotEndDate = new Date(slotDate.getTime() + serviceDuration * 60000)
 
     if (slotDate < minBookingTime) {
       slot.available = false
       continue
     }
 
-    const overlapCount = existingAppointments.filter((apt) => {
-      const aptDate = new Date(apt.date)
-      const aptEndDate = new Date(aptDate.getTime() + apt.duration * 60000)
-      return (
-        (slotDate >= aptDate && slotDate < aptEndDate) ||
-        (slotEndDate > aptDate && slotEndDate <= aptEndDate) ||
-        (slotDate <= aptDate && slotEndDate >= aptEndDate)
-      )
-    }).length
-
-    if (overlapCount >= capacity) {
-      slot.available = false
+    if (relevantProfessionalIds.length > 0) {
+      // Disponível se pelo menos um profissional do conjunto (o pedido, ou
+      // todos os vinculados quando "qualquer um") estiver livre nesse slot.
+      const someoneFree = relevantProfessionalIds.some((id) => {
+        const theirAppointments = appointmentsByProfessional.get(id) ?? []
+        return !theirAppointments.some((apt) => overlaps(slotDate, serviceDuration, apt.date, apt.duration))
+      })
+      if (!someoneFree) slot.available = false
+    } else {
+      // Agenda legada sem profissional vinculado: capacidade 1 pra agenda inteira.
+      const occupied = existingAppointments.some((apt) => overlaps(slotDate, serviceDuration, apt.date, apt.duration))
+      if (occupied) slot.available = false
     }
   }
 
@@ -178,10 +212,13 @@ export async function resolveCandidateSchedules(params: {
   userId: string
   serviceId: string
   professionalId?: string
+  /** Client transacional, quando chamado de dentro de withBookingLock. */
+  tx?: typeof prisma | Prisma.TransactionClient
 }): Promise<{ id: string }[]> {
-  const { userId, serviceId, professionalId } = params
+  const { userId, serviceId, professionalId, tx } = params
+  const db = tx ?? prisma
 
-  return prisma.schedule.findMany({
+  return db.schedule.findMany({
     where: {
       userId,
       isActive: true,

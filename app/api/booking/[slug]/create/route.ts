@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { NotificationService } from '@/lib/notification-service'
-import { checkAppointmentQuota, resolveBookingTarget } from '@/lib/appointment-service'
+import { checkAppointmentQuota, resolveBookingTarget, withBookingLock } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 import { parseCalendarDate } from '@/lib/availability-service'
 import { formatWhatsAppNumber } from '@/lib/utils'
@@ -114,40 +114,51 @@ export async function POST(
     const appointmentDate = parseCalendarDate(date)
     appointmentDate.setHours(hours, minutes, 0, 0)
 
-    // Resolve a agenda (o cliente não escolhe mais) e o profissional (o
-    // escolhido, ou o primeiro livre entre os vinculados, quando não houver preferência)
-    const resolution = await resolveBookingTarget({
-      userId: user.id,
-      serviceId,
-      date: appointmentDate,
-      duration: service.duration,
-      requestedProfessionalId: professionalId || null,
-    })
-
-    if (resolution.error || !resolution.scheduleId) {
-      return NextResponse.json(
-        { error: resolution.error || 'Este horário acabou de ficar indisponível' },
-        { status: 409 }
-      )
-    }
-
     // Determinar status inicial baseado na configuração
     const initialStatus = user.businessConfig.autoConfirm ? 'CONFIRMED' : 'SCHEDULED'
 
-    // Criar agendamento
-    const appointment = await prisma.appointment.create({
-      data: {
+    // Resolve a agenda (o cliente não escolhe mais) e o profissional (o
+    // escolhido, ou o primeiro livre entre os vinculados, quando não houver
+    // preferência), e cria o agendamento — tudo sob um advisory lock, senão
+    // dois clientes reservando o mesmo horário ao mesmo tempo passam ambos
+    // pelo check-then-write e o mesmo profissional fica com dois compromissos.
+    const clientId = client.id
+    const lockKey = professionalId || `service:${serviceId}`
+    const result = await withBookingLock(lockKey, async (tx) => {
+      const resolution = await resolveBookingTarget({
+        userId: user.id,
+        serviceId,
         date: appointmentDate,
         duration: service.duration,
-        status: initialStatus,
-        scheduleId: resolution.scheduleId,
-        serviceId,
-        professionalId: resolution.professionalId,
-        clientId: client.id,
-        userId: user.id,
-        price: service.price || undefined
+        requestedProfessionalId: professionalId || null,
+        tx,
+      })
+
+      if (resolution.error || !resolution.scheduleId) {
+        return { ok: false as const, error: resolution.error || 'Este horário acabou de ficar indisponível' }
       }
+
+      const created = await tx.appointment.create({
+        data: {
+          date: appointmentDate,
+          duration: service.duration,
+          status: initialStatus,
+          scheduleId: resolution.scheduleId,
+          serviceId,
+          professionalId: resolution.professionalId,
+          clientId,
+          userId: user.id,
+          price: service.price || undefined
+        }
+      })
+
+      return { ok: true as const, appointment: created }
     })
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 409 })
+    }
+    const { appointment } = result
 
     // Verificar se deve notificar sobre limite de agendamentos
     try {
@@ -165,8 +176,8 @@ export async function POST(
       // Não falhar a criação do agendamento se houver erro na notificação
     }
 
-    const professional = resolution.professionalId
-      ? await prisma.user.findUnique({ where: { id: resolution.professionalId }, select: { name: true } })
+    const professional = appointment.professionalId
+      ? await prisma.user.findUnique({ where: { id: appointment.professionalId }, select: { name: true } })
       : null
 
     // Enviar notificação via WhatsApp se configurado

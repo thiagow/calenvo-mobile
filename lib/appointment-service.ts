@@ -1,12 +1,19 @@
 import { prisma } from '@/lib/db'
 import { canCreateAppointment, getRemainingAppointments } from '@/lib/plan-limits'
-import { resolveCandidateSchedules } from '@/lib/availability-service'
-import { PlanType, AppointmentStatus } from '@prisma/client'
+import { resolveCandidateSchedules, overlaps } from '@/lib/availability-service'
+import { PlanType, AppointmentStatus, Prisma } from '@prisma/client'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 
 const OPEN_APPOINTMENT_STATUSES: AppointmentStatus[] = ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']
+
+type DbClient = typeof prisma | Prisma.TransactionClient
+
+// Nenhum agendamento real passa disso — só existe pra dar um limite inferior
+// à busca de conflito, que antes escaneava o histórico inteiro da agenda a
+// cada tentativa de reserva (`date: { lt: appointmentEnd }` sem piso).
+const MAX_APPOINTMENT_LOOKBACK_MINUTES = 24 * 60
 
 export interface QuotaCheckResult {
   allowed: boolean
@@ -41,44 +48,66 @@ export async function checkAppointmentQuota(userId: string, planType: PlanType):
 }
 
 /**
- * Verifica sobreposição de horário numa agenda (opcionalmente restrita a um
- * profissional específico). Baseado em intervalo de início/fim, não em
- * igualdade exata de data/hora — pega conflitos parciais também.
+ * Verifica sobreposição de horário para um profissional (globalmente, em
+ * qualquer agenda em que ele atenda) ou, na ausência de profissional, para a
+ * agenda inteira (caso legado, sem nenhum ScheduleProfessional vinculado).
+ * Baseado em intervalo de início/fim, não em igualdade exata de data/hora —
+ * pega conflitos parciais também. Mesma regra usada pelo motor de slots em
+ * `availability-service.ts`, que é quem primeiro deveria ter escondido esse
+ * horário — este é o guard de última linha na escrita.
  */
-export async function checkScheduleConflict(params: {
+export async function checkBookingConflict(params: {
   scheduleId: string
   professionalId?: string | null
   date: Date
   duration: number
   excludeAppointmentId?: string
+  tx?: DbClient
 }): Promise<boolean> {
-  const { scheduleId, professionalId, date, duration, excludeAppointmentId } = params
+  const { scheduleId, professionalId, date, duration, excludeAppointmentId, tx } = params
+  const db = tx ?? prisma
   const appointmentEnd = new Date(date.getTime() + duration * 60000)
+  const lookbackStart = new Date(date.getTime() - MAX_APPOINTMENT_LOOKBACK_MINUTES * 60000)
 
-  const whereClause: any = {
-    scheduleId,
-    date: { lt: appointmentEnd },
-    status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-    deletedAt: null,
-  }
-
-  if (professionalId) {
-    whereClause.professionalId = professionalId
-  }
+  const whereClause: any = professionalId
+    ? {
+        professionalId,
+        date: { gte: lookbackStart, lt: appointmentEnd },
+        status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+        deletedAt: null,
+      }
+    : {
+        scheduleId,
+        date: { gte: lookbackStart, lt: appointmentEnd },
+        status: { notIn: ['CANCELLED', 'NO_SHOW'] },
+        deletedAt: null,
+      }
 
   if (excludeAppointmentId) {
     whereClause.id = { not: excludeAppointmentId }
   }
 
-  const candidates = await prisma.appointment.findMany({
+  const candidates = await db.appointment.findMany({
     where: whereClause,
     select: { date: true, duration: true },
   })
 
-  return candidates.some((appointment) => {
-    const existingStart = appointment.date
-    const existingEnd = new Date(existingStart.getTime() + appointment.duration * 60000)
-    return date < existingEnd && appointmentEnd > existingStart
+  return candidates.some((appointment) => overlaps(date, duration, appointment.date, appointment.duration))
+}
+
+/**
+ * Serializa a checagem de conflito + criação para uma chave (profissional, ou
+ * agenda quando não há profissional) usando um advisory lock do Postgres.
+ * Sem isso, dois pedidos concorrentes pro mesmo horário passam ambos pelo
+ * check-then-write em memória e ambos inserem — não existe unique/exclusion
+ * constraint no schema hoje que pegasse essa corrida (Appointment só tem
+ * `date` + `duration`, não um range, e scheduleId/professionalId são
+ * nullable). O lock é liberado automaticamente ao fim da transação.
+ */
+export async function withBookingLock<T>(key: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
+    return fn(tx)
   })
 }
 
@@ -106,10 +135,13 @@ export async function resolveProfessionalForBooking(params: {
    * chama esta função é responsável por checar a permissão antes.
    */
   allowOverbook?: boolean
+  /** Client transacional, quando chamado de dentro de withBookingLock. */
+  tx?: DbClient
 }): Promise<ProfessionalResolution> {
-  const { scheduleId, date, duration, requestedProfessionalId, allowOverbook } = params
+  const { scheduleId, date, duration, requestedProfessionalId, allowOverbook, tx } = params
+  const db = tx ?? prisma
 
-  const schedule = await prisma.schedule.findUnique({
+  const schedule = await db.schedule.findUnique({
     where: { id: scheduleId },
     select: { professionals: { select: { professionalId: true } } },
   })
@@ -122,7 +154,7 @@ export async function resolveProfessionalForBooking(params: {
     if (allowOverbook) {
       return { professionalId: requestedProfessionalId }
     }
-    const conflict = await checkScheduleConflict({ scheduleId, professionalId: requestedProfessionalId, date, duration })
+    const conflict = await checkBookingConflict({ scheduleId, professionalId: requestedProfessionalId, date, duration, tx })
     if (conflict) {
       return { professionalId: null, error: 'Este profissional já está ocupado nesse horário' }
     }
@@ -135,7 +167,7 @@ export async function resolveProfessionalForBooking(params: {
     if (allowOverbook) {
       return { professionalId: null }
     }
-    const conflict = await checkScheduleConflict({ scheduleId, date, duration })
+    const conflict = await checkBookingConflict({ scheduleId, date, duration, tx })
     return conflict
       ? { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
       : { professionalId: null }
@@ -146,7 +178,7 @@ export async function resolveProfessionalForBooking(params: {
   }
 
   for (const id of linkedIds) {
-    const conflict = await checkScheduleConflict({ scheduleId, professionalId: id, date, duration })
+    const conflict = await checkBookingConflict({ scheduleId, professionalId: id, date, duration, tx })
     if (!conflict) {
       return { professionalId: id }
     }
@@ -173,13 +205,16 @@ export async function resolveBookingTarget(params: {
   date: Date
   duration: number
   requestedProfessionalId?: string | null
+  /** Client transacional, quando chamado de dentro de withBookingLock. */
+  tx?: DbClient
 }): Promise<BookingTargetResolution> {
-  const { userId, serviceId, date, duration, requestedProfessionalId } = params
+  const { userId, serviceId, date, duration, requestedProfessionalId, tx } = params
 
   const candidates = await resolveCandidateSchedules({
     userId,
     serviceId,
     professionalId: requestedProfessionalId || undefined,
+    tx,
   })
 
   if (candidates.length === 0) {
@@ -193,6 +228,7 @@ export async function resolveBookingTarget(params: {
       date,
       duration,
       requestedProfessionalId,
+      tx,
     })
     if (!resolution.error) {
       return { scheduleId: candidate.id, professionalId: resolution.professionalId }

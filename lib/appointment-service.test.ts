@@ -12,6 +12,9 @@ let mockProfessionalsBySchedule: Record<string, { professionalId: string }[]> = 
   'schedule-1': [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }],
 }
 
+const queryRawMock = vi.fn(async () => undefined)
+const transactionMock = vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockTx))
+
 vi.mock('@/lib/db', () => ({
   prisma: {
     schedule: {
@@ -21,15 +24,36 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(async () => mockCandidateScheduleIds.map((id) => ({ id }))),
     },
     appointment: {
+      // Com professionalId, checkBookingConflict não filtra por scheduleId
+      // (ocupação é global pro profissional) — só compara scheduleId quando a
+      // chave está mesmo presente no where (caso legado, sem profissional).
       findMany: vi.fn(async ({ where }: any) =>
         mockAppointments.filter((a) =>
-          (a.scheduleId === undefined || a.scheduleId === where.scheduleId) &&
-          (!where.professionalId || a.professionalId === where.professionalId)
+          ('scheduleId' in where ? a.scheduleId === where.scheduleId : true) &&
+          (!where.professionalId || a.professionalId === where.professionalId) &&
+          (!where.id?.not || a.id !== where.id.not)
         )
       ),
     },
+    $transaction: transactionMock,
+    $queryRaw: queryRawMock,
   },
 }))
+
+// "tx" usado dentro de withBookingLock — nos testes, é o mesmo objeto mockado
+// acima (o mock não distingue client normal de transacional).
+const mockTx = {
+  appointment: {
+    findMany: vi.fn(async ({ where }: any) =>
+      mockAppointments.filter((a) =>
+        ('scheduleId' in where ? a.scheduleId === where.scheduleId : true) &&
+        (!where.professionalId || a.professionalId === where.professionalId) &&
+        (!where.id?.not || a.id !== where.id.not)
+      )
+    ),
+  },
+  $queryRaw: queryRawMock,
+}
 
 beforeEach(() => {
   mockAppointments = []
@@ -149,5 +173,57 @@ describe('resolveBookingTarget', () => {
 
     expect(result.scheduleId).toBeNull()
     expect(result.error).toBeDefined()
+  })
+})
+
+// checkBookingConflict é o guard de última linha na escrita (dashboard, público,
+// chat e reagendamento) — mesma regra do motor de slots, mas na hora de gravar.
+describe('checkBookingConflict', () => {
+  it('detecta conflito para o profissional pedido, sem precisar do scheduleId bater', async () => {
+    mockAppointments = [{ date, duration, professionalId: 'p1' }]
+    const { checkBookingConflict } = await import('@/lib/appointment-service')
+
+    const conflict = await checkBookingConflict({ scheduleId, professionalId: 'p1', date, duration })
+
+    expect(conflict).toBe(true)
+  })
+
+  it('excludeAppointmentId permite salvar um reagendamento em cima do próprio horário original', async () => {
+    mockAppointments = [{ id: 'apt-1', date, duration, professionalId: 'p1' }]
+    const { checkBookingConflict } = await import('@/lib/appointment-service')
+
+    const conflict = await checkBookingConflict({
+      scheduleId,
+      professionalId: 'p1',
+      date,
+      duration,
+      excludeAppointmentId: 'apt-1',
+    })
+
+    expect(conflict).toBe(false)
+  })
+
+  it('sem professionalId, cai pro escopo da agenda inteira (agenda legada)', async () => {
+    mockAppointments = [{ scheduleId, date, duration, professionalId: null }]
+    const { checkBookingConflict } = await import('@/lib/appointment-service')
+
+    const conflict = await checkBookingConflict({ scheduleId, date, duration })
+
+    expect(conflict).toBe(true)
+  })
+})
+
+// withBookingLock serializa checagem + escrita sob um advisory lock — sem
+// transação nem constraint no schema, é o único mecanismo que fecha a janela
+// de corrida entre dois pedidos concorrentes pro mesmo horário.
+describe('withBookingLock', () => {
+  it('roda a callback dentro de uma transação e devolve o resultado dela', async () => {
+    const { withBookingLock } = await import('@/lib/appointment-service')
+
+    const result = await withBookingLock('p1', async () => ({ ok: true, value: 42 }))
+
+    expect(result).toEqual({ ok: true, value: 42 })
+    expect(transactionMock).toHaveBeenCalled()
+    expect(queryRawMock).toHaveBeenCalled()
   })
 })
