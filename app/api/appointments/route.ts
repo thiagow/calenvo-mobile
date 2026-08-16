@@ -9,6 +9,7 @@ import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { checkAppointmentQuota, resolveProfessionalForBooking, withBookingLock } from '@/lib/appointment-service'
+import { logError } from '@/lib/error-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -208,6 +209,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(transformedAppointments)
   } catch (error) {
     console.error('Error fetching appointments:', error)
+    await logError({ functionality: 'appointment_list', error })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -216,6 +218,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Hoisted pra ficarem disponíveis no catch como metadata do ErrorLog —
+  // sem isso, um erro no meio do fluxo (ex.: FK inválida no create) virava
+  // um "Internal server error" opaco, sem registro de qual agenda/cliente
+  // estava envolvido. Só espelham as constantes reais abaixo, não substituem
+  // elas — evita perder o narrowing de tipo que o resto do handler depende.
+  let userIdForLog: string | undefined
+  let clientIdForLog: string | undefined
+  let scheduleIdForLog: string | undefined
   try {
     const session = await getServerSession(authOptions)
 
@@ -224,6 +234,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (session.user as any).id
+    userIdForLog = userId
     const body = await request.json()
     const {
       clientId,
@@ -242,6 +253,8 @@ export async function POST(request: NextRequest) {
       price,
       forceOverbook
     } = body
+    clientIdForLog = clientId
+    scheduleIdForLog = scheduleId
 
     // scheduleId é obrigatório: sem ele, o bloco de checagem de conflito abaixo
     // era pulado inteiro e o agendamento entrava sem validação nenhuma — o
@@ -312,6 +325,7 @@ export async function POST(request: NextRequest) {
     const result = await withBookingLock(lockKey, async (tx) => {
       const resolution = await resolveProfessionalForBooking({
         scheduleId,
+        userId,
         date: new Date(date),
         duration,
         requestedProfessionalId: professionalId || null,
@@ -446,6 +460,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(transformedAppointment, { status: 201 })
   } catch (error) {
     console.error('Error creating appointment:', error)
+    await logError({
+      functionality: 'appointment_create',
+      error,
+      userId: userIdForLog,
+      metadata: { clientId: clientIdForLog, scheduleId: scheduleIdForLog },
+    })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

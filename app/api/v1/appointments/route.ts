@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
 
   const resolution = await resolveProfessionalForBooking({
     scheduleId,
+    userId: user.id,
     date: appointmentDate,
     duration: finalDuration,
     requestedProfessionalId: professionalId || null,

@@ -10,6 +10,7 @@ import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { processPackageDeduction } from '@/app/actions/packages'
 import { processLoyaltyEarn } from '@/app/actions/loyalty'
 import { checkBookingConflict, withBookingLock } from '@/lib/appointment-service'
+import { logError } from '@/lib/error-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,6 +70,7 @@ export async function GET(
     return NextResponse.json(transformedAppointment)
   } catch (error) {
     console.error('Error fetching appointment:', error)
+    await logError({ functionality: 'appointment_get', error, metadata: { appointmentId: params.id } })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -390,6 +392,7 @@ export async function PUT(
     return NextResponse.json(transformedAppointment)
   } catch (error) {
     console.error('Error updating appointment:', error)
+    await logError({ functionality: 'appointment_update', error, metadata: { appointmentId: params.id } })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -432,6 +435,7 @@ export async function DELETE(
     return NextResponse.json({ message: 'Appointment deleted successfully' })
   } catch (error) {
     console.error('Error deleting appointment:', error)
+    await logError({ functionality: 'appointment_delete', error, metadata: { appointmentId: params.id } })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

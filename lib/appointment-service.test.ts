@@ -12,15 +12,20 @@ let mockProfessionalsBySchedule: Record<string, { professionalId: string }[]> = 
   'schedule-1': [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }],
 }
 
-const queryRawMock = vi.fn(async () => undefined)
+const executeRawMock = vi.fn(async () => 0)
 const transactionMock = vi.fn(async (fn: (tx: any) => Promise<any>) => fn(mockTx))
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     schedule: {
-      findUnique: vi.fn(async ({ where }: any) => ({
-        professionals: mockProfessionalsBySchedule[where.id] || [],
-      })),
+      // resolveProfessionalForBooking exige que a agenda pertença ao tenant
+      // chamado — devolve null (agenda "não encontrada") pra qualquer userId
+      // diferente do dono, do mesmo jeito que o Prisma faria com o where composto.
+      findFirst: vi.fn(async ({ where }: any) =>
+        where.userId !== TENANT_ID
+          ? null
+          : { professionals: mockProfessionalsBySchedule[where.id] || [] }
+      ),
       findMany: vi.fn(async () => mockCandidateScheduleIds.map((id) => ({ id }))),
     },
     appointment: {
@@ -36,7 +41,7 @@ vi.mock('@/lib/db', () => ({
       ),
     },
     $transaction: transactionMock,
-    $queryRaw: queryRawMock,
+    $executeRaw: executeRawMock,
   },
 }))
 
@@ -52,7 +57,7 @@ const mockTx = {
       )
     ),
   },
-  $queryRaw: queryRawMock,
+  $executeRaw: executeRawMock,
 }
 
 beforeEach(() => {
@@ -66,12 +71,13 @@ beforeEach(() => {
 const scheduleId = 'schedule-1'
 const date = new Date(2099, 0, 1, 10, 0, 0, 0)
 const duration = 30
+const TENANT_ID = 'tenant-a'
 
 describe('resolveProfessionalForBooking', () => {
   it('atribui o profissional pedido quando ele está livre', async () => {
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
-    const result = await resolveProfessionalForBooking({ scheduleId, date, duration, requestedProfessionalId: 'p2' })
+    const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'p2' })
 
     expect(result).toEqual({ professionalId: 'p2' })
   })
@@ -79,7 +85,7 @@ describe('resolveProfessionalForBooking', () => {
   it('rejeita quando o profissional pedido não pertence a esta agenda', async () => {
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
-    const result = await resolveProfessionalForBooking({ scheduleId, date, duration, requestedProfessionalId: 'estranho' })
+    const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'estranho' })
 
     expect(result.professionalId).toBeNull()
     expect(result.error).toBeDefined()
@@ -89,7 +95,7 @@ describe('resolveProfessionalForBooking', () => {
     mockAppointments = [{ date, duration, professionalId: 'p2' }]
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
-    const result = await resolveProfessionalForBooking({ scheduleId, date, duration, requestedProfessionalId: 'p2' })
+    const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'p2' })
 
     expect(result.professionalId).toBeNull()
     expect(result.error).toBeDefined()
@@ -99,7 +105,7 @@ describe('resolveProfessionalForBooking', () => {
     mockAppointments = [{ date, duration, professionalId: 'p1' }]
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
-    const result = await resolveProfessionalForBooking({ scheduleId, date, duration })
+    const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration })
 
     expect(result).toEqual({ professionalId: 'p2' })
   })
@@ -112,10 +118,25 @@ describe('resolveProfessionalForBooking', () => {
     ]
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
-    const result = await resolveProfessionalForBooking({ scheduleId, date, duration })
+    const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration })
 
     expect(result.professionalId).toBeNull()
     expect(result.error).toBeDefined()
+  })
+
+  it('rejeita quando a agenda não pertence ao tenant chamado (isolamento cross-tenant)', async () => {
+    const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+    const result = await resolveProfessionalForBooking({
+      scheduleId,
+      userId: 'tenant-outro',
+      date,
+      duration,
+      requestedProfessionalId: 'p2',
+    })
+
+    expect(result.professionalId).toBeNull()
+    expect(result.error).toBe('Agenda não encontrada')
   })
 })
 
@@ -224,6 +245,6 @@ describe('withBookingLock', () => {
 
     expect(result).toEqual({ ok: true, value: 42 })
     expect(transactionMock).toHaveBeenCalled()
-    expect(queryRawMock).toHaveBeenCalled()
+    expect(executeRawMock).toHaveBeenCalled()
   })
 })

@@ -106,7 +106,7 @@ export async function checkBookingConflict(params: {
  */
 export async function withBookingLock<T>(key: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`
     return fn(tx)
   })
 }
@@ -125,6 +125,11 @@ export interface ProfessionalResolution {
  */
 export async function resolveProfessionalForBooking(params: {
   scheduleId: string
+  /** Tenant dono da agenda — sem isso, um scheduleId de outro tenant (ou já
+   * excluído) caía silenciosamente no ramo "agenda legada sem profissional"
+   * em vez de ser rejeitado, e só estourava mais adiante como violação de FK
+   * no create. */
+  userId: string
   date: Date
   duration: number
   requestedProfessionalId?: string | null
@@ -138,14 +143,17 @@ export async function resolveProfessionalForBooking(params: {
   /** Client transacional, quando chamado de dentro de withBookingLock. */
   tx?: DbClient
 }): Promise<ProfessionalResolution> {
-  const { scheduleId, date, duration, requestedProfessionalId, allowOverbook, tx } = params
+  const { scheduleId, userId, date, duration, requestedProfessionalId, allowOverbook, tx } = params
   const db = tx ?? prisma
 
-  const schedule = await db.schedule.findUnique({
-    where: { id: scheduleId },
+  const schedule = await db.schedule.findFirst({
+    where: { id: scheduleId, userId },
     select: { professionals: { select: { professionalId: true } } },
   })
-  const linkedIds = schedule?.professionals.map((p) => p.professionalId) || []
+  if (!schedule) {
+    return { professionalId: null, error: 'Agenda não encontrada' }
+  }
+  const linkedIds = schedule.professionals.map((p) => p.professionalId)
 
   if (requestedProfessionalId) {
     if (!linkedIds.includes(requestedProfessionalId)) {
@@ -225,6 +233,7 @@ export async function resolveBookingTarget(params: {
   for (const candidate of candidates) {
     const resolution = await resolveProfessionalForBooking({
       scheduleId: candidate.id,
+      userId,
       date,
       duration,
       requestedProfessionalId,
