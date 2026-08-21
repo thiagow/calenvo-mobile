@@ -1,7 +1,8 @@
 import OpenAI from 'openai'
 import { prisma } from '@/lib/db'
 import { checkAppointmentQuota, resolveBookingTarget, withBookingLock, getClientOpenAppointments, cancelAppointmentAsClient } from '@/lib/appointment-service'
-import { getAvailableSlotsForService, parseCalendarDate } from '@/lib/availability-service'
+import { getAvailableSlotsForService } from '@/lib/availability-service'
+import { DEFAULT_TIMEZONE, todayInZone, wallTimeToInstant } from '@/lib/timezone'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import type { User, BusinessConfig } from '@prisma/client'
@@ -28,12 +29,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/
 
 function getTenantTimezone(tenant: User & { businessConfig: BusinessConfig | null }): string {
-  return tenant.businessConfig?.timezone || 'America/Sao_Paulo'
-}
-
-// "Hoje" no timezone do tenant, formato YYYY-MM-DD — comparável lexicograficamente.
-function getTodayInTimezone(timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date())
+  return tenant.businessConfig?.timezone || DEFAULT_TIMEZONE
 }
 
 // Label legível em português pro system prompt, ex: "sexta-feira, 15 de julho de 2026".
@@ -48,7 +44,7 @@ function getTodayLabel(timezone: string): string {
 }
 
 function isPastDate(dateStr: string, timezone: string): boolean {
-  return dateStr < getTodayInTimezone(timezone)
+  return dateStr < todayInZone(timezone)
 }
 
 export interface ChatMessage {
@@ -247,9 +243,9 @@ export async function executeTool(
         const service = await prisma.service.findFirst({ where: { id: input.serviceId, userId: tenant.id } })
         if (!service) return { error: 'Serviço não encontrado' }
 
-        const [hours, minutes] = input.time.split(':').map(Number)
-        const appointmentDate = parseCalendarDate(input.date)
-        appointmentDate.setHours(hours, minutes, 0, 0)
+        // Horário de parede do negócio -> instante, no fuso do tenant (não no
+        // do processo, que em produção é UTC).
+        const appointmentDate = wallTimeToInstant(input.date, input.time, getTenantTimezone(tenant))
 
         if (Number.isNaN(appointmentDate.getTime())) {
           return { error: 'Data ou horário inválido. Peça para o cliente confirmar novamente.' }

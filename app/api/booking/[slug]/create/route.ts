@@ -6,7 +6,7 @@ import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/pl
 import { NotificationService } from '@/lib/notification-service'
 import { checkAppointmentQuota, resolveBookingTarget, withBookingLock } from '@/lib/appointment-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
-import { parseCalendarDate } from '@/lib/availability-service'
+import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 
@@ -109,10 +109,19 @@ export async function POST(
       )
     }
 
-    // Criar data/hora do agendamento
-    const [hours, minutes] = time.split(':').map(Number)
-    const appointmentDate = parseCalendarDate(date)
-    appointmentDate.setHours(hours, minutes, 0, 0)
+    // Horário de parede do NEGÓCIO -> instante. Antes isso era montado com
+    // métodos locais do processo, que em produção (Netlify) é UTC: um cliente
+    // reservando 15:00 tinha o agendamento gravado às 15:00Z = 12:00 no fuso
+    // do salão, 3h antes do que ele escolheu.
+    const appointmentDate = wallTimeToInstant(
+      date,
+      time,
+      user.businessConfig?.timezone || DEFAULT_TIMEZONE
+    )
+
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return NextResponse.json({ error: 'Data ou horário inválido' }, { status: 400 })
+    }
 
     // Determinar status inicial baseado na configuração
     const initialStatus = user.businessConfig.autoConfirm ? 'CONFIRMED' : 'SCHEDULED'

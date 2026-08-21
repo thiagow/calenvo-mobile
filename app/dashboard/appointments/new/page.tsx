@@ -141,15 +141,33 @@ export default function NewAppointmentPage() {
     if (!formData.serviceId) { toast.error('Selecione um serviço'); return }
     if (!formData.patientName || !formData.patientPhone || !formData.date || !time) { toast.error('Preencha todos os campos obrigatórios'); return }
 
-    // Encaixe manual: se o horário digitado não está entre os livres, pede
-    // confirmação explícita antes de forçar a criação sobre o conflito.
-    const isForcedSlot = overbookMode && !availableSlots.some((s: any) => s.time === time)
-    if (isForcedSlot) {
+    // Encaixe é intenção explícita do operador (o switch), nunca inferida da
+    // grade: a grade pode estar desatualizada ou ter sido calculada com outro
+    // conjunto de profissionais, e quando ela discordava do servidor o encaixe
+    // se desarmava sozinho — o pedido virava um agendamento comum e voltava
+    // recusado com "este profissional já está ocupado nesse horário".
+    const isEncaixe = overbookMode && Boolean(overbookTime)
+
+    if (isEncaixe) {
+      // Quem sabe se o horário está mesmo ocupado é o servidor. Só perguntamos
+      // pra que o texto da confirmação seja verdadeiro — o encaixe é enviado de
+      // qualquer forma, e o servidor decide se ele conta como encaixe.
+      let occupied = false
+      try {
+        const probe = await fetch('/api/appointments/validate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheduleId: formData.scheduleId, professionalId: formData.professionalId || null, date: formData.date, time, duration: parseInt(formData.duration) })
+        })
+        occupied = probe.status === 409
+      } catch { /* sonda indisponível: confirma mesmo assim, sem afirmar ocupação */ }
+
       const ok = await confirm({
         title: 'Criar encaixe?',
-        description: `O horário ${time} já está ocupado. Deseja criar este agendamento mesmo assim, como um encaixe?`,
-        confirmText: 'Criar encaixe',
-        variant: 'destructive'
+        description: occupied
+          ? `O horário ${time} já está ocupado. Deseja criar este agendamento mesmo assim, como um encaixe?`
+          : `Criar agendamento às ${time}? Este horário parece livre — ele será criado normalmente.`,
+        confirmText: occupied ? 'Criar encaixe' : 'Criar agendamento',
+        variant: occupied ? 'destructive' : 'default'
       })
       if (!ok) return
     }
@@ -164,7 +182,7 @@ export default function NewAppointmentPage() {
       }
       const res = await fetch('/api/appointments', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId, scheduleId: formData.scheduleId, serviceId: formData.serviceId, professionalId: formData.professionalId || null, date: new Date(`${formData.date}T${time}:00`).toISOString(), duration: parseInt(formData.duration), status: 'SCHEDULED', modality: formData.appointmentType === 'presencial' ? 'PRESENCIAL' : 'TELECONSULTA', specialty: formData.specialty || null, insurance: formData.insuranceType === 'convenio' ? formData.insuranceName : 'Particular', notes: formData.notes || null, forceOverbook: isForcedSlot })
+        body: JSON.stringify({ clientId, scheduleId: formData.scheduleId, serviceId: formData.serviceId, professionalId: formData.professionalId || null, date: formData.date, time, duration: parseInt(formData.duration), status: 'SCHEDULED', modality: formData.appointmentType === 'presencial' ? 'PRESENCIAL' : 'TELECONSULTA', specialty: formData.specialty || null, insurance: formData.insuranceType === 'convenio' ? formData.insuranceName : 'Particular', notes: formData.notes || null, forceOverbook: isEncaixe })
       })
       if (!res.ok) throw new Error((await res.json()).error || 'Erro ao criar agendamento')
       toast.success('Agendamento criado!')

@@ -10,6 +10,7 @@ import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { processPackageDeduction } from '@/app/actions/packages'
 import { processLoyaltyEarn } from '@/app/actions/loyalty'
 import { checkBookingConflict, withBookingLock } from '@/lib/appointment-service'
+import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { logError } from '@/lib/error-logger'
 
 export const dynamic = 'force-dynamic'
@@ -93,6 +94,7 @@ export async function PUT(
     const body = await request.json()
     const {
       date,
+      time,
       duration,
       status,
       modality,
@@ -118,25 +120,45 @@ export async function PUT(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        role: true,
+        canForceOverbook: true,
+        businessConfig: { select: { timezone: true } }
+      }
+    })
+
+    // Mesma conversão de hora de parede -> instante usada na criação e no motor
+    // de slots: no fuso do negócio, resolvida no servidor.
+    const timezone = user?.businessConfig?.timezone || DEFAULT_TIMEZONE
+    let newDate: Date | undefined
+    if (date) {
+      newDate = time ? wallTimeToInstant(date, time, timezone) : new Date(date)
+      if (Number.isNaN(newDate.getTime())) {
+        return NextResponse.json({ error: 'Data ou horário inválido' }, { status: 400 })
+      }
+    }
+
     // Reagendamento: se data ou duração mudam, o novo horário não pode empilhar
     // em cima de outro compromisso do mesmo profissional (ou da mesma agenda,
     // pra agendas legadas sem profissional vinculado) — mesma regra aplicada na
     // criação. "Encaixe" segue exigindo a mesma permissão do POST.
-    const dateChanged = Boolean(date) && new Date(date).getTime() !== existingAppointment.date.getTime()
+    const dateChanged = Boolean(newDate) && newDate!.getTime() !== existingAppointment.date.getTime()
     const durationChanged = Boolean(duration) && Number(duration) !== existingAppointment.duration
     const isReschedule = (dateChanged || durationChanged) && Boolean(existingAppointment.scheduleId)
 
-    let allowOverbook = false
-    if (isReschedule) {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { role: true, canForceOverbook: true }
-      })
-      allowOverbook = Boolean(forceOverbook) && (user?.role === 'MASTER' || user?.canForceOverbook === true)
+    const canOverbook = user?.role === 'MASTER' || user?.canForceOverbook === true
+    if (forceOverbook && !canOverbook) {
+      return NextResponse.json(
+        { error: 'Você não tem permissão para criar encaixes' },
+        { status: 403 }
+      )
     }
+    const allowOverbook = isReschedule && Boolean(forceOverbook) && canOverbook
 
     const updateData = {
-      ...(date && { date: new Date(date) }),
+      ...(newDate && { date: newDate }),
       ...(duration && { duration: Number(duration) }),
       ...(status && { status: status as AppointmentStatus }),
       ...(modality && { modality: modality as ModalityType }),
@@ -145,8 +167,9 @@ export async function PUT(
       ...(professional !== undefined && { professional }),
       ...(notes !== undefined && { notes }),
       ...(price !== undefined && { price: price ? parseFloat(price) : null }),
-      ...(clientPackageItemId !== undefined && { clientPackageItemId }),
-      ...(allowOverbook && { isOverbooked: true })
+      ...(clientPackageItemId !== undefined && { clientPackageItemId })
+      // `isOverbooked` não entra aqui: só o resultado da checagem sob lock,
+      // abaixo, sabe se o novo horário estava mesmo ocupado.
     }
 
     const includeClause = {
@@ -177,27 +200,29 @@ export async function PUT(
       }
     } as const
 
-    // Reagendamento sem encaixe: checagem + escrita precisam ficar atômicas —
-    // sem isso, dois PUTs concorrentes pro mesmo profissional podem ambos
-    // passar pelo check-then-write e empilhar no mesmo horário.
+    // Reagendamento: checagem + escrita precisam ficar atômicas — sem isso,
+    // dois PUTs concorrentes pro mesmo profissional podem ambos passar pelo
+    // check-then-write e empilhar no mesmo horário. O encaixe também passa por
+    // aqui: não pra ser bloqueado, mas pra que `isOverbooked` reflita se o
+    // horário estava de fato ocupado.
     let updatedAppointment
-    if (isReschedule && !allowOverbook) {
+    if (isReschedule) {
       const lockKey = existingAppointment.professionalId ?? existingAppointment.scheduleId!
       const result = await withBookingLock(lockKey, async (tx) => {
         const conflict = await checkBookingConflict({
           scheduleId: existingAppointment.scheduleId!,
           professionalId: existingAppointment.professionalId,
-          date: date ? new Date(date) : existingAppointment.date,
+          date: newDate ?? existingAppointment.date,
           duration: duration ? Number(duration) : existingAppointment.duration,
           excludeAppointmentId: params.id,
           tx
         })
-        if (conflict) {
+        if (conflict && !allowOverbook) {
           return { ok: false as const }
         }
         const appointment = await tx.appointment.update({
           where: { id: params.id },
-          data: updateData,
+          data: { ...updateData, ...(allowOverbook && { isOverbooked: conflict }) },
           include: includeClause
         })
         return { ok: true as const, appointment }

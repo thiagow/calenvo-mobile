@@ -113,6 +113,14 @@ export async function withBookingLock<T>(key: string, fn: (tx: Prisma.Transactio
 
 export interface ProfessionalResolution {
   professionalId: string | null
+  /**
+   * Houve de fato sobreposição no horário escolhido. Só pode ser `true` quando
+   * `allowOverbook` foi passado — sem encaixe, um conflito vira `error` e nada
+   * é criado. É o servidor, e não o cliente, quem decide se o agendamento é um
+   * encaixe de verdade: a UI não tem como saber (a grade dela pode estar
+   * desatualizada, ou ter sido calculada com outro conjunto de profissionais).
+   */
+  hadConflict: boolean
   error?: string
 }
 
@@ -151,48 +159,48 @@ export async function resolveProfessionalForBooking(params: {
     select: { professionals: { select: { professionalId: true } } },
   })
   if (!schedule) {
-    return { professionalId: null, error: 'Agenda não encontrada' }
+    return { professionalId: null, hadConflict: false, error: 'Agenda não encontrada' }
   }
   const linkedIds = schedule.professionals.map((p) => p.professionalId)
 
   if (requestedProfessionalId) {
     if (!linkedIds.includes(requestedProfessionalId)) {
-      return { professionalId: null, error: 'Profissional não vinculado a esta agenda' }
+      return { professionalId: null, hadConflict: false, error: 'Profissional não vinculado a esta agenda' }
     }
-    if (allowOverbook) {
-      return { professionalId: requestedProfessionalId }
-    }
+    // Mesmo em encaixe a checagem roda — não pra bloquear, mas pra registrar se
+    // o horário estava realmente ocupado (`isOverbooked`).
     const conflict = await checkBookingConflict({ scheduleId, professionalId: requestedProfessionalId, date, duration, tx })
-    if (conflict) {
-      return { professionalId: null, error: 'Este profissional já está ocupado nesse horário' }
+    if (conflict && !allowOverbook) {
+      return { professionalId: null, hadConflict: true, error: 'Este profissional já está ocupado nesse horário' }
     }
-    return { professionalId: requestedProfessionalId }
+    return { professionalId: requestedProfessionalId, hadConflict: conflict }
   }
 
   // Agenda legada sem nenhum profissional vinculado: mantém o comportamento
   // histórico (sem atribuição, conflito checado pra agenda inteira).
   if (linkedIds.length === 0) {
-    if (allowOverbook) {
-      return { professionalId: null }
-    }
     const conflict = await checkBookingConflict({ scheduleId, date, duration, tx })
-    return conflict
-      ? { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
-      : { professionalId: null }
-  }
-
-  if (allowOverbook) {
-    return { professionalId: linkedIds[0] }
+    if (conflict && !allowOverbook) {
+      return { professionalId: null, hadConflict: true, error: 'Este horário acabou de ficar indisponível' }
+    }
+    return { professionalId: null, hadConflict: conflict }
   }
 
   for (const id of linkedIds) {
     const conflict = await checkBookingConflict({ scheduleId, professionalId: id, date, duration, tx })
     if (!conflict) {
-      return { professionalId: id }
+      return { professionalId: id, hadConflict: false }
     }
   }
 
-  return { professionalId: null, error: 'Este horário acabou de ficar indisponível' }
+  // Todos ocupados. Num encaixe sem profissional escolhido, cai no primeiro
+  // vinculado — antes esse ramo vinha ANTES do laço acima e empilhava todo
+  // encaixe em `linkedIds[0]` mesmo havendo colega livre.
+  if (allowOverbook) {
+    return { professionalId: linkedIds[0], hadConflict: true }
+  }
+
+  return { professionalId: null, hadConflict: true, error: 'Este horário acabou de ficar indisponível' }
 }
 
 export interface BookingTargetResolution {
@@ -240,6 +248,8 @@ export async function resolveBookingTarget(params: {
       tx,
     })
     if (!resolution.error) {
+      // Sem `allowOverbook` aqui (booking público/chat nunca encaixam), então
+      // uma resolução sem erro é necessariamente um horário livre.
       return { scheduleId: candidate.id, professionalId: resolution.professionalId }
     }
     lastError = resolution.error

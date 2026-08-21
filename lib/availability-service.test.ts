@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { addCalendarDays, todayInZone, wallTimeToInstant } from '@/lib/timezone'
+
+// Fuso do negócio nos testes. A suíte roda com TZ=UTC (igual à produção), então
+// esses dois nunca coincidem — é justamente o que garante que o motor de slots
+// não volte a calcular no fuso do processo.
+const TZ = 'America/Sao_Paulo'
 
 // Regressão: getAvailableSlots buscava a Schedule só pelo id, sem confirmar que
 // pertence ao tenant (userId) do chamador — mesma classe de vazamento cross-tenant
@@ -22,6 +28,7 @@ function baseSchedule(overrides: Partial<any> = {}) {
     blocks: [],
     services: [{ service: { id: 'service-1', duration: 30 } }],
     professionals: [],
+    user: { businessConfig: { timezone: TZ } },
     ...overrides,
   }
 }
@@ -45,11 +52,15 @@ vi.mock('@/lib/db', () => ({
       // scheduleId — sempre que a agenda tem algum profissional vinculado; só
       // cai pro filtro por scheduleId em agenda legada (sem nenhum vinculado).
       findMany: vi.fn(async ({ where }: any) => {
+        // A janela de datas é respeitada de propósito: é ela que precisa recuar
+        // além da meia-noite pra pegar agendamento que começa na véspera.
+        const inWindow = (a: any) =>
+          a.date >= where.date.gte && a.date <= where.date.lte
         if (where.professionalId) {
           const ids: string[] = where.professionalId.in
-          return mockAppointments.filter((a) => ids.includes(a.professionalId))
+          return mockAppointments.filter((a) => ids.includes(a.professionalId) && inWindow(a))
         }
-        return mockAppointments.filter((a) => a.scheduleId === where.scheduleId)
+        return mockAppointments.filter((a) => a.scheduleId === where.scheduleId && inWindow(a))
       }),
     },
   },
@@ -61,30 +72,15 @@ beforeEach(() => {
   mockScheduleList = [{ id: 'schedule-1' }]
 })
 
-describe('parseCalendarDate', () => {
-  it('não desloca o dia da semana por causa de fuso horário (bug reproduzido em produção)', async () => {
-    const { parseCalendarDate } = await import('@/lib/availability-service')
-
-    // 21/07/2026 é uma terça-feira (dia 2). new Date("2026-07-21") sozinho
-    // parseia como meia-noite UTC; num processo rodando fora de UTC (ex.:
-    // GMT-3), combinar isso com .getDay() (método local) resolve para
-    // segunda-feira — foi exatamente o que fez a IA achar a agenda fechada
-    // num dia em que ela estava aberta.
-    expect(parseCalendarDate('2026-07-21').getDay()).toBe(2)
-  })
-})
-
-// Data usada nos testes de slots: sempre "daqui a 5 dias", pra nunca cair no
-// passado nem estourar advanceBookingDays conforme o tempo passa.
+// Data usada nos testes de slots: sempre "daqui a N dias" no calendário do
+// negócio, pra nunca cair no passado nem estourar advanceBookingDays.
 function futureDateStr(daysAhead: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + daysAhead)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return addCalendarDays(todayInZone(TZ), daysAhead)
 }
 
+/** Instante de um agendamento às HH:mm do horário de parede do negócio. */
 function dateAt(dateStr: string, hour: number, minute = 0): Date {
-  const [y, m, d] = dateStr.split('-').map(Number)
-  return new Date(y, m - 1, d, hour, minute, 0, 0)
+  return wallTimeToInstant(dateStr, `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`, TZ)
 }
 
 describe('getAvailableSlots', () => {
@@ -130,6 +126,40 @@ describe('getAvailableSlots', () => {
     const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(-5), userId: 'tenant-a' })
 
     expect(result).toEqual([])
+  })
+
+  // Regressão do bug relatado na conta ferfigueirag: a grade exibia 15:00 como
+  // livre enquanto a criação recusava o mesmo horário com "este profissional já
+  // está ocupado". O motor montava o horário de parede do slot com métodos
+  // locais do processo — UTC em produção — e comparava 15:00Z contra o instante
+  // realmente gravado, 18:00Z (15:00 em GMT-3). Defasagem fixa de 3h: o slot
+  // ocupado aparecia livre, e o slot livre 3h adiante aparecia ocupado.
+  describe('fuso horário do negócio (processo em UTC)', () => {
+    it('bloqueia o slot das 15:00 quando há agendamento às 15:00 no fuso do negócio', async () => {
+      const { getAvailableSlots } = await import('@/lib/availability-service')
+      const date = futureDateStr(5)
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 15), duration: 30, professionalId: 'p1' }]
+
+      const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p1' })
+
+      expect(result!.find((s) => s.time === '15:00')?.available).toBe(false)
+      // E não desloca a ocupação pra 3h adiante, que era o outro lado do bug.
+      expect(result!.find((s) => s.time === '12:00')?.available).toBe(true)
+    })
+
+    it('um agendamento que começa na véspera e invade o dia bloqueia o primeiro slot', async () => {
+      const { getAvailableSlots } = await import('@/lib/availability-service')
+      const date = futureDateStr(5)
+      mockSchedulesById['schedule-1'].startTime = '00:00'
+      mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+      // 23:30 do dia anterior, 60min -> invade 00:00 do dia consultado.
+      mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(addCalendarDays(date, -1), 23, 30), duration: 60, professionalId: 'p1' }]
+
+      const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p1' })
+
+      expect(result!.find((s) => s.time === '00:00')?.available).toBe(false)
+    })
   })
 
   // Regressão: antes, uma agenda com N profissionais vinculados só aceitava 1

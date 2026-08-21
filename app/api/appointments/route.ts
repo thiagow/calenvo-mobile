@@ -9,6 +9,7 @@ import { WhatsAppService } from '@/lib/whatsapp-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { checkAppointmentQuota, resolveProfessionalForBooking, withBookingLock } from '@/lib/appointment-service'
+import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { logError } from '@/lib/error-logger'
 
 export const dynamic = 'force-dynamic'
@@ -242,6 +243,7 @@ export async function POST(request: NextRequest) {
       serviceId,
       professionalId,
       date,
+      time,
       duration: bodyDuration,
       status = 'SCHEDULED',
       modality = 'PRESENCIAL',
@@ -272,7 +274,8 @@ export async function POST(request: NextRequest) {
       select: {
         planType: true,
         role: true,
-        canForceOverbook: true
+        canForceOverbook: true,
+        businessConfig: { select: { timezone: true } }
       }
     })
 
@@ -287,7 +290,28 @@ export async function POST(request: NextRequest) {
     // quando o usuário autenticado é MASTER ou tem permissão explícita
     // (canForceOverbook) — nunca confiar só na claim de role da sessão/JWT
     // para uma ação sensível, recarregamos do banco acima.
-    const allowOverbook = Boolean(forceOverbook) && (user.role === 'MASTER' || user.canForceOverbook === true)
+    const canOverbook = user.role === 'MASTER' || user.canForceOverbook === true
+    if (forceOverbook && !canOverbook) {
+      // Antes isso degradava em silêncio pra `false` e o pedido voltava como um
+      // 409 de conflito genérico — o operador via "profissional já ocupado"
+      // sem nunca saber que o encaixe tinha sido descartado por permissão.
+      return NextResponse.json(
+        { error: 'Você não tem permissão para criar encaixes' },
+        { status: 403 }
+      )
+    }
+    const allowOverbook = Boolean(forceOverbook) && canOverbook
+
+    // Horário de parede do negócio -> instante. O cliente manda `date`
+    // (YYYY-MM-DD) + `time` (HH:mm) e quem converte é o servidor, no fuso do
+    // negócio — assim o fuso do navegador do operador não influencia mais o que
+    // é gravado, e a escrita passa a usar exatamente a mesma conversão do motor
+    // de slots. O ISO completo continua aceito por compatibilidade.
+    const timezone = user.businessConfig?.timezone || DEFAULT_TIMEZONE
+    const appointmentDate = time ? wallTimeToInstant(date, time, timezone) : new Date(date)
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return NextResponse.json({ error: 'Data ou horário inválido' }, { status: 400 })
+    }
 
     // Verificar limite de agendamentos do mês atual
     const quota = await checkAppointmentQuota(userId, user.planType ?? 'BASICO')
@@ -326,7 +350,7 @@ export async function POST(request: NextRequest) {
       const resolution = await resolveProfessionalForBooking({
         scheduleId,
         userId,
-        date: new Date(date),
+        date: appointmentDate,
         duration,
         requestedProfessionalId: professionalId || null,
         allowOverbook,
@@ -344,7 +368,7 @@ export async function POST(request: NextRequest) {
           scheduleId,
           serviceId: serviceId || null,
           professionalId: resolution.professionalId,
-          date: new Date(date),
+          date: appointmentDate,
           duration,
           status,
           modality,
@@ -354,7 +378,10 @@ export async function POST(request: NextRequest) {
           professional,
           notes,
           price: price ? parseFloat(price) : null,
-          isOverbooked: allowOverbook
+          // Só é encaixe se houve conflito de verdade — quem sabe disso é o
+          // servidor. Um encaixe pedido sobre um horário que na prática estava
+          // livre entra como agendamento normal, sem o selo de encaixe.
+          isOverbooked: allowOverbook && resolution.hadConflict
         },
         include: {
           client: {

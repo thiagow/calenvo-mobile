@@ -1,5 +1,18 @@
 import { prisma } from '@/lib/db'
+import {
+  DEFAULT_TIMEZONE,
+  addCalendarDays,
+  dayOfWeekFromDateStr,
+  tenantCalendarDayWindow,
+  todayInZone,
+  wallTimeToInstant,
+} from '@/lib/timezone'
 import type { Prisma } from '@prisma/client'
+
+// Um agendamento pode começar antes do dia pedido e invadi-lo. A janela de
+// ocupação recua além da meia-noite do negócio pra não perder essa sobreposição
+// — o guard de escrita já fazia o mesmo (MAX_APPOINTMENT_LOOKBACK_MINUTES).
+const OCCUPANCY_LOOKBACK_MS = 24 * 60 * 60 * 1000
 
 export interface AvailabilitySlot {
   time: string
@@ -19,27 +32,18 @@ export function overlaps(aStart: Date, aDuration: number, bStart: Date, bDuratio
 }
 
 /**
- * Constrói uma Date à meia-noite local a partir de "YYYY-MM-DD".
- *
- * `new Date(dateStr)` parseia a string como meia-noite UTC; combinar isso com
- * métodos locais (`getDay`, `setHours`) desalinha o dia sempre que o processo
- * roda fora de UTC — ex.: "2026-07-21" virava terça (dia real) só em servidor
- * UTC, mas segunda-feira num servidor em GMT-3, porque meia-noite UTC de dia
- * 21 já é 21h do dia 20 em Brasília. Construir a partir dos componentes
- * locais evita o problema, independente do timezone do processo.
- */
-export function parseCalendarDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  return new Date(year, month - 1, day)
-}
-
-/**
  * Calcula os horários disponíveis de uma agenda/serviço num dia específico,
  * considerando dias de trabalho, bloqueios, horário de almoço, antecedência
  * mínima/máxima e agendamentos já existentes. Único motor de disponibilidade do
  * sistema — compartilhado pela página pública de agendamento, pelas ferramentas
  * do agente de IA (widget de chat) e pela tela de agendamento do dashboard —
  * mesma regra em todos, incluindo a capacidade por profissional (ver `professionalId`).
+ *
+ * Todo o cálculo acontece no fuso do negócio (`BusinessConfig.timezone`), nunca
+ * no fuso do processo: em produção as Functions do Netlify rodam em UTC, e
+ * montar o horário de parede do slot com métodos locais comparava 15:00Z contra
+ * o instante realmente gravado (18:00Z, montado em GMT-3) — defasando a grade
+ * inteira em 3h, exibindo como livre um horário ocupado e bloqueando outro.
  */
 export async function getAvailableSlots(params: {
   scheduleId: string
@@ -57,6 +61,7 @@ export async function getAvailableSlots(params: {
       blocks: true,
       services: { where: { serviceId }, include: { service: true } },
       professionals: { select: { professionalId: true } },
+      user: { select: { businessConfig: { select: { timezone: true } } } },
     },
   })
 
@@ -65,23 +70,26 @@ export async function getAvailableSlots(params: {
   const service = schedule.services[0]?.service
   if (!service) return null
 
-  const date = parseCalendarDate(dateStr)
-  const dayOfWeek = date.getDay()
+  const timeZone = schedule.user.businessConfig?.timezone || DEFAULT_TIMEZONE
+
+  const dayOfWeek = dayOfWeekFromDateStr(dateStr)
 
   const now = new Date()
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (date < todayStart) return []
-
-  const maxBookingDate = new Date(todayStart)
-  maxBookingDate.setDate(maxBookingDate.getDate() + schedule.advanceBookingDays)
-  if (date > maxBookingDate) return []
+  // Comparações de calendário como string "YYYY-MM-DD": ordem lexicográfica é
+  // igual à cronológica nesse formato, e não depende de fuso nenhum.
+  const today = todayInZone(timeZone, now)
+  if (dateStr < today) return []
+  if (dateStr > addCalendarDays(today, schedule.advanceBookingDays)) return []
 
   if (!schedule.workingDays.includes(dayOfWeek)) return []
 
+  // Bloqueios são comparados pela data de calendário UTC dos instantes gravados
+  // — mesma semântica que a produção (processo em UTC) já aplicava, agora sem
+  // depender do fuso do processo.
   const hasBlock = schedule.blocks.some((block) => {
-    const blockStart = new Date(block.startDate)
-    const blockEnd = new Date(block.endDate)
-    return date >= blockStart && date <= blockEnd
+    const blockStartDay = new Date(block.startDate).toISOString().slice(0, 10)
+    const blockEndDay = new Date(block.endDate).toISOString().slice(0, 10)
+    return dateStr >= blockStartDay && dateStr <= blockEndDay
   })
   if (hasBlock) return []
 
@@ -129,10 +137,8 @@ export async function getAvailableSlots(params: {
     }
   }
 
-  const dateStart = new Date(date)
-  dateStart.setHours(0, 0, 0, 0)
-  const dateEnd = new Date(date)
-  dateEnd.setHours(23, 59, 59, 999)
+  const { start: dayStart, end: dateEnd } = tenantCalendarDayWindow(timeZone, dateStr)
+  const dateStart = new Date(dayStart.getTime() - OCCUPANCY_LOOKBACK_MS)
 
   // Ocupação é por profissional, não por agenda: o mesmo User pode estar
   // vinculado a várias agendas (ScheduleProfessional), e um agendamento dele
@@ -174,9 +180,7 @@ export async function getAvailableSlots(params: {
   const minBookingTime = new Date(now.getTime() + schedule.minNoticeHours * 60 * 60 * 1000)
 
   for (const slot of slots) {
-    const [slotHour, slotMinute] = slot.time.split(':').map(Number)
-    const slotDate = new Date(date)
-    slotDate.setHours(slotHour, slotMinute, 0, 0)
+    const slotDate = wallTimeToInstant(dateStr, slot.time, timeZone)
 
     if (slotDate < minBookingTime) {
       slot.available = false

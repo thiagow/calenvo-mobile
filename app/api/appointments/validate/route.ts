@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { checkBookingConflict } from '@/lib/appointment-service'
+import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     const userId = (session.user as any).id
     const body = await request.json()
-    const { scheduleId, professionalId, date, duration } = body
+    const { scheduleId, professionalId, date, time, duration } = body
 
     if (!scheduleId || !date || !duration) {
       return NextResponse.json(
@@ -32,16 +33,24 @@ export async function POST(request: NextRequest) {
     // agenda de outro tenant só adivinhando/vazando um scheduleId.
     const schedule = await prisma.schedule.findFirst({
       where: { id: scheduleId, userId },
-      select: { id: true }
+      select: { id: true, user: { select: { businessConfig: { select: { timezone: true } } } } }
     })
     if (!schedule) {
       return NextResponse.json({ error: 'Agenda não encontrada' }, { status: 404 })
     }
 
+    // Mesma conversão da escrita — a sonda tem que perguntar exatamente sobre o
+    // instante que o POST vai gravar, senão volta a divergir da criação.
+    const timezone = schedule.user.businessConfig?.timezone || DEFAULT_TIMEZONE
+    const appointmentDate = time ? wallTimeToInstant(date, time, timezone) : new Date(date)
+    if (Number.isNaN(appointmentDate.getTime())) {
+      return NextResponse.json({ error: 'Data ou horário inválido' }, { status: 400 })
+    }
+
     const hasConflict = await checkBookingConflict({
       scheduleId,
       professionalId: professionalId || null,
-      date: new Date(date),
+      date: appointmentDate,
       duration
     })
 

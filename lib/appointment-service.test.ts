@@ -79,7 +79,7 @@ describe('resolveProfessionalForBooking', () => {
 
     const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'p2' })
 
-    expect(result).toEqual({ professionalId: 'p2' })
+    expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
   })
 
   it('rejeita quando o profissional pedido não pertence a esta agenda', async () => {
@@ -107,7 +107,7 @@ describe('resolveProfessionalForBooking', () => {
 
     const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration })
 
-    expect(result).toEqual({ professionalId: 'p2' })
+    expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
   })
 
   it('sem professionalId, rejeita quando todos os profissionais vinculados estão ocupados', async () => {
@@ -122,6 +122,60 @@ describe('resolveProfessionalForBooking', () => {
 
     expect(result.professionalId).toBeNull()
     expect(result.error).toBeDefined()
+  })
+
+  // Encaixe: o pedido nunca é bloqueado, mas `hadConflict` tem que dizer a
+  // verdade — é ele, e não o cliente, que define `isOverbooked`. Antes a UI
+  // adivinhava isso pela grade de horários livres e, quando a grade discordava
+  // do servidor, o encaixe se desarmava sozinho e voltava recusado.
+  describe('encaixe (allowOverbook)', () => {
+    it('cria sobre horário ocupado e reporta hadConflict', async () => {
+      mockAppointments = [{ date, duration, professionalId: 'p2' }]
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'p2', allowOverbook: true })
+
+      expect(result).toEqual({ professionalId: 'p2', hadConflict: true })
+    })
+
+    it('sobre horário livre não é marcado como encaixe', async () => {
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'p2', allowOverbook: true })
+
+      expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
+    })
+
+    it('sem professionalId, prefere um colega livre em vez de empilhar no primeiro vinculado', async () => {
+      mockAppointments = [{ date, duration, professionalId: 'p1' }]
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, allowOverbook: true })
+
+      expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
+    })
+
+    it('sem professionalId e todos ocupados, cai no primeiro vinculado como encaixe', async () => {
+      mockAppointments = [
+        { date, duration, professionalId: 'p1' },
+        { date, duration, professionalId: 'p2' },
+        { date, duration, professionalId: 'p3' },
+      ]
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, allowOverbook: true })
+
+      expect(result).toEqual({ professionalId: 'p1', hadConflict: true })
+    })
+
+    it('continua exigindo que o profissional pedido pertença à agenda', async () => {
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date, duration, requestedProfessionalId: 'estranho', allowOverbook: true })
+
+      expect(result.professionalId).toBeNull()
+      expect(result.error).toBeDefined()
+    })
   })
 
   it('rejeita quando a agenda não pertence ao tenant chamado (isolamento cross-tenant)', async () => {
