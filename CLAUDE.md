@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Animations | Framer Motion |
 | Forms | react-hook-form + Zod |
 | Deployment | Netlify |
-| Notifications | n8n webhooks → WhatsApp |
+| Notifications | Uazapi (WhatsApp) direct |
 | Payments | Stripe |
 
 ## Commands
@@ -73,9 +73,9 @@ All API routes follow: **auth → validation → logic → response**.
 
 `User` → owns a business → has `Schedule` configs, `Service` catalog, `Client` list, `Appointment` records. `WhatsAppConfig` and `LoyaltyConfig` hang off `User`. Appointments track status transitions and can have `AppointmentPackageUsage`.
 
-### WhatsApp / n8n
+### WhatsApp / Uazapi
 
-All WhatsApp automation flows through n8n webhooks. Environment variables `N8N_WEBHOOK_URL`, `N8N_CREATE_INSTANCE_URL`, etc. control which n8n instance is targeted. The service layer lives in `/lib/whatsapp-service.ts`.
+Calenvo talks to the Uazapi server directly — no n8n, no Evolution API (both removed 2026-09). The client lives in `/lib/uazapi.ts` (instance lifecycle, `sendText`, webhook config, webhook payload types), server actions in `/app/actions/whatsapp.ts`, automated notification triggers in `/lib/whatsapp-trigger.ts`, and the inbound webhook handler at `/app/api/webhooks/uazapi/route.ts`. The instance token is stored encrypted at rest in `WhatsAppConfig.apiKey` (AES-256-GCM, `/lib/crypto.ts`) and is never sent to the client — any query that reads `WhatsAppConfig` for a client component (Server Component prop, server action) must use Prisma's `omit: { apiKey: true }`.
 
 ### Multi-tenancy
 
@@ -94,7 +94,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 Optional (features degrade gracefully without them):
 - `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_STANDARD_PRICE_ID`
-- `N8N_WEBHOOK_URL`, `N8N_CREATE_INSTANCE_URL`, `N8N_UPDATE_QR_CODE_URL`, `N8N_STATUS_URL`, `N8N_DELETE_URL`
+- `UAZAPI_BASE_URL`, `UAZAPI_ADMIN_TOKEN`, `UAZAPI_WEBHOOK_SECRET`, `SECRETS_ENCRYPTION_KEY` (WhatsApp — see "WhatsApp / Uazapi" above)
 - `AWS_REGION`, `AWS_BUCKET_NAME` (file uploads)
 
 Copy `.env.example` for the full list.

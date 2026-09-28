@@ -1,24 +1,18 @@
 /**
- * WhatsApp Notification Trigger Service v3.2
- * 
+ * WhatsApp Notification Trigger Service
+ *
  * Centralized service for sending automated notifications to clients.
- * Interacts with n8n real-time messaging endpoint with exponential backoff.
+ * Fala direto com a Uazapi via `lib/uazapi.ts` (retry/backoff já embutido
+ * no client — não duplicamos aqui como na versão n8n).
  */
 
 import { prisma } from './db';
 import { Appointment, Client } from '@prisma/client';
-import axios from 'axios';
 import { formatWhatsAppNumber } from './utils';
-
-/**
- * Helper for exponential backoff delay
- */
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { decryptSecret } from './crypto';
+import { sendText } from './uazapi';
 
 export class WhatsAppTriggerService {
-  /** Real-time messaging endpoint */
-  private static sendMessageUrl = process.env.N8N_SEND_MESSAGE_URL;
-
   /**
    * Replace mustache-style variables in message templates.
    * Supported: {{nome_cliente}}, {{data}}, {{hora}}, {{servico}}, {{profissional}}, {{empresa}}, {{link_avaliacao}}, {{link_confirmacao}}
@@ -61,52 +55,24 @@ export class WhatsAppTriggerService {
   }
 
   /**
-   * Send message to n8n with automatic exponential backoff retry
+   * Descriptografa o token da instância e envia via Uazapi. Retry/backoff em
+   * 429/5xx já acontece dentro de `sendText` (`lib/uazapi.ts`) — não
+   * duplicamos aqui como fazia a versão n8n.
    */
-  private static async sendToN8n(
-    instanceName: string,
+  private static async sendViaUazapi(
+    encryptedInstanceToken: string,
     recipient: string,
-    message: string,
-    attempt: number = 1
+    message: string
   ): Promise<boolean> {
-    if (!this.sendMessageUrl) {
-      console.warn('[WhatsAppTrigger] N8N_SEND_MESSAGE_URL not configured');
-      return false;
-    }
-
-    // Format recipient number (ensure 55 DDI)
     const formattedRecipient = formatWhatsAppNumber(recipient);
 
-    const MAX_RETRIES = 3;
-    const BASE_DELAY = 1000;
-
     try {
-      await axios.post(
-        this.sendMessageUrl,
-        {
-          instancia: instanceName,
-          mensagem: message,
-          destinatario: formattedRecipient,
-        },
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 10000,
-        }
-      );
-
-      console.log(`[WhatsAppTrigger] Message sent to ${formattedRecipient} via ${instanceName}`);
+      await sendText(decryptSecret(encryptedInstanceToken), formattedRecipient, message);
+      console.log(`[WhatsAppTrigger] Message sent to ${formattedRecipient}`);
       return true;
-    } catch (error: any) {
-      if (attempt >= MAX_RETRIES) {
-        console.error(`[WhatsAppTrigger] Failed after ${MAX_RETRIES} attempts to ${formattedRecipient}:`, error.message);
-        return false;
-      }
-
-      const delay = BASE_DELAY * Math.pow(2, attempt - 1);
-      console.warn(`[WhatsAppTrigger] Attempt ${attempt} failed for ${formattedRecipient}. Retrying in ${delay}ms...`);
-      
-      await sleep(delay);
-      return this.sendToN8n(instanceName, recipient, message, attempt + 1);
+    } catch (error) {
+      console.error(`[WhatsAppTrigger] Failed to send to ${formattedRecipient}:`, error);
+      return false;
     }
   }
 
@@ -123,7 +89,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyOnCreate) return;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCreate) return;
       if (!appointment.client.phone) return;
 
       const message = this.replaceVariables(config.createMessage || '', {
@@ -134,7 +100,7 @@ export class WhatsAppTriggerService {
         businessName: appointment.user.businessName || undefined,
       });
 
-      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      await this.sendViaUazapi(config.apiKey, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentCreated:', error);
     }
@@ -153,7 +119,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyOnCancel) return;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCancel) return;
       if (!appointment.client.phone) return;
 
       const message = this.replaceVariables(config.cancelMessage || '', {
@@ -164,7 +130,7 @@ export class WhatsAppTriggerService {
         businessName: appointment.user.businessName || undefined,
       });
 
-      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      await this.sendViaUazapi(config.apiKey, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentCancelled:', error);
     }
@@ -188,7 +154,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyProfessionalOnCancel) return;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyProfessionalOnCancel) return;
 
       const recipient =
         appointment.professionalUser?.whatsapp ||
@@ -206,7 +172,7 @@ export class WhatsAppTriggerService {
         businessName: appointment.user.businessName || undefined,
       });
 
-      await this.sendToN8n(config.instanceName, recipient, message);
+      await this.sendViaUazapi(config.apiKey, recipient, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentCancelledByClient:', error);
     }
@@ -229,7 +195,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyConfirmation) return false;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyConfirmation) return false;
       if (!appointment.client.phone) return false;
 
       const message = this.replaceVariables(config.confirmationMessage || '', {
@@ -241,7 +207,7 @@ export class WhatsAppTriggerService {
         confirmationLink,
       });
 
-      return await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      return await this.sendViaUazapi(config.apiKey, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentConfirmationRequest:', error);
       return false;
@@ -261,7 +227,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyReminder) return;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyReminder) return;
       if (!appointment.client.phone) return;
 
       const message = this.replaceVariables(config.reminderMessage || '', {
@@ -272,7 +238,7 @@ export class WhatsAppTriggerService {
         businessName: appointment.user.businessName || undefined,
       });
 
-      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      await this.sendViaUazapi(config.apiKey, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentReminder:', error);
     }
@@ -291,7 +257,7 @@ export class WhatsAppTriggerService {
         where: { userId: appointment.userId },
       });
 
-      if (!config || !config.enabled || !config.isConnected || !config.notifyOnCompleted) return;
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCompleted) return;
       if (!appointment.client.phone) return;
 
       const message = this.replaceVariables(config.completedMessage || '', {
@@ -303,7 +269,7 @@ export class WhatsAppTriggerService {
         reviewLink: config.reviewLink || undefined,
       });
 
-      await this.sendToN8n(config.instanceName, appointment.client.phone, message);
+      await this.sendViaUazapi(config.apiKey, appointment.client.phone, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentCompleted:', error);
     }

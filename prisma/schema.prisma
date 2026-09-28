@@ -536,7 +536,7 @@ enum NotificationType {
 
 enum NotificationChannel {
   INTERNAL // Notificação interna (sino)
-  WHATSAPP // WhatsApp via Evolution API
+  WHATSAPP // WhatsApp via Uazapi
   BOTH // Ambos
 }
 
@@ -566,14 +566,17 @@ model Notification {
   @@index([userId, createdAt])
 }
 
-/// Configuration for WhatsApp Integration via n8n (v3.1)
+/// Configuration for WhatsApp Integration via Uazapi (direct, no n8n/Evolution)
 model WhatsAppConfig {
   id              String    @id @default(cuid())
-  /// Unique identifier for the instance in n8n/Evolution
+  /// Unique identifier for the instance on the Uazapi server
   instanceName    String    @unique
-  /// Legacy API Key for direct Evolution access
+  /// Instance token from Uazapi, encrypted at rest (AES-256-GCM, see lib/crypto.ts).
+  /// Never sent to the client — always query with `omit: { apiKey: true }`.
   apiKey          String?   @db.Text
-  /// URL of the n8n webhook or Evolution API
+  /// Legacy: Evolution API base URL / n8n webhook URL. Unused since the Uazapi
+  /// migration (base URL now comes from the fixed UAZAPI_BASE_URL env var).
+  /// Kept `String` (not optional) to avoid a schema migration; new rows write ''.
   apiUrl          String
   /// The phone number connected to this instance
   phoneNumber     String?   @db.Text

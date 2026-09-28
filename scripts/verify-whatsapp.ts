@@ -76,11 +76,12 @@ async function runVerification() {
   // 2. Test Trigger on Creation
   console.log('🧪 Testando gatilho de criação...');
   try {
-    // Note: This will attempt to call the n8n webhook. 
-    // In a real automated test we would mock this, but here we'll just check if it fails gracefully
-    // or if we need to mock the environment variables.
+    // Sem `apiKey` (token Uazapi) configurado no upsert acima, o trigger
+    // retorna cedo sem tentar enviar nada — este script só valida que o
+    // fluxo não lança. Pra exercitar o envio de verdade, popule `apiKey`
+    // com um token de instância real cifrado (`encryptSecret` de lib/crypto.ts).
     await WhatsAppTriggerService.onAppointmentCreated(appointment);
-    console.log('✅ Gatilho de criação executado (Verifique logs se EVOLUTION_API_URL estiver configurado).');
+    console.log('✅ Gatilho de criação executado (sem apiKey configurado, não deve ter enviado nada).');
   } catch (error) {
     console.log('ℹ️ Gatilho de criação falhou como esperado (provavelmente falta de env vars):', error instanceof Error ? error.message : error);
   }

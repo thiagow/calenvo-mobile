@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { WhatsAppConfig } from '@prisma/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +14,8 @@ import {
   createInstanceAction,
   checkConnectionStatusAction,
   deleteInstanceAction,
-  refreshQRCodeAction
+  refreshQRCodeAction,
+  type PublicWhatsAppConfig,
 } from '@/app/actions/whatsapp';
 import { QRCodeModal } from './qrcode-modal';
 import { useStatusPolling } from './use-status-polling';
@@ -24,8 +24,8 @@ import { useStatusPolling } from './use-status-polling';
  * Properties for the WhatsApp Connection component
  */
 interface WhatsAppConnectionProps {
-  /** Existing WhatsApp configuration from the database */
-  config: WhatsAppConfig | null;
+  /** Existing WhatsApp configuration from the database (sem o token da instância) */
+  config: PublicWhatsAppConfig | null;
 }
 
 /**

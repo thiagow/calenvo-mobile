@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { WhatsAppConfig } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -11,14 +10,14 @@ import { NotificationCard } from './notification-card';
 import { Bell, CalendarCheck, CalendarX, Clock, AlertCircle, Send, Loader2, CheckCircle2, Star, UserCog } from 'lucide-react';
 import { FeedbackDialog } from './feedback-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { updateWhatsAppSettingsAction, sendTestMessageAction } from '@/app/actions/whatsapp';
+import { updateWhatsAppSettingsAction, sendTestMessageAction, type PublicWhatsAppConfig } from '@/app/actions/whatsapp';
 import { VariableHelper } from './variable-helper';
 import { MessagePreview } from './message-preview';
 import { Textarea } from '@/components/ui/textarea';
 import { TestMessageDialog } from './test-message-dialog';
 
 interface NotificationSettingsProps {
-  config: WhatsAppConfig;
+  config: PublicWhatsAppConfig;
   disabled?: boolean;
 }
 

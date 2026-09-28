@@ -26,9 +26,15 @@ export default async function CanaisAtendimentoPage() {
   const isWhatsappGated = user.planType === 'BASICO'
   const hasAccess = !isWhatsappGated
 
+  // `omit: { apiKey: true }` — o token da instância Uazapi nunca deve
+  // trafegar pro client component (Server Component → props serializa no
+  // payload RSC enviado ao navegador).
   let whatsAppConfig = null
   if (hasAccess) {
-    whatsAppConfig = await prisma.whatsAppConfig.findUnique({ where: { userId: user.id } })
+    whatsAppConfig = await prisma.whatsAppConfig.findUnique({
+      where: { userId: user.id },
+      omit: { apiKey: true },
+    })
   }
 
   return (

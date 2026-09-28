@@ -3,7 +3,7 @@ export const USER_FRIENDLY_ERRORS = {
     WHATSAPP_INSTANCE_NOT_FOUND: 'Instância do WhatsApp não encontrada no servidor. Verifique a configuração ou reconecte.',
     WHATSAPP_SEND_FAILED: 'Não foi possível enviar a mensagem no momento. Tente novamente em instantes.',
     WHATSAPP_INVALID_NUMBER: 'O número de telefone informado parece inválido ou não possui WhatsApp.',
-    WHATSAPP_NETWORK_ERROR: 'Ocorreu um erro de comunicação com o servidor n8n/WhatsApp.',
+    WHATSAPP_NETWORK_ERROR: 'Ocorreu um erro de comunicação com o servidor do WhatsApp.',
     UNKNOWN_ERROR: 'Ocorreu um erro inesperado. Por favor, tente novamente.',
 } as const;
 
