@@ -34,7 +34,7 @@ interface WhatsAppConnectionProps {
  * Handles the entire lifecycle of a WhatsApp instance connection:
  * 1. Initial configuration and phone number entry
  * 2. QR Code generation and display in a responsive modal
- * 3. Automatic background polling (30s interval) with countdown
+ * 3. Automatic background polling (4s interval) that also keeps the QR fresh
  * 4. Manual status synchronization
  * 5. Instance deletion (disconnection)
  * 
@@ -107,6 +107,11 @@ export function WhatsAppConnection({ config: initialConfig }: WhatsAppConnection
       if (result.success && result.data) {
         const nowConnected = result.data.isConnected;
 
+        // QR rotated on the Uazapi side — keep the modal showing the live code
+        if (result.data.qrCode) {
+          setQrCode(result.data.qrCode);
+        }
+
         // Only show toast and reload if status changed to connected
         if (nowConnected && !isConnected && !connectionToastShown) {
           console.log('[WhatsAppConnection] Connection established!');
@@ -135,9 +140,9 @@ export function WhatsAppConnection({ config: initialConfig }: WhatsAppConnection
   }, [isConnected, connectionToastShown, toast]);
 
   // Status polling hook - only active when modal is open
-  const { countdown, isChecking, triggerCheck } = useStatusPolling({
+  const { isChecking } = useStatusPolling({
     enabled: showQRModal && !isConnected,
-    intervalMs: 30000, // 30 seconds
+    intervalMs: 4000,
     onCheck: handlePollingCheck,
   });
 
@@ -548,7 +553,6 @@ export function WhatsAppConnection({ config: initialConfig }: WhatsAppConnection
           qrCode={qrCode}
           open={showQRModal}
           onOpenChange={setShowQRModal}
-          countdown={countdown}
           isChecking={isChecking}
         />
       )}

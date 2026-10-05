@@ -10,6 +10,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Smartphone, Clock } from 'lucide-react';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 /**
  * Properties for the WhatsApp QR Code Modal
@@ -21,8 +22,6 @@ interface QRCodeModalProps {
   open: boolean;
   /** Callback executed when modal open state changes */
   onOpenChange: (open: boolean) => void;
-  /** Current countdown value in seconds for the next status check */
-  countdown?: number;
   /** Whether a connection status check is currently being performed */
   isChecking?: boolean;
 }
@@ -37,7 +36,6 @@ export function QRCodeModal({
   qrCode, 
   open, 
   onOpenChange,
-  countdown,
   isChecking = false,
 }: QRCodeModalProps) {
   return (
@@ -77,19 +75,11 @@ export function QRCodeModal({
               )}
             </div>
 
-            {/* Status Check Countdown */}
-            {countdown !== undefined && (
-              <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border w-full">
-                <Clock className={`h-4 w-4 ${isChecking ? 'animate-pulse text-primary' : 'text-muted-foreground'}`} />
-                <span className="text-sm font-medium">
-                  {isChecking ? (
-                    'Verificando conexão...'
-                  ) : (
-                    `Próxima verificação em ${countdown}s`
-                  )}
-                </span>
-              </div>
-            )}
+            {/* Live connection status */}
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border w-full">
+              <Clock className={cn('h-4 w-4', isChecking ? 'animate-pulse text-primary' : 'text-muted-foreground')} />
+              <span className="text-sm font-medium">Aguardando você escanear o código…</span>
+            </div>
           </div>
 
           {/* Right Column - Instructions & Info */}
@@ -116,7 +106,7 @@ export function QRCodeModal({
 
             {/* Expiration Notice */}
             <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-              <p>Este código expira em alguns minutos. Se expirar, feche esta janela e gere um novo código.</p>
+              <p>O código é renovado automaticamente enquanto esta janela estiver aberta. A conexão é detectada em poucos segundos após a leitura.</p>
             </div>
           </div>
         </div>

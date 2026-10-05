@@ -378,7 +378,9 @@ export async function getWhatsAppConfigAction(): Promise<ActionState<PublicWhats
  * substitui) o webhook: cobre o caso de o webhook não ter chegado ainda ou
  * ter se perdido.
  */
-export async function checkConnectionStatusAction(): Promise<ActionState<{ isConnected: boolean; uazapiStatus?: string }>> {
+export async function checkConnectionStatusAction(): Promise<
+  ActionState<{ isConnected: boolean; uazapiStatus?: string; qrCode?: string }>
+> {
   try {
     const session = (await getServerSession(authOptions)) as ExtendedSession | null;
     if (!session?.user?.id) {
@@ -420,7 +422,17 @@ export async function checkConnectionStatusAction(): Promise<ActionState<{ isCon
       });
     }
 
-    return { success: true, data: { isConnected, uazapiStatus: instance.status } };
+    // Enquanto `connecting`, a Uazapi pode rotacionar o QR — devolvemos o atual
+    // para o modal não ficar exibindo um código já inválido.
+    const qrCode = instance.status === 'connecting' ? instance.qrcode : undefined;
+    if (qrCode && qrCode !== config.qrCode) {
+      await prisma.whatsAppConfig.update({
+        where: { id: config.id },
+        data: { qrCode, qrCodeExpiresAt: new Date(Date.now() + QR_CODE_TTL_MS) },
+      });
+    }
+
+    return { success: true, data: { isConnected, uazapiStatus: instance.status, qrCode } };
   } catch (error) {
     console.error('[checkConnectionStatusAction] Error:', error);
     return { success: false, error: 'Erro ao verificar status' };
