@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAvailableSlotsForService } from '@/lib/availability-service'
+import { getAvailableSlotsForService, getMaxBookableDate } from '@/lib/availability-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 
 export const dynamic = 'force-dynamic'
@@ -26,12 +26,19 @@ export async function GET(
       return NextResponse.json({ error: 'Negócio não encontrado' }, { status: 404 })
     }
 
-    const slots = await getAvailableSlotsForService({
-      serviceId,
-      date,
-      userId: tenant.id,
-      ...(professionalId && { professionalId }),
-    })
+    const [slots, maxDate] = await Promise.all([
+      getAvailableSlotsForService({
+        serviceId,
+        date,
+        userId: tenant.id,
+        ...(professionalId && { professionalId }),
+      }),
+      getMaxBookableDate({
+        serviceId,
+        userId: tenant.id,
+        ...(professionalId && { professionalId }),
+      }),
+    ])
 
     if (slots === null) {
       return NextResponse.json(
@@ -40,7 +47,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ slots })
+    return NextResponse.json({ slots, maxDate })
   } catch (error) {
     console.error('Erro ao buscar horários:', error)
     return NextResponse.json(

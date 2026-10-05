@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { DEFAULT_ADVANCE_BOOKING_DAYS, DEFAULT_MIN_NOTICE_HOURS, parseBookingWindow } from '@/lib/booking-window'
 
 export const dynamic = 'force-dynamic'
 
@@ -153,6 +154,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const bookingWindow = parseBookingWindow({ advanceBookingDays, minNoticeHours })
+    if (!bookingWindow.ok) {
+      return NextResponse.json({ error: bookingWindow.error }, { status: 400 })
+    }
+
     if (!professionalIds || professionalIds.length === 0) {
       console.log('❌ Validation error - No professionals selected')
       return NextResponse.json(
@@ -199,8 +205,8 @@ export async function POST(request: NextRequest) {
       workingDays,
       slotDuration: derivedSlotDuration,
       bufferTime: bufferTime || 0,
-      advanceBookingDays: advanceBookingDays || 30,
-      minNoticeHours: minNoticeHours || 2
+      advanceBookingDays: bookingWindow.advanceBookingDays ?? DEFAULT_ADVANCE_BOOKING_DAYS,
+      minNoticeHours: bookingWindow.minNoticeHours ?? DEFAULT_MIN_NOTICE_HOURS
     })
 
     const schedule = await prisma.schedule.create({
@@ -212,8 +218,8 @@ export async function POST(request: NextRequest) {
         workingDays,
         slotDuration: derivedSlotDuration,
         bufferTime: bufferTime || 0,
-        advanceBookingDays: advanceBookingDays || 30,
-        minNoticeHours: minNoticeHours || 2
+        advanceBookingDays: bookingWindow.advanceBookingDays ?? DEFAULT_ADVANCE_BOOKING_DAYS,
+        minNoticeHours: bookingWindow.minNoticeHours ?? DEFAULT_MIN_NOTICE_HOURS
       }
     })
 

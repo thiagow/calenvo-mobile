@@ -120,6 +120,25 @@ describe('getAvailableSlots', () => {
     expect(result).toEqual([])
   })
 
+  it('aceita o último dia da janela e rejeita o dia seguinte', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    mockSchedulesById['schedule-1'].advanceBookingDays = 10
+
+    const lastDay = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(10), userId: 'tenant-a' })
+    const dayAfter = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(11), userId: 'tenant-a' })
+
+    expect(lastDay!.length).toBeGreaterThan(0)
+    expect(dayAfter).toEqual([])
+  })
+
+  it('aceita datas de meses futuros com a janela padrão de 90 dias', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(60), userId: 'tenant-a' })
+
+    expect(result!.length).toBeGreaterThan(0)
+  })
+
   it('rejeita data no passado', async () => {
     const { getAvailableSlots } = await import('@/lib/availability-service')
 
@@ -319,5 +338,26 @@ describe('getAvailableSlotsForService', () => {
 
     // schedule-1 tem o 09:00 ocupado, mas schedule-2 está livre — a união mostra disponível
     expect(result!.find((s) => s.time === '09:00')?.available).toBe(true)
+  })
+})
+
+describe('getMaxBookableDate', () => {
+  it('devolve hoje + a maior antecedência entre as agendas candidatas', async () => {
+    const { getMaxBookableDate } = await import('@/lib/availability-service')
+    mockScheduleList = [
+      { id: 'a', advanceBookingDays: 30, user: { businessConfig: { timezone: TZ } } },
+      { id: 'b', advanceBookingDays: 120, user: { businessConfig: { timezone: TZ } } },
+    ] as any
+
+    const result = await getMaxBookableDate({ userId: 'tenant-a', serviceId: 'service-1' })
+
+    expect(result).toBe(futureDateStr(120))
+  })
+
+  it('retorna null quando o serviço não está em nenhuma agenda', async () => {
+    const { getMaxBookableDate } = await import('@/lib/availability-service')
+    mockScheduleList = []
+
+    expect(await getMaxBookableDate({ userId: 'tenant-a', serviceId: 'service-1' })).toBeNull()
   })
 })

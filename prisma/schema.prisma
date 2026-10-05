@@ -228,7 +228,7 @@ model Schedule {
   // Configurações de agendamento
   lunchStart         String?
   lunchEnd           String?
-  advanceBookingDays Int     @default(30) // Quantos dias no futuro permitir agendamento
+  advanceBookingDays Int     @default(90) // Quantos dias no futuro permitir agendamento
   minNoticeHours     Int     @default(2) // Horas mínimas de antecedência
 
   // Controle de horários customizados

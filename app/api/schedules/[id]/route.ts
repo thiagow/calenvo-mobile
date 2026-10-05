@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { parseBookingWindow } from '@/lib/booking-window'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,6 +95,11 @@ export async function PUT(
       professionalIds
     } = body
 
+    const bookingWindow = parseBookingWindow({ advanceBookingDays, minNoticeHours })
+    if (!bookingWindow.ok) {
+      return NextResponse.json({ error: bookingWindow.error }, { status: 400 })
+    }
+
     // Verificar se a agenda pertence ao usuário
     const existingSchedule = await prisma.schedule.findFirst({
       where: {
@@ -145,8 +151,8 @@ export async function PUT(
         bufferTime,
         lunchStart,
         lunchEnd,
-        advanceBookingDays,
-        minNoticeHours,
+        advanceBookingDays: bookingWindow.advanceBookingDays,
+        minNoticeHours: bookingWindow.minNoticeHours,
         isActive,
         acceptWalkIn: acceptWalkIn ?? false
       }

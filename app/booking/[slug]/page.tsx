@@ -52,6 +52,7 @@ export default function PublicBookingPage() {
   const [selectedDate, setSelectedDate] = useState<Date>()
   const [slots, setSlots] = useState<BookingTimeSlot[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
+  const [maxDate, setMaxDate] = useState<string | null>(null)
   const [selectedTime, setSelectedTime] = useState('')
 
   const [clientName, setClientName] = useState('')
@@ -127,6 +128,7 @@ export default function PublicBookingPage() {
       if (response.ok) {
         const data = await response.json()
         setSlots(data.slots || [])
+        setMaxDate(data.maxDate ?? null)
       }
     } catch (error) {
       console.error('Erro ao buscar horários:', error)
@@ -364,6 +366,7 @@ export default function PublicBookingPage() {
                     }}
                     slots={slots}
                     loadingSlots={loadingSlots}
+                    maxDate={maxDate}
                     selectedTime={selectedTime}
                     onSelectTime={setSelectedTime}
                   />

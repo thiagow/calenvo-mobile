@@ -235,6 +235,38 @@ export async function resolveCandidateSchedules(params: {
 }
 
 /**
+ * Último dia ("YYYY-MM-DD", calendário do negócio) em que o cliente ainda pode
+ * reservar este serviço: a maior `advanceBookingDays` entre as agendas
+ * candidatas. Permite à página pública explicar por que uma data distante não
+ * tem horários, em vez de mostrar só "indisponível". `null` se não há agenda.
+ */
+export async function getMaxBookableDate(params: {
+  userId: string
+  serviceId: string
+  professionalId?: string
+}): Promise<string | null> {
+  const { userId, serviceId, professionalId } = params
+
+  const schedules = await prisma.schedule.findMany({
+    where: {
+      userId,
+      isActive: true,
+      services: { some: { serviceId } },
+      ...(professionalId && { professionals: { some: { professionalId } } }),
+    },
+    select: {
+      advanceBookingDays: true,
+      user: { select: { businessConfig: { select: { timezone: true } } } },
+    },
+  })
+  if (schedules.length === 0) return null
+
+  const timeZone = schedules[0].user.businessConfig?.timezone || DEFAULT_TIMEZONE
+  const maxDays = Math.max(...schedules.map((s) => s.advanceBookingDays))
+  return addCalendarDays(todayInZone(timeZone), maxDays)
+}
+
+/**
  * Disponibilidade de um serviço sem precisar de scheduleId: resolve as agendas
  * candidatas e une os horários de todas — um horário aparece disponível se
  * estiver livre em pelo menos uma delas. Retorna `null` quando o serviço não

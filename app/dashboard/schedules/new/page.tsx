@@ -53,7 +53,7 @@ export default function NewSchedulePage() {
     description: '',
     color: '#3B82F6',
     bufferTime: 0,
-    advanceBookingDays: 30,
+    advanceBookingDays: 90,
     minNoticeHours: 2,
     selectedServices: [] as string[],
     selectedProfessionals: [] as string[],
@@ -319,6 +319,39 @@ export default function NewSchedulePage() {
           initialConfigs={dayConfigs}
           onChange={(configs) => setDayConfigs(configs)}
         />
+        <Card>
+          <CardHeader>
+            <CardTitle>Janela de Agendamento</CardTitle>
+            <CardDescription>Até quando e com quanta antecedência o cliente pode agendar nesta agenda</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
+              <div>
+                <Label htmlFor="advanceBookingDays">Antecedência máxima (dias)</Label>
+                <Input
+                  id="advanceBookingDays"
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={formData.advanceBookingDays}
+                  onChange={(e) => setFormData({ ...formData, advanceBookingDays: Number(e.target.value) || 0 })}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Quão longe no futuro o cliente enxerga horários</p>
+              </div>
+              <div>
+                <Label htmlFor="minNoticeHours">Antecedência mínima (horas)</Label>
+                <Input
+                  id="minNoticeHours"
+                  type="number"
+                  min="0"
+                  value={formData.minNoticeHours}
+                  onChange={(e) => setFormData({ ...formData, minNoticeHours: Number(e.target.value) || 0 })}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Tempo mínimo entre agora e o horário escolhido</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
