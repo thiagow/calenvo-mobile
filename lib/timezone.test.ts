@@ -3,6 +3,7 @@ import {
   addCalendarDays,
   calendarDateInZone,
   dayOfWeekFromDateStr,
+  formatInZone,
   tenantCalendarDayWindow,
   tenantDayWindow,
   todayInZone,
@@ -118,5 +119,19 @@ describe('calendarDateInZone / todayInZone', () => {
 
   it('todayInZone aceita um instante de referência', () => {
     expect(todayInZone(SP, new Date('2026-08-22T01:00:00.000Z'))).toBe('2026-08-21')
+  })
+})
+
+describe('formatInZone', () => {
+  it('formata no fuso do negócio, independente do fuso do processo', () => {
+    expect(formatInZone(new Date('2026-10-14T19:00:00.000Z'), SP)).toEqual({ date: '14/10/2026', time: '16:00' })
+  })
+
+  it('acerta a data na virada de dia', () => {
+    expect(formatInZone(new Date('2026-10-15T01:30:00.000Z'), SP)).toEqual({ date: '14/10/2026', time: '22:30' })
+  })
+
+  it('preenche com zero à esquerda', () => {
+    expect(formatInZone(new Date('2026-03-05T11:05:00.000Z'), SP)).toEqual({ date: '05/03/2026', time: '08:05' })
   })
 })

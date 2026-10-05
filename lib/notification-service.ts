@@ -1,8 +1,7 @@
 
 import { prisma } from '@/lib/db'
 import { NotificationType } from '@prisma/client'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { DEFAULT_TIMEZONE, formatInZone } from '@/lib/timezone'
 
 export interface CreateNotificationParams {
   userId: string
@@ -14,6 +13,19 @@ export interface CreateNotificationParams {
 }
 
 export class NotificationService {
+  /**
+   * "dd/MM/yyyy às HH:mm" no fuso do negócio. Formatar no fuso do processo
+   * mostraria UTC em produção (3h à frente de America/Sao_Paulo).
+   */
+  private static async formatDateForTenant(userId: string, date: Date): Promise<string> {
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId },
+      select: { timezone: true },
+    })
+    const { date: d, time } = formatInZone(date, businessConfig?.timezone || DEFAULT_TIMEZONE)
+    return `${d} às ${time}`
+  }
+
   /**
    * Cria uma notificação interna
    */
@@ -107,7 +119,7 @@ export class NotificationService {
     serviceName: string,
     date: Date
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
     
     return await this.createNotification({
       userId,
@@ -129,7 +141,7 @@ export class NotificationService {
     serviceName: string,
     date: Date
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
     
     return await this.createNotification({
       userId,
@@ -151,7 +163,7 @@ export class NotificationService {
     serviceName: string,
     date: Date
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
     
     return await this.createNotification({
       userId,
@@ -177,7 +189,7 @@ export class NotificationService {
     date: Date,
     reason?: string | null
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
 
     return await this.createNotification({
       userId,
@@ -199,7 +211,7 @@ export class NotificationService {
     serviceName: string,
     date: Date
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
     
     return await this.createNotification({
       userId,
@@ -222,8 +234,8 @@ export class NotificationService {
     oldDate: Date,
     newDate: Date
   ) {
-    const formattedOldDate = format(oldDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-    const formattedNewDate = format(newDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedOldDate = await this.formatDateForTenant(userId, oldDate)
+    const formattedNewDate = await this.formatDateForTenant(userId, newDate)
     
     return await this.createNotification({
       userId,
@@ -250,7 +262,7 @@ export class NotificationService {
     serviceName: string,
     date: Date
   ) {
-    const formattedDate = format(date, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+    const formattedDate = await this.formatDateForTenant(userId, date)
     
     return await this.createNotification({
       userId,

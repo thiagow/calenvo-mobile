@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { AppointmentStatus } from '@prisma/client'
+import { DEFAULT_TIMEZONE, formatInZone } from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,6 +173,12 @@ export async function GET(request: NextRequest) {
       })
     ])
 
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId: masterId },
+      select: { timezone: true }
+    })
+    const timeZone = businessConfig?.timezone || DEFAULT_TIMEZONE
+
     return NextResponse.json({
       stats: {
         todayAppointments,
@@ -184,10 +191,7 @@ export async function GET(request: NextRequest) {
       recentAppointments: recentAppointments.map(apt => ({
         id: apt.id,
         patient: apt.client.name,
-        time: apt.date.toLocaleTimeString('pt-BR', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
+        time: formatInZone(apt.date, timeZone).time,
         status: apt.status,
         type: apt.service?.name || apt.specialty || 'Consulta',
         serviceName: apt.service?.name,

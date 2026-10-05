@@ -11,6 +11,7 @@ import { Appointment, Client } from '@prisma/client';
 import { formatWhatsAppNumber } from './utils';
 import { decryptSecret } from './crypto';
 import { sendText } from './uazapi';
+import { DEFAULT_TIMEZONE, formatInZone } from './timezone';
 
 export const DEFAULT_PROFESSIONAL_CANCEL_MESSAGE =
   'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.';
@@ -34,6 +35,15 @@ export class WhatsAppTriggerService {
     );
   }
 
+  /** Fuso configurado do negócio, com fallback para o padrão do sistema. */
+  private static async getTenantTimeZone(userId: string): Promise<string> {
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId },
+      select: { timezone: true },
+    });
+    return businessConfig?.timezone || DEFAULT_TIMEZONE;
+  }
+
   /**
    * Replace mustache-style variables in message templates.
    * Supported: {{nome_cliente}}, {{data}}, {{hora}}, {{servico}}, {{profissional}}, {{empresa}}, {{link_avaliacao}}, {{link_confirmacao}}
@@ -43,6 +53,8 @@ export class WhatsAppTriggerService {
     data: {
       clientName: string;
       appointmentDate: Date;
+      /** Fuso do negócio — obrigatório: sem ele a hora sairia no fuso do servidor (UTC). */
+      timeZone: string;
       serviceName?: string;
       professionalName?: string;
       businessName?: string;
@@ -50,11 +62,10 @@ export class WhatsAppTriggerService {
       confirmationLink?: string;
     }
   ): string {
-    const dateFormatted = new Date(data.appointmentDate).toLocaleDateString('pt-BR');
-    const timeFormatted = new Date(data.appointmentDate).toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const { date: dateFormatted, time: timeFormatted } = formatInZone(
+      new Date(data.appointmentDate),
+      data.timeZone
+    );
 
     let message = template
       .replace(/\{\{nome_cliente\}\}/g, data.clientName)
@@ -116,6 +127,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.createMessage || '', {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -146,6 +158,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.cancelMessage || '', {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -183,6 +196,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.professionalCancelMessage || DEFAULT_PROFESSIONAL_CANCEL_MESSAGE, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -220,6 +234,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.professionalBookingMessage || DEFAULT_PROFESSIONAL_BOOKING_MESSAGE, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -254,6 +269,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.confirmationMessage || '', {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -286,6 +302,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.reminderMessage || '', {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,
@@ -316,6 +333,7 @@ export class WhatsAppTriggerService {
       const message = this.replaceVariables(config.completedMessage || '', {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
+        timeZone: await this.getTenantTimeZone(appointment.userId),
         serviceName,
         professionalName,
         businessName: appointment.user.businessName || undefined,

@@ -106,6 +106,21 @@ export function calendarDateInZone(instant: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone }).format(instant)
 }
 
+/**
+ * Formata um instante no fuso do negócio ("14/10/2026" e "16:00"). Sempre
+ * passe o fuso explicitamente: `toLocale*String` sem `timeZone` usa o fuso do
+ * PROCESSO, que em produção (Netlify Functions) é UTC e mostraria 19:00 para
+ * um agendamento das 16:00 em America/Sao_Paulo.
+ */
+export function formatInZone(instant: Date, timeZone: string): { date: string; time: string } {
+  const w = getWallTimeInZone(instant, timeZone)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    date: `${pad(w.day)}/${pad(w.month)}/${w.year}`,
+    time: `${pad(w.hour)}:${pad(w.minute)}`,
+  }
+}
+
 /** "Hoje" no calendário do tenant, em "YYYY-MM-DD" — comparável lexicograficamente. */
 export function todayInZone(timeZone: string, now: Date = new Date()): string {
   return calendarDateInZone(now, timeZone)
