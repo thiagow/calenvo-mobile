@@ -318,12 +318,22 @@ export async function executeTool(
         const appointment = result.appointment
 
         const professional = appointment.professionalId
-          ? await prisma.user.findUnique({ where: { id: appointment.professionalId }, select: { name: true } })
+          ? await prisma.user.findUnique({ where: { id: appointment.professionalId }, select: { name: true, whatsapp: true, phone: true } })
           : null
 
         try {
           await WhatsAppTriggerService.onAppointmentCreated(
             { ...appointment, client: clientRecord, user: { businessName: tenant.businessName } } as any,
+            service.name,
+            professional?.name ?? undefined
+          )
+          await WhatsAppTriggerService.onAppointmentCreatedByClient(
+            {
+              ...appointment,
+              client: clientRecord,
+              user: { businessName: tenant.businessName, whatsapp: tenant.whatsapp, phone: tenant.phone },
+              professionalUser: professional,
+            },
             service.name,
             professional?.name ?? undefined
           )

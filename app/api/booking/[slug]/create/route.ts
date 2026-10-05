@@ -186,13 +186,23 @@ export async function POST(
     }
 
     const professional = appointment.professionalId
-      ? await prisma.user.findUnique({ where: { id: appointment.professionalId }, select: { name: true } })
+      ? await prisma.user.findUnique({ where: { id: appointment.professionalId }, select: { name: true, whatsapp: true, phone: true } })
       : null
 
     // Enviar notificação via WhatsApp se configurado
     try {
       await WhatsAppTriggerService.onAppointmentCreated(
         { ...appointment, client, user: { businessName: user.businessName } } as any,
+        service.name,
+        professional?.name ?? undefined
+      )
+      await WhatsAppTriggerService.onAppointmentCreatedByClient(
+        {
+          ...appointment,
+          client,
+          user: { businessName: user.businessName, whatsapp: user.whatsapp, phone: user.phone },
+          professionalUser: professional,
+        },
         service.name,
         professional?.name ?? undefined
       )

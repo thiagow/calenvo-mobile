@@ -609,6 +609,10 @@ model WhatsAppConfig {
   notifyProfessionalOnCancel Boolean @default(false)
   professionalCancelMessage  String? @db.Text
 
+  // Aviso ao profissional quando o cliente agenda sozinho (booking público / chat)
+  notifyProfessionalOnBooking Boolean @default(false)
+  professionalBookingMessage  String? @db.Text
+
   // Confirmação de Presença (X dias antes)
   notifyConfirmation  Boolean @default(true)
   confirmationDays    Int     @default(1)

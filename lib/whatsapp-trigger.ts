@@ -12,7 +12,28 @@ import { formatWhatsAppNumber } from './utils';
 import { decryptSecret } from './crypto';
 import { sendText } from './uazapi';
 
+export const DEFAULT_PROFESSIONAL_CANCEL_MESSAGE =
+  'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.';
+export const DEFAULT_PROFESSIONAL_BOOKING_MESSAGE =
+  'Novo agendamento: {{nome_cliente}} agendou {{servico}} em {{data}} às {{hora}}.';
+
 export class WhatsAppTriggerService {
+  /**
+   * WhatsApp do profissional responsável, com fallback para o dono do negócio.
+   */
+  private static resolveProfessionalRecipient(appointment: {
+    user: { whatsapp?: string | null; phone?: string | null };
+    professionalUser?: { whatsapp?: string | null; phone?: string | null } | null;
+  }): string | null {
+    return (
+      appointment.professionalUser?.whatsapp ||
+      appointment.professionalUser?.phone ||
+      appointment.user.whatsapp ||
+      appointment.user.phone ||
+      null
+    );
+  }
+
   /**
    * Replace mustache-style variables in message templates.
    * Supported: {{nome_cliente}}, {{data}}, {{hora}}, {{servico}}, {{profissional}}, {{empresa}}, {{link_avaliacao}}, {{link_confirmacao}}
@@ -156,15 +177,10 @@ export class WhatsAppTriggerService {
 
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyProfessionalOnCancel) return;
 
-      const recipient =
-        appointment.professionalUser?.whatsapp ||
-        appointment.professionalUser?.phone ||
-        appointment.user.whatsapp ||
-        appointment.user.phone;
+      const recipient = this.resolveProfessionalRecipient(appointment);
       if (!recipient) return;
 
-      const defaultMessage = 'O cliente {{nome_cliente}} cancelou o agendamento de {{servico}} em {{data}} às {{hora}}.';
-      const message = this.replaceVariables(config.professionalCancelMessage || defaultMessage, {
+      const message = this.replaceVariables(config.professionalCancelMessage || DEFAULT_PROFESSIONAL_CANCEL_MESSAGE, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         serviceName,
@@ -175,6 +191,43 @@ export class WhatsAppTriggerService {
       await this.sendViaUazapi(config.apiKey, recipient, message);
     } catch (error) {
       console.error('[WhatsAppTrigger] Error in onAppointmentCancelledByClient:', error);
+    }
+  }
+
+  /**
+   * Trigger notification to the PROFESSIONAL (not the client) when the client
+   * books an appointment themselves via public booking or the chat widget.
+   */
+  static async onAppointmentCreatedByClient(
+    appointment: Appointment & {
+      client: Client;
+      user: { businessName?: string | null; whatsapp?: string | null; phone?: string | null };
+      professionalUser?: { whatsapp?: string | null; phone?: string | null } | null;
+    },
+    serviceName?: string,
+    professionalName?: string
+  ): Promise<void> {
+    try {
+      const config = await prisma.whatsAppConfig.findUnique({
+        where: { userId: appointment.userId },
+      });
+
+      if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyProfessionalOnBooking) return;
+
+      const recipient = this.resolveProfessionalRecipient(appointment);
+      if (!recipient) return;
+
+      const message = this.replaceVariables(config.professionalBookingMessage || DEFAULT_PROFESSIONAL_BOOKING_MESSAGE, {
+        clientName: appointment.client.name,
+        appointmentDate: appointment.date,
+        serviceName,
+        professionalName,
+        businessName: appointment.user.businessName || undefined,
+      });
+
+      await this.sendViaUazapi(config.apiKey, recipient, message);
+    } catch (error) {
+      console.error('[WhatsAppTrigger] Error in onAppointmentCreatedByClient:', error);
     }
   }
 
