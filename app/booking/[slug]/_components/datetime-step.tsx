@@ -24,6 +24,10 @@ export function DateTimeStep({
   selectedTime,
   onSelectTime,
 }: DateTimeStepProps) {
+  // Só exibimos o que o cliente consegue reservar — horários ocupados
+  // desabilitados confundiam quem tentava clicar neles.
+  const availableSlots = slots.filter((slot) => slot.available)
+
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
@@ -44,14 +48,13 @@ export function DateTimeStep({
             <div className="flex justify-center py-6">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : slots.length > 0 ? (
+          ) : availableSlots.length > 0 ? (
             <div className="grid grid-cols-4 gap-2">
-              {slots.map((slot) => (
+              {availableSlots.map((slot) => (
                 <Button
                   key={slot.time}
                   type="button"
                   variant={selectedTime === slot.time ? 'default' : 'outline'}
-                  disabled={!slot.available}
                   onClick={() => onSelectTime(slot.time)}
                   className="w-full"
                 >
