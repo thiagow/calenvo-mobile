@@ -324,7 +324,12 @@ export async function refreshQRCodeAction(): Promise<ActionState<{ qrCode: strin
     }
 
     if (!stateCheck.config.apiKey) {
-      return { success: false, error: 'Instância sem token Uazapi salvo. Reconecte para migrar.' };
+      // Registro legado (era Evolution/n8n): nunca teve instância na Uazapi.
+      // Cria uma agora, reaproveitando o número já salvo.
+      if (!stateCheck.config.phoneNumber) {
+        return { success: false, error: 'Instância sem token Uazapi salvo. Desconecte e conecte novamente.' };
+      }
+      return createInstanceAction(stateCheck.config.phoneNumber);
     }
 
     const instanceToken = decryptSecret(stateCheck.config.apiKey);
