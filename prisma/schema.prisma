@@ -278,10 +278,15 @@ model ScheduleBlock {
   reason    String? // Motivo do bloqueio (ex: "Férias", "Feriado")
   isAllDay  Boolean  @default(true) // Se true, bloqueia o dia inteiro
 
+  // Blocos criados juntos via "todas as agendas" compartilham o mesmo groupId
+  // (um bloco por agenda). Null = bloqueio criado para uma agenda só.
+  groupId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([scheduleId, startDate, endDate])
+  @@index([groupId])
 }
 
 // Tabela de junção: Agenda <-> Profissionais

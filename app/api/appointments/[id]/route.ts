@@ -9,6 +9,7 @@ import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { processPackageDeduction } from '@/app/actions/packages'
 import { processLoyaltyEarn } from '@/app/actions/loyalty'
 import { checkBookingConflict, withBookingLock } from '@/lib/appointment-service'
+import { BLOCKED_DATE_ERROR, isScheduleDateBlocked } from '@/lib/schedule-blocks'
 import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { logError } from '@/lib/error-logger'
 
@@ -208,6 +209,12 @@ export async function PUT(
     if (isReschedule) {
       const lockKey = existingAppointment.professionalId ?? existingAppointment.scheduleId!
       const result = await withBookingLock(lockKey, async (tx) => {
+        // Mover um agendamento PARA uma data bloqueada é, na prática, um novo
+        // agendamento nela. Só checa quando a data muda — editar duração ou
+        // observações de um agendamento já dentro do período segue permitido.
+        if (dateChanged && (await isScheduleDateBlocked({ scheduleId: existingAppointment.scheduleId!, date: newDate!, tx }))) {
+          return { ok: false as const, blocked: true as const }
+        }
         const conflict = await checkBookingConflict({
           scheduleId: existingAppointment.scheduleId!,
           professionalId: existingAppointment.professionalId,
@@ -228,6 +235,9 @@ export async function PUT(
       })
 
       if (!result.ok) {
+        if ('blocked' in result) {
+          return NextResponse.json({ error: BLOCKED_DATE_ERROR }, { status: 409 })
+        }
         return NextResponse.json(
           { error: 'Já existe um agendamento neste horário para este profissional' },
           { status: 409 }

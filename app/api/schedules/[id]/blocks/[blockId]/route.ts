@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { deleteBlockGroup } from '@/lib/schedule-blocks'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,11 +37,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Bloqueio não encontrado' }, { status: 404 })
     }
 
+    // `?scope=all` remove o grupo inteiro (blocos criados via "todas as agendas").
+    // Sem isso, só este bloco — comportamento anterior.
+    const removeWholeGroup =
+      request.nextUrl.searchParams.get('scope') === 'all' && Boolean(block.groupId)
+
+    if (removeWholeGroup) {
+      const removed = await deleteBlockGroup(prisma, { userId, groupId: block.groupId! })
+      return NextResponse.json({ success: true, removed })
+    }
+
     await prisma.scheduleBlock.delete({
       where: { id: blockId }
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, removed: 1 })
   } catch (error) {
     console.error('Error deleting schedule block:', error)
     return NextResponse.json(

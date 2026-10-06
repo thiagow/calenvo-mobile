@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // paralelo.
 let mockAppointments: any[] = []
 let mockCandidateScheduleIds: string[] = ['schedule-1']
+let mockBlocksBySchedule: Record<string, { startDate: Date; endDate: Date }[]> = {}
 let mockProfessionalsBySchedule: Record<string, { professionalId: string }[]> = {
   'schedule-1': [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }],
 }
@@ -24,7 +25,11 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(async ({ where }: any) =>
         where.userId !== TENANT_ID
           ? null
-          : { professionals: mockProfessionalsBySchedule[where.id] || [] }
+          : {
+              professionals: mockProfessionalsBySchedule[where.id] || [],
+              blocks: mockBlocksBySchedule[where.id] || [],
+              user: { businessConfig: { timezone: 'America/Sao_Paulo' } },
+            }
       ),
       findMany: vi.fn(async () => mockCandidateScheduleIds.map((id) => ({ id }))),
     },
@@ -62,6 +67,7 @@ const mockTx = {
 
 beforeEach(() => {
   mockAppointments = []
+  mockBlocksBySchedule = {}
   mockCandidateScheduleIds = ['schedule-1']
   mockProfessionalsBySchedule = {
     'schedule-1': [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }],
@@ -178,6 +184,62 @@ describe('resolveProfessionalForBooking', () => {
     })
   })
 
+  // Bloqueio de data vale para TODO novo agendamento, por qualquer canal. A
+  // trava mora aqui porque painel, API v1, página pública e chat passam todos
+  // por esta função — antes o bloqueio só escondia horários na grade.
+  describe('bloqueio de data', () => {
+    // `date` acima é 01/01/2099 10:00 no fuso do processo; o bloqueio cobre o dia 2099-01-01.
+    const blockCoveringDate = [{ startDate: new Date('2099-01-01T00:00:00.000Z'), endDate: new Date('2099-01-02T00:00:00.000Z') }]
+    const blockElsewhere = [{ startDate: new Date('2099-03-01T00:00:00.000Z'), endDate: new Date('2099-03-05T00:00:00.000Z') }]
+    // 01/01/2099 13:00Z = 10:00 em São Paulo, dia inequívoco nos dois fusos
+    const bookingDate = new Date('2099-01-01T13:00:00.000Z')
+
+    it('recusa agendamento numa data bloqueada', async () => {
+      mockBlocksBySchedule = { 'schedule-1': blockCoveringDate }
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+      const { BLOCKED_DATE_ERROR } = await import('@/lib/schedule-blocks')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date: bookingDate, duration })
+
+      expect(result.professionalId).toBeNull()
+      expect(result.error).toBe(BLOCKED_DATE_ERROR)
+    })
+
+    it('encaixe (allowOverbook) NÃO fura o bloqueio', async () => {
+      mockBlocksBySchedule = { 'schedule-1': blockCoveringDate }
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+      const { BLOCKED_DATE_ERROR } = await import('@/lib/schedule-blocks')
+
+      const result = await resolveProfessionalForBooking({
+        scheduleId, userId: TENANT_ID, date: bookingDate, duration, requestedProfessionalId: 'p2', allowOverbook: true,
+      })
+
+      expect(result.professionalId).toBeNull()
+      expect(result.error).toBe(BLOCKED_DATE_ERROR)
+    })
+
+    it('data fora do bloqueio segue normal', async () => {
+      mockBlocksBySchedule = { 'schedule-1': blockElsewhere }
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date: bookingDate, duration, requestedProfessionalId: 'p2' })
+
+      expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
+    })
+
+    it('respeita o fuso do negócio: 01:30Z do dia 02 ainda é dia 01 em São Paulo', async () => {
+      // 2099-01-02T01:30Z = 2099-01-01 22:30 em São Paulo → cai no bloqueio do dia 01
+      mockBlocksBySchedule = { 'schedule-1': [{ startDate: new Date('2099-01-01T00:00:00.000Z'), endDate: new Date('2099-01-01T00:00:00.000Z') }] }
+      const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+      const result = await resolveProfessionalForBooking({
+        scheduleId, userId: TENANT_ID, date: new Date('2099-01-02T01:30:00.000Z'), duration, requestedProfessionalId: 'p2',
+      })
+
+      expect(result.error).toBeDefined()
+    })
+  })
+
   it('rejeita quando a agenda não pertence ao tenant chamado (isolamento cross-tenant)', async () => {
     const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
 
@@ -248,6 +310,34 @@ describe('resolveBookingTarget', () => {
 
     expect(result.scheduleId).toBeNull()
     expect(result.error).toBeDefined()
+  })
+
+  // Bloqueio só numa agenda não pode impedir reservar numa outra que esteja
+  // aberta — a trava recusa a agenda bloqueada e o laço segue para a próxima.
+  it('pula a agenda bloqueada e usa a próxima que está aberta', async () => {
+    mockCandidateScheduleIds = ['schedule-1', 'schedule-2']
+    mockProfessionalsBySchedule['schedule-2'] = [{ professionalId: 'q1' }]
+    mockBlocksBySchedule = {
+      'schedule-1': [{ startDate: new Date('2099-01-01T00:00:00.000Z'), endDate: new Date('2099-01-02T00:00:00.000Z') }],
+    }
+    const { resolveBookingTarget } = await import('@/lib/appointment-service')
+
+    const result = await resolveBookingTarget({ userId, serviceId, date: new Date('2099-01-01T13:00:00.000Z'), duration })
+
+    expect(result).toEqual({ scheduleId: 'schedule-2', professionalId: 'q1' })
+  })
+
+  it('recusa quando TODAS as agendas candidatas estão bloqueadas na data', async () => {
+    mockCandidateScheduleIds = ['schedule-1', 'schedule-2']
+    mockProfessionalsBySchedule['schedule-2'] = [{ professionalId: 'q1' }]
+    const block = [{ startDate: new Date('2099-01-01T00:00:00.000Z'), endDate: new Date('2099-01-02T00:00:00.000Z') }]
+    mockBlocksBySchedule = { 'schedule-1': block, 'schedule-2': block }
+    const { resolveBookingTarget } = await import('@/lib/appointment-service')
+
+    const result = await resolveBookingTarget({ userId, serviceId, date: new Date('2099-01-01T13:00:00.000Z'), duration })
+
+    expect(result.scheduleId).toBeNull()
+    expect(result.error).toBe('Esta data está bloqueada para agendamentos')
   })
 })
 

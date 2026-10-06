@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { DEFAULT_TIMEZONE } from '@/lib/timezone'
+import { createBlocks, findAppointmentsInBlockRange } from '@/lib/schedule-blocks'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +45,21 @@ export async function GET(
       }
     })
 
-    return NextResponse.json(blocks)
+    // Quantas agendas compartilham cada grupo (blocos criados via "todas as agendas")
+    const groupIds = Array.from(new Set(blocks.map((b) => b.groupId).filter((g): g is string => Boolean(g))))
+    const groupSizes = new Map<string, number>()
+    if (groupIds.length > 0) {
+      const grouped = await prisma.scheduleBlock.groupBy({
+        by: ['groupId'],
+        where: { groupId: { in: groupIds }, schedule: { userId } },
+        _count: { _all: true },
+      })
+      for (const g of grouped) if (g.groupId) groupSizes.set(g.groupId, g._count._all)
+    }
+
+    return NextResponse.json(
+      blocks.map((b) => ({ ...b, groupSize: b.groupId ? groupSizes.get(b.groupId) ?? 1 : null }))
+    )
   } catch (error) {
     console.error('Error fetching schedule blocks:', error)
     return NextResponse.json(
@@ -81,7 +97,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { startDate, endDate, reason, isAllDay } = body
+    const { startDate, endDate, reason, isAllDay, applyToAll, confirmConflicts } = body
 
     if (!startDate || !endDate) {
       return NextResponse.json(
@@ -90,25 +106,72 @@ export async function POST(
       )
     }
 
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return NextResponse.json({ error: 'Data inválida' }, { status: 400 })
+    }
+
     // Validar que endDate > startDate
-    if (new Date(endDate) <= new Date(startDate)) {
+    if (end <= start) {
       return NextResponse.json(
         { error: 'Data de fim deve ser posterior à data de início' },
         { status: 400 }
       )
     }
 
-    const block = await prisma.scheduleBlock.create({
-      data: {
-        scheduleId,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
-        reason: reason || null,
-        isAllDay: isAllDay !== undefined ? isAllDay : true
-      }
+    // Agendas-alvo: só esta, ou todas do tenant (inclusive inativas — se uma for
+    // reativada depois, a data continua fechada).
+    const targetSchedules = applyToAll
+      ? await prisma.schedule.findMany({ where: { userId }, select: { id: true } })
+      : [{ id: scheduleId }]
+    const scheduleIds = targetSchedules.map((s) => s.id)
+
+    // Agendamentos que já existem no período: o bloqueio NUNCA os altera, mas o
+    // dono precisa saber antes de concluir. Aviso imposto aqui no servidor —
+    // sem confirmação explícita, nada é criado.
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId },
+      select: { timezone: true }
+    })
+    const conflicts = await findAppointmentsInBlockRange(prisma, {
+      userId,
+      scheduleIds,
+      startDate: start,
+      endDate: end,
+      timeZone: businessConfig?.timezone || DEFAULT_TIMEZONE
     })
 
-    return NextResponse.json(block, { status: 201 })
+    if (conflicts.length > 0 && confirmConflicts !== true) {
+      return NextResponse.json(
+        {
+          error: `Já existem ${conflicts.length} agendamento(s) neste período`,
+          code: 'BLOCK_HAS_APPOINTMENTS',
+          conflictingAppointments: conflicts.length,
+          schedulesCount: scheduleIds.length,
+          sample: conflicts.slice(0, 5).map((c) => ({
+            date: c.date,
+            clientName: c.clientName,
+            serviceName: c.serviceName
+          }))
+        },
+        { status: 409 }
+      )
+    }
+
+    const { count, groupId } = await createBlocks(prisma, {
+      scheduleIds,
+      startDate: start,
+      endDate: end,
+      reason: reason || null,
+      isAllDay: isAllDay !== undefined ? isAllDay : true,
+      grouped: Boolean(applyToAll)
+    })
+
+    return NextResponse.json(
+      { success: true, schedulesCount: count, groupId, conflictingAppointments: conflicts.length },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Error creating schedule block:', error)
     return NextResponse.json(

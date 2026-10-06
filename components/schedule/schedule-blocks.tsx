@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Plus, Trash2, Calendar, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Calendar, AlertCircle, AlertTriangle, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -28,6 +29,14 @@ interface ScheduleBlock {
   endDate: string
   reason?: string
   isAllDay: boolean
+  groupId?: string | null
+  groupSize?: number | null
+}
+
+interface BlockConflictInfo {
+  conflictingAppointments: number
+  schedulesCount: number
+  sample: { date: string; clientName: string; serviceName: string }[]
 }
 
 interface ScheduleBlocksProps {
@@ -46,10 +55,22 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
     reason: '',
     isAllDay: true
   })
+  const [scope, setScope] = useState<'single' | 'all'>('single')
+  const [totalSchedules, setTotalSchedules] = useState(0)
+  const [conflict, setConflict] = useState<BlockConflictInfo | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ScheduleBlock | null>(null)
 
   useEffect(() => {
     fetchBlocks()
   }, [scheduleId])
+
+  useEffect(() => {
+    // Total de agendas (inclusive inativas) para o texto "Todas as agendas (N)"
+    fetch('/api/schedules?includeInactive=true')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setTotalSchedules(Array.isArray(data) ? data.length : 0))
+      .catch(() => setTotalSchedules(0))
+  }, [])
 
   const fetchBlocks = async () => {
     try {
@@ -75,21 +96,39 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
       return
     }
 
+    await submitBlock(false)
+  }
+
+  const submitBlock = async (confirmConflicts: boolean) => {
     setLoading(true)
     try {
       const response = await fetch(`/api/schedules/${scheduleId}/blocks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ ...formData, applyToAll: scope === 'all', confirmConflicts })
       })
+      const data = await response.json().catch(() => ({}))
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Erro ao criar bloqueio')
+      // Já existem agendamentos no período: nada foi criado ainda. Pede
+      // confirmação ao dono antes de concluir (os existentes serão mantidos).
+      if (response.status === 409 && data.code === 'BLOCK_HAS_APPOINTMENTS') {
+        setConflict(data as BlockConflictInfo)
+        return
       }
 
-      toast.success('Bloqueio criado com sucesso!')
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao criar bloqueio')
+      }
+
+      const count = data.schedulesCount ?? 1
+      toast.success(
+        scope === 'all'
+          ? `Bloqueio criado em ${count} agenda${count === 1 ? '' : 's'}!`
+          : 'Bloqueio criado com sucesso!'
+      )
+      setConflict(null)
       setDialogOpen(false)
+      setScope('single')
       setFormData({
         startDate: '',
         endDate: '',
@@ -105,7 +144,30 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
     }
   }
 
-  const handleDeleteBlock = async (blockId: string) => {
+  const deleteBlock = async (block: ScheduleBlock, removeAll: boolean) => {
+    try {
+      const response = await fetch(
+        `/api/schedules/${scheduleId}/blocks/${block.id}${removeAll ? '?scope=all' : ''}`,
+        { method: 'DELETE' }
+      )
+
+      if (!response.ok) throw new Error('Erro ao remover bloqueio')
+
+      toast.success(removeAll ? 'Bloqueio removido de todas as agendas!' : 'Bloqueio removido com sucesso!')
+      fetchBlocks()
+    } catch (error) {
+      console.error('Error deleting block:', error)
+      toast.error('Erro ao remover bloqueio')
+    }
+  }
+
+  const handleDeleteBlock = async (block: ScheduleBlock) => {
+    // Bloco criado para todas as agendas: o dono escolhe o alcance da remoção.
+    if (block.groupId && (block.groupSize ?? 1) > 1) {
+      setDeleteTarget(block)
+      return
+    }
+
     const confirmed = await confirm({
       title: 'Remover Bloqueio',
       description: 'Deseja realmente remover este bloqueio?',
@@ -114,21 +176,7 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
     })
 
     if (!confirmed) return
-
-    try {
-      const response = await fetch(
-        `/api/schedules/${scheduleId}/blocks/${blockId}`,
-        { method: 'DELETE' }
-      )
-
-      if (!response.ok) throw new Error('Erro ao remover bloqueio')
-
-      toast.success('Bloqueio removido com sucesso!')
-      fetchBlocks()
-    } catch (error) {
-      console.error('Error deleting block:', error)
-      toast.error('Erro ao remover bloqueio')
-    }
+    await deleteBlock(block, false)
   }
 
   const formatDate = (dateString: string) => {
@@ -216,6 +264,28 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
                   </Label>
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Aplicar a</Label>
+                  <RadioGroup value={scope} onValueChange={(v) => setScope(v as 'single' | 'all')}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="single" id="scope-single" />
+                      <Label htmlFor="scope-single" className="cursor-pointer font-normal">
+                        Somente esta agenda
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="all" id="scope-all" />
+                      <Label htmlFor="scope-all" className="cursor-pointer font-normal">
+                        Todas as agendas{totalSchedules > 0 ? ` (${totalSchedules})` : ''}
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  <p className="text-xs text-muted-foreground">
+                    Ninguém poderá agendar nestas datas (painel, página pública e chat).
+                    Agendamentos já marcados são mantidos.
+                  </p>
+                </div>
+
                 <div>
                   <Label htmlFor="reason">Motivo (opcional)</Label>
                   <Textarea
@@ -292,12 +362,18 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
                         {block.isAllDay ? 'Dia Inteiro' : 'Horário Específico'}
                       </span>
+                      {block.groupId && (block.groupSize ?? 1) > 1 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          <Layers className="h-3 w-3" />
+                          Todas as agendas
+                        </span>
+                      )}
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDeleteBlock(block.id)}
+                    onClick={() => handleDeleteBlock(block)}
                   >
                     <Trash2 className="h-4 w-4 text-red-500" />
                   </Button>
@@ -307,6 +383,87 @@ export function ScheduleBlocks({ scheduleId, scheduleName }: ScheduleBlocksProps
           </div>
         )}
       </CardContent>
+
+      {/* Já existem agendamentos no período: confirmar antes de bloquear */}
+      <Dialog open={conflict !== null} onOpenChange={(open) => !open && setConflict(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Já existem agendamentos neste período
+            </DialogTitle>
+            <DialogDescription>
+              Há {conflict?.conflictingAppointments} agendamento
+              {conflict?.conflictingAppointments === 1 ? '' : 's'} marcado
+              {conflict?.conflictingAppointments === 1 ? '' : 's'} nas datas escolhidas.
+              Os agendamentos existentes serão mantidos; o bloqueio vale apenas para novos agendamentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {conflict && conflict.sample.length > 0 && (
+            <ul className="space-y-1 rounded-md border p-3 text-sm">
+              {conflict.sample.map((item, index) => (
+                <li key={index} className="flex justify-between gap-3">
+                  <span className="truncate">{item.clientName} — {item.serviceName}</span>
+                  <span className="shrink-0 text-muted-foreground">{formatDateTime(item.date)}</span>
+                </li>
+              ))}
+              {conflict.conflictingAppointments > conflict.sample.length && (
+                <li className="text-xs text-muted-foreground">
+                  e mais {conflict.conflictingAppointments - conflict.sample.length}…
+                </li>
+              )}
+            </ul>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setConflict(null)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={() => submitBlock(true)} disabled={loading}>
+              {loading ? 'Criando...' : 'Bloquear mesmo assim'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remover bloqueio de grupo: escolher o alcance */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover Bloqueio</DialogTitle>
+            <DialogDescription>
+              Este bloqueio foi criado para {deleteTarget?.groupSize} agendas. Deseja remover apenas
+              desta agenda ou de todas?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const target = deleteTarget
+                setDeleteTarget(null)
+                if (target) await deleteBlock(target, false)
+              }}
+            >
+              Só desta agenda
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const target = deleteTarget
+                setDeleteTarget(null)
+                if (target) await deleteBlock(target, true)
+              }}
+            >
+              Todas as agendas
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

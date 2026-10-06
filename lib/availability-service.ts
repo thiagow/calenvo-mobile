@@ -7,6 +7,7 @@ import {
   todayInZone,
   wallTimeToInstant,
 } from '@/lib/timezone'
+import { isDateBlocked } from '@/lib/schedule-blocks'
 import type { Prisma } from '@prisma/client'
 
 // Um agendamento pode começar antes do dia pedido e invadi-lo. A janela de
@@ -86,12 +87,7 @@ export async function getAvailableSlots(params: {
   // Bloqueios são comparados pela data de calendário UTC dos instantes gravados
   // — mesma semântica que a produção (processo em UTC) já aplicava, agora sem
   // depender do fuso do processo.
-  const hasBlock = schedule.blocks.some((block) => {
-    const blockStartDay = new Date(block.startDate).toISOString().slice(0, 10)
-    const blockEndDay = new Date(block.endDate).toISOString().slice(0, 10)
-    return dateStr >= blockStartDay && dateStr <= blockEndDay
-  })
-  if (hasBlock) return []
+  if (isDateBlocked(dateStr, schedule.blocks)) return []
 
   let workingHours: { startTime: string; endTime: string }[]
 
