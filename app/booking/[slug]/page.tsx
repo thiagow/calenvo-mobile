@@ -4,10 +4,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
-import { ArrowLeft, CalendarPlus, CalendarSearch, ChevronRight } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { BookingStepper, type StepDefinition } from './_components/booking-stepper'
@@ -17,6 +16,8 @@ import { DateTimeStep } from './_components/datetime-step'
 import { ConfirmStep } from './_components/confirm-step'
 import { SuccessScreen } from './_components/success-screen'
 import { MyAppointmentsStep } from './_components/my-appointments-step'
+import { EntryScreen } from './_components/entry-screen'
+import { useBookingTheme } from './_components/booking-theme-root'
 import type { BookingProfessional, BookingService, BookingTimeSlot } from './_components/types'
 
 const STEPS: StepDefinition[] = [
@@ -35,6 +36,7 @@ interface BusinessInfo {
 export default function PublicBookingPage() {
   const params = useParams()
   const slug = params?.slug as string
+  const theme = useBookingTheme()
 
   const [loading, setLoading] = useState(true)
   const [businessInfo, setBusinessInfo] = useState<BusinessInfo | null>(null)
@@ -241,7 +243,7 @@ export default function PublicBookingPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary" />
       </div>
     )
@@ -260,20 +262,31 @@ export default function PublicBookingPage() {
     )
   }
 
-  const canGoBack = mode !== 'entry'
+  if (mode === 'entry') {
+    return (
+      <EntryScreen
+        theme={theme}
+        businessName={businessInfo?.businessName || 'Agendamento Online'}
+        businessLogo={businessInfo?.businessLogo ?? null}
+        onNewBooking={() => setMode('new')}
+        onExistingBooking={() => setMode('existing')}
+      />
+    )
+  }
+
   const canConfirmDateTime = Boolean(selectedDate && selectedTime)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-lg px-4 pb-32 pt-6">
         <div className="mb-6 flex items-center gap-3">
-          {canGoBack ? (
-            <button onClick={handleBack} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-muted">
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="w-9" />
-          )}
+          <button
+            onClick={handleBack}
+            aria-label="Voltar"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
           <div className="min-w-0 flex-1 text-center">
             {businessInfo?.businessLogo && (
               <div className="mb-1 flex justify-center">
@@ -287,47 +300,12 @@ export default function PublicBookingPage() {
                 </div>
               </div>
             )}
-            <h1 className="truncate text-lg font-bold calenvo-gradient">
+            <h1 className="bk-heading truncate text-lg font-bold">
               {businessInfo?.businessName || 'Agendamento Online'}
             </h1>
           </div>
           <div className="w-9" />
         </div>
-
-        {mode === 'entry' && (
-          <div className="space-y-3">
-            <Card
-              className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
-              onClick={() => setMode('new')}
-            >
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <CalendarPlus className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground">Novo agendamento</p>
-                  <p className="text-xs text-muted-foreground">Escolher serviço, horário e agendar</p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </CardContent>
-            </Card>
-            <Card
-              className="cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
-              onClick={() => setMode('existing')}
-            >
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <CalendarSearch className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground">Já tenho agenda</p>
-                  <p className="text-xs text-muted-foreground">Ver ou cancelar meu agendamento</p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {mode === 'existing' && <MyAppointmentsStep slug={slug} />}
 

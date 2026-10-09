@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,7 +12,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle, ArrowLeft } from 'lucide-react'
+import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle, ArrowLeft, Palette } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useUserRole } from '@/hooks/use-user-role'
@@ -390,6 +391,18 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        <Link
+          href="/dashboard/settings/pagina-publica"
+          className="flex items-center gap-3 bg-muted/50 rounded-lg px-3 py-3 transition-colors hover:bg-muted"
+        >
+          <Palette className="h-4 w-4 text-primary flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Aparência da página</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Template, cores e imagem de capa</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        </Link>
 
         <div className="space-y-3 pt-2 border-t border-border">
           {[

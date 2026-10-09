@@ -40,6 +40,13 @@ enum PlanType {
   BUSINESS
 }
 
+enum BookingTemplate {
+  NATURAL
+  VIBRANT
+  CLEAN
+  DARK
+}
+
 enum BillingInterval {
   MONTHLY
   ANNUAL
@@ -495,6 +502,14 @@ model BusinessConfig {
   // Personalização da página de agendamento do cliente
   businessLogo String? // URL do logo
   publicUrl    String? @unique // URL pública para agendamento (slug único)
+
+  // Aparência da página pública. Cores nulas = padrão do template escolhido.
+  bookingTemplate     BookingTemplate @default(NATURAL)
+  bookingBgColor      String? // #RRGGBB
+  bookingTextColor    String? // #RRGGBB
+  bookingAccentColor  String? // #RRGGBB (botões e destaques)
+  bookingCoverEnabled Boolean         @default(false)
+  bookingCoverImage   String? // chave no storage; nulo + capa ligada = capa preset do template
 
   // Informações adicionais do negócio para o Agente IA e exibição
   address     String?  @db.Text // Endereço físico completo

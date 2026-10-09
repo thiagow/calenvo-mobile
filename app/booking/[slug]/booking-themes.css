@@ -1,0 +1,161 @@
+/*
+ * Estrutura visual dos 4 templates da página pública. As CORES vêm das CSS
+ * variables injetadas por lib/booking-theme.ts; aqui ficam só forma, sombra,
+ * textura e tipografia, que mudam de template para template.
+ */
+
+.bk-heading {
+  letter-spacing: -0.01em;
+}
+
+.bk-root[data-heading-font='serif'] .bk-heading {
+  font-family: var(--font-booking-serif), Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+}
+
+/* --- Capa ---------------------------------------------------------------- */
+
+.bk-cover-fallback {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.85), hsl(var(--primary) / 0.35));
+}
+
+/* Dissolve a base da capa no fundo da página, para o logo "sair" dela. */
+.bk-cover-fade {
+  background: linear-gradient(to top, hsl(var(--background) / 0.9) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* --- Logo ---------------------------------------------------------------- */
+
+.bk-logo {
+  background: hsl(var(--card));
+  border: 4px solid hsl(var(--background));
+  box-shadow: 0 8px 24px -10px hsl(var(--foreground) / 0.35);
+}
+
+/* --- Cards da tela de entrada ------------------------------------------- */
+
+.bk-entry-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  text-align: left;
+  cursor: pointer;
+  background: hsl(var(--bk-entry-card));
+  color: hsl(var(--bk-entry-card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.bk-entry-card:hover {
+  transform: translateY(-1px);
+}
+
+.bk-entry-card:active {
+  transform: scale(0.99);
+}
+
+.bk-entry-card:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.bk-entry-sub {
+  color: hsl(var(--bk-entry-card-muted));
+}
+
+.bk-entry-icon {
+  display: flex;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bk-entry-card {
+    transition: none;
+  }
+  .bk-entry-card:hover,
+  .bk-entry-card:active {
+    transform: none;
+  }
+}
+
+/* --- NATURAL: terroso, sombras suaves, luz vinda de cima ---------------- */
+
+.bk-root[data-template='NATURAL'] {
+  background-image: radial-gradient(120% 45% at 50% 0%, hsl(var(--primary) / 0.12), transparent 70%);
+}
+
+.bk-root[data-template='NATURAL'] .bk-entry-card {
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.6) inset, 0 14px 28px -16px hsl(var(--foreground) / 0.4);
+}
+
+/* --- VIBRANT: cards sólidos com brilho na cor de destaque --------------- */
+
+.bk-root[data-template='VIBRANT'] {
+  /* Degradê "suavizado" (vários pontos) para não aparecer uma quebra no fim. */
+  background-image: linear-gradient(
+    180deg,
+    hsl(var(--primary) / 0.22) 0%,
+    hsl(var(--primary) / 0.15) 18%,
+    hsl(var(--primary) / 0.08) 38%,
+    hsl(var(--primary) / 0.03) 58%,
+    transparent 80%
+  );
+}
+
+.bk-root[data-template='VIBRANT'] .bk-entry-card {
+  border: 1px solid hsl(var(--primary) / 0.7);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14), 0 14px 32px -12px hsl(var(--primary) / 0.6);
+}
+
+.bk-root[data-template='VIBRANT'] .bk-entry-icon {
+  background: hsl(var(--bk-entry-card-foreground) / 0.16);
+  color: hsl(var(--bk-entry-card-foreground));
+}
+
+.bk-root[data-template='VIBRANT'] .bk-logo {
+  border-color: hsl(var(--primary));
+}
+
+/* --- CLEAN: grade sutil, cards nítidos ---------------------------------- */
+
+.bk-root[data-template='CLEAN'] {
+  background-image:
+    linear-gradient(hsl(var(--primary) / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--primary) / 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.bk-root[data-template='CLEAN'] .bk-entry-card {
+  border-radius: 0.875rem;
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.06), 0 10px 24px -14px hsl(var(--primary) / 0.35);
+}
+
+/* --- DARK: vidro com filete dourado ------------------------------------- */
+
+.bk-root[data-template='DARK'] {
+  background-image: radial-gradient(90% 40% at 50% 0%, hsl(var(--primary) / 0.14), transparent 70%);
+}
+
+.bk-root[data-template='DARK'] .bk-entry-card {
+  background: linear-gradient(145deg, hsl(0 0% 100% / 0.1), hsl(0 0% 100% / 0.03));
+  border: 1px solid hsl(var(--primary) / 0.45);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 hsl(0 0% 100% / 0.08) inset, 0 16px 32px -16px hsl(0 0% 0% / 0.7);
+}
+
+.bk-root[data-template='DARK'] .bk-entry-icon {
+  background: hsl(0 0% 0% / 0.35);
+}

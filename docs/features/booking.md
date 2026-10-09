@@ -388,3 +388,22 @@ interface BookingPageConfig {
 - [ ] Multi-idioma
 - [ ] Temas personalizados
 - [ ] A/B testing
+
+## Aparência da página pública
+
+O dono do negócio escolhe o visual em **Configurações → Aparência da página** (`/dashboard/settings/pagina-publica`).
+
+- **Template** (`BusinessConfig.bookingTemplate`): `NATURAL`, `VIBRANT`, `CLEAN` ou `DARK`.
+- **Cores** (`bookingBgColor`, `bookingTextColor`, `bookingAccentColor`): `#RRGGBB` ou `null` = padrão do template. Trocar de template zera as cores personalizadas.
+- **Capa** (`bookingCoverEnabled`, `bookingCoverImage`): o toggle vale para qualquer template. Capa ligada sem imagem enviada usa o preset do template (`public/booking-covers/<template>.webp`); se o arquivo faltar, cai num degradê da cor de destaque.
+
+Como funciona:
+
+- `lib/booking-theme.ts` (puro, com testes) resolve template + overrides em CSS variables no formato HSL dos tokens shadcn e deriva cores legíveis (texto do botão por contraste, bordas, muted). Só aceita `#RRGGBB`, então nada fora disso chega ao CSS.
+- `app/booking/[slug]/layout.tsx` resolve o tema no servidor (sem flash de cor) e o `BookingThemeRoot` aplica as variáveis no wrapper e no `<body>`, para que portais Radix (calendário, popovers) herdem o tema. O template escuro adiciona a classe `dark`.
+- Os steps não conhecem o tema: usam só tokens semânticos (`bg-primary`, `text-foreground`…). Estrutura visual por template fica em `booking-themes.css` (`data-template`).
+- Os cards sólidos do Vibrante existem só na tela de entrada (`--bk-entry-card`); os demais steps sempre usam `--card`.
+- O preview do editor renderiza o mesmo `EntryScreen` da página pública.
+- `PUT /api/settings/booking-appearance` (Zod, só MASTER). Upload da capa em `/api/upload/booking-cover`: valida magic bytes (JPG/PNG/WebP), reencoda para 1600×700 WebP com `sharp` e apaga a capa anterior.
+
+Migration `20261009120000_add_booking_appearance` (idempotente, aplicada via `db execute` + `migrate resolve`, nunca `migrate dev`).
