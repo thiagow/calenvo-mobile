@@ -5,7 +5,7 @@ import { PlanType, AppointmentStatus, Prisma } from '@prisma/client'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
-import { BLOCKED_DATE_ERROR, isDateBlocked } from '@/lib/schedule-blocks'
+import { BLOCKED_DATE_ERROR, isIntervalBlocked } from '@/lib/schedule-blocks'
 import { DEFAULT_TIMEZONE, calendarDateInZone } from '@/lib/timezone'
 
 const OPEN_APPOINTMENT_STATUSES: AppointmentStatus[] = ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']
@@ -160,7 +160,7 @@ export async function resolveProfessionalForBooking(params: {
     where: { id: scheduleId, userId },
     select: {
       professionals: { select: { professionalId: true } },
-      blocks: { select: { startDate: true, endDate: true } },
+      blocks: { select: { startDate: true, endDate: true, isAllDay: true } },
       user: { select: { businessConfig: { select: { timezone: true } } } },
     },
   })
@@ -171,7 +171,14 @@ export async function resolveProfessionalForBooking(params: {
   // Bloqueio de data vale para TODO novo agendamento, inclusive encaixe — por
   // isso roda antes de qualquer checagem de conflito e ignora `allowOverbook`.
   const timeZone = schedule.user.businessConfig?.timezone || DEFAULT_TIMEZONE
-  if (isDateBlocked(calendarDateInZone(date, timeZone), schedule.blocks)) {
+  if (
+    isIntervalBlocked({
+      dateStr: calendarDateInZone(date, timeZone),
+      start: date,
+      durationMinutes: duration,
+      blocks: schedule.blocks,
+    })
+  ) {
     return { professionalId: null, hadConflict: false, error: BLOCKED_DATE_ERROR }
   }
 

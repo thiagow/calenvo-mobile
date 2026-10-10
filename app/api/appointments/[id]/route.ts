@@ -212,7 +212,15 @@ export async function PUT(
         // Mover um agendamento PARA uma data bloqueada é, na prática, um novo
         // agendamento nela. Só checa quando a data muda — editar duração ou
         // observações de um agendamento já dentro do período segue permitido.
-        if (dateChanged && (await isScheduleDateBlocked({ scheduleId: existingAppointment.scheduleId!, date: newDate!, tx }))) {
+        if (
+          dateChanged &&
+          (await isScheduleDateBlocked({
+            scheduleId: existingAppointment.scheduleId!,
+            date: newDate!,
+            duration: duration ? Number(duration) : existingAppointment.duration,
+            tx
+          }))
+        ) {
           return { ok: false as const, blocked: true as const }
         }
         const conflict = await checkBookingConflict({

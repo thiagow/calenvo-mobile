@@ -252,22 +252,27 @@ async function getAvailability(scheduleId: string, date: Date) {
 ```
 
 ### Criar Bloqueio
+Criado pelo botão **Bloqueio de Períodos** na página de Agendas (combobox com "Todas as agendas" ou uma seleção de agendas). A aba "Bloqueios" da agenda só exibe e remove.
+
 ```typescript
-async function createBlock(scheduleId: string, block: BlockData) {
-  const response = await fetch(`/api/schedules/${scheduleId}/blocks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      startDate: block.startDate,
-      endDate: block.endDate,
-      reason: "Férias",
-      isAllDay: true,
-    }),
-  })
-  
-  return response.json()
-}
+// Dia inteiro (sem endDate = um dia só) ou período
+await fetch('/api/schedule-blocks', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    scheduleIds: ['sched_1', 'sched_2'],
+    isAllDay: true,
+    startDate: '2026-10-20',
+    endDate: '2026-10-21', // opcional
+    reason: 'Feriado',
+  }),
+})
+
+// Faixa de horário num dia (fuso do negócio)
+// { scheduleIds, isAllDay: false, date: '2026-10-20', startTime: '14:00', endTime: '16:00' }
 ```
+
+Regra única de aplicação (`isIntervalBlocked`, `lib/schedule-blocks.ts`): dia inteiro bloqueia o(s) dia(s) de calendário; faixa de horário bloqueia só os slots que a sobrepõem. A mesma regra vale na grade de horários e na trava de escrita (booking público, chat, dashboard e reagendamento).
 
 ### Configurar Horário Customizado por Dia
 ```typescript

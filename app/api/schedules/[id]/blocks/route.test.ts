@@ -116,6 +116,29 @@ describe('POST /api/schedules/[id]/blocks', () => {
     expect(createManyMock).not.toHaveBeenCalled()
   })
 
+  it('um dia só: início = término (ou sem término) é aceito', async () => {
+    expect((await post({ startDate: '2026-10-20', endDate: '2026-10-20' })).status).toBe(201)
+    expect((await post({ startDate: '2026-10-20', endDate: undefined })).status).toBe(201)
+    const rows = createManyMock.mock.calls[1][0].data as { startDate: Date; endDate: Date }[]
+    expect(rows[0].startDate.toISOString()).toBe('2026-10-20T00:00:00.000Z')
+    expect(rows[0].endDate.toISOString()).toBe('2026-10-20T00:00:00.000Z')
+  })
+
+  it('faixa de horário: grava instantes no fuso do negócio e isAllDay=false', async () => {
+    const res = await post({ isAllDay: false, date: '2026-10-20', startTime: '14:00', endTime: '16:00' })
+
+    expect(res.status).toBe(201)
+    const rows = createManyMock.mock.calls[0][0].data as { startDate: Date; endDate: Date; isAllDay: boolean }[]
+    expect(rows[0].isAllDay).toBe(false)
+    expect(rows[0].startDate.toISOString()).toBe('2026-10-20T17:00:00.000Z')
+    expect(rows[0].endDate.toISOString()).toBe('2026-10-20T19:00:00.000Z')
+  })
+
+  it('faixa de horário com fim antes do início: 400', async () => {
+    expect((await post({ isAllDay: false, date: '2026-10-20', startTime: '16:00', endTime: '14:00' })).status).toBe(400)
+    expect(createManyMock).not.toHaveBeenCalled()
+  })
+
   it('datas inválidas: 400', async () => {
     expect((await post({ startDate: '2026-12-26', endDate: '2026-12-24' })).status).toBe(400)
     expect((await post({ startDate: 'lixo', endDate: 'lixo' })).status).toBe(400)

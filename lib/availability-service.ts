@@ -7,7 +7,7 @@ import {
   todayInZone,
   wallTimeToInstant,
 } from '@/lib/timezone'
-import { isDateBlocked } from '@/lib/schedule-blocks'
+import { isDateBlocked, isIntervalBlocked } from '@/lib/schedule-blocks'
 import type { Prisma } from '@prisma/client'
 
 // Um agendamento pode começar antes do dia pedido e invadi-lo. A janela de
@@ -84,9 +84,9 @@ export async function getAvailableSlots(params: {
 
   if (!schedule.workingDays.includes(dayOfWeek)) return []
 
-  // Bloqueios são comparados pela data de calendário UTC dos instantes gravados
-  // — mesma semântica que a produção (processo em UTC) já aplicava, agora sem
-  // depender do fuso do processo.
+  // Bloqueios de dia inteiro são comparados pela data de calendário UTC dos
+  // instantes gravados — mesma semântica que a produção (processo em UTC) já
+  // aplicava, agora sem depender do fuso do processo.
   if (isDateBlocked(dateStr, schedule.blocks)) return []
 
   let workingHours: { startTime: string; endTime: string }[]
@@ -179,6 +179,12 @@ export async function getAvailableSlots(params: {
     const slotDate = wallTimeToInstant(dateStr, slot.time, timeZone)
 
     if (slotDate < minBookingTime) {
+      slot.available = false
+      continue
+    }
+
+    // Bloqueio de faixa de horário (o de dia inteiro já devolveu `[]` acima).
+    if (isIntervalBlocked({ dateStr, start: slotDate, durationMinutes: serviceDuration, blocks: schedule.blocks })) {
       slot.available = false
       continue
     }

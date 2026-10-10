@@ -6,9 +6,12 @@ import {
   blockDay,
   createBlocks,
   deleteBlockGroup,
+  describeBlock,
   findAppointmentsInBlockRange,
   isDateBlocked,
+  isIntervalBlocked,
   isScheduleDateBlocked,
+  parseBlockInput,
 } from '@/lib/schedule-blocks'
 
 const SP = 'America/Sao_Paulo'
@@ -41,6 +44,91 @@ describe('isDateBlocked', () => {
 
   it('blockDay usa o dia de calendário UTC', () => {
     expect(blockDay(new Date('2026-12-25T00:00:00.000Z'))).toBe('2026-12-25')
+  })
+})
+
+describe('parseBlockInput', () => {
+  it('dia inteiro sem término é um dia só (início = fim)', () => {
+    const r = parseBlockInput({ isAllDay: true, startDate: '2026-10-20' }, SP)
+    expect(r).toMatchObject({ ok: true, isAllDay: true })
+    if (r.ok) expect(r.startDate.toISOString()).toBe(r.endDate.toISOString())
+  })
+
+  it('dia inteiro com início = término é aceito; término anterior é recusado', () => {
+    expect(parseBlockInput({ startDate: '2026-10-20', endDate: '2026-10-20' }, SP).ok).toBe(true)
+    expect(parseBlockInput({ startDate: '2026-10-21', endDate: '2026-10-20' }, SP).ok).toBe(false)
+  })
+
+  it('dia inteiro grava meia-noite UTC do dia escolhido', () => {
+    const r = parseBlockInput({ startDate: '2026-10-20', endDate: '2026-10-21' }, SP)
+    expect(r.ok && r.startDate.toISOString()).toBe('2026-10-20T00:00:00.000Z')
+    expect(r.ok && r.endDate.toISOString()).toBe('2026-10-21T00:00:00.000Z')
+  })
+
+  it('rejeita datas inválidas', () => {
+    expect(parseBlockInput({ startDate: 'lixo' }, SP).ok).toBe(false)
+    expect(parseBlockInput({ startDate: '2026-02-30' }, SP).ok).toBe(false)
+    expect(parseBlockInput({}, SP).ok).toBe(false)
+  })
+
+  it('faixa de horário: lê no fuso do negócio (14:00 em São Paulo = 17:00Z)', () => {
+    const r = parseBlockInput({ isAllDay: false, date: '2026-10-20', startTime: '14:00', endTime: '16:00' }, SP)
+    expect(r.ok && r.startDate.toISOString()).toBe('2026-10-20T17:00:00.000Z')
+    expect(r.ok && r.endDate.toISOString()).toBe('2026-10-20T19:00:00.000Z')
+  })
+
+  it('faixa de horário: horário final precisa ser posterior ao inicial; formato inválido é recusado', () => {
+    expect(parseBlockInput({ isAllDay: false, date: '2026-10-20', startTime: '16:00', endTime: '16:00' }, SP).ok).toBe(false)
+    expect(parseBlockInput({ isAllDay: false, date: '2026-10-20', startTime: '17:00', endTime: '09:00' }, SP).ok).toBe(false)
+    expect(parseBlockInput({ isAllDay: false, date: '2026-10-20', startTime: '9h', endTime: '10:00' }, SP).ok).toBe(false)
+    expect(parseBlockInput({ isAllDay: false, startTime: '09:00', endTime: '10:00' }, SP).ok).toBe(false)
+  })
+})
+
+describe('isIntervalBlocked', () => {
+  // 14:00–16:00 em São Paulo no dia 20/10/2026
+  const partial = { startDate: new Date('2026-10-20T17:00:00Z'), endDate: new Date('2026-10-20T19:00:00Z'), isAllDay: false }
+  const at = (hhmmZ: string) => new Date(`2026-10-20T${hhmmZ}:00Z`)
+
+  it('bloqueia o slot que sobrepõe a faixa e libera os adjacentes', () => {
+    const check = (start: string, dur: number) =>
+      isIntervalBlocked({ dateStr: '2026-10-20', start: at(start), durationMinutes: dur, blocks: [partial] })
+    expect(check('17:00', 30)).toBe(true)
+    expect(check('18:30', 30)).toBe(true)
+    expect(check('16:30', 60)).toBe(true) // começa antes mas invade a faixa
+    expect(check('16:00', 60)).toBe(false) // termina exatamente quando a faixa começa
+    expect(check('19:00', 30)).toBe(false) // começa quando a faixa termina
+  })
+
+  it('faixa de horário não bloqueia o dia inteiro', () => {
+    expect(isDateBlocked('2026-10-20', [partial])).toBe(false)
+  })
+
+  it('dia inteiro continua bloqueando qualquer horário do dia', () => {
+    const allDay = { startDate: new Date('2026-10-20T00:00:00Z'), endDate: new Date('2026-10-21T00:00:00Z'), isAllDay: true }
+    expect(isIntervalBlocked({ dateStr: '2026-10-20', start: at('13:00'), durationMinutes: 30, blocks: [allDay] })).toBe(true)
+    expect(isIntervalBlocked({ dateStr: '2026-10-21', start: new Date('2026-10-21T13:00:00Z'), durationMinutes: 30, blocks: [allDay] })).toBe(true)
+    expect(isIntervalBlocked({ dateStr: '2026-10-22', start: new Date('2026-10-22T13:00:00Z'), durationMinutes: 30, blocks: [allDay] })).toBe(false)
+  })
+})
+
+describe('describeBlock', () => {
+  it('dia inteiro: dias de calendário, sem horários', () => {
+    expect(describeBlock({ startDate: new Date('2026-10-20T00:00:00Z'), endDate: new Date('2026-10-21T00:00:00Z'), isAllDay: true }, SP)).toEqual({
+      firstDay: '2026-10-20',
+      lastDay: '2026-10-21',
+      startTime: null,
+      endTime: null,
+    })
+  })
+
+  it('faixa: dia e horários no fuso do negócio', () => {
+    expect(describeBlock({ startDate: new Date('2026-10-21T01:00:00Z'), endDate: new Date('2026-10-21T02:30:00Z'), isAllDay: false }, SP)).toEqual({
+      firstDay: '2026-10-20', // 22:00 de São Paulo ainda é dia 20
+      lastDay: '2026-10-20',
+      startTime: '22:00',
+      endTime: '23:30',
+    })
   })
 })
 
@@ -133,6 +221,23 @@ describe('findAppointmentsInBlockRange', () => {
     const date = (findMany.mock.calls[0] as unknown as [{ where: { date: { gte: Date; lte: Date } } }])[0].where.date
     expect(date.gte.toISOString()).toBe('2026-12-24T03:00:00.000Z')
     expect(date.lte.toISOString()).toBe('2026-12-27T02:59:59.999Z')
+  })
+
+  it('faixa de horário: só avisa de agendamentos que esbarram na faixa', async () => {
+    const { db } = dbWith([
+      { id: '1', date: new Date('2026-10-20T17:30:00Z'), duration: 30, client: { name: 'Dentro' }, service: null, specialty: null },
+      { id: '2', date: new Date('2026-10-20T13:00:00Z'), duration: 60, client: { name: 'Antes' }, service: null, specialty: null },
+      { id: '3', date: new Date('2026-10-20T16:30:00Z'), duration: 60, client: { name: 'Invade' }, service: null, specialty: null },
+      { id: '4', date: new Date('2026-10-20T19:00:00Z'), duration: 30, client: { name: 'Depois' }, service: null, specialty: null },
+    ])
+    const result = await findAppointmentsInBlockRange(db, {
+      ...params,
+      isAllDay: false,
+      startDate: new Date('2026-10-20T17:00:00Z'),
+      endDate: new Date('2026-10-20T19:00:00Z'),
+    })
+
+    expect(result.map((r) => r.clientName)).toEqual(['Dentro', 'Invade'])
   })
 
   it('sem agendas-alvo nem consulta', async () => {

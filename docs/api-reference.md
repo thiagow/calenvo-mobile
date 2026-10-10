@@ -137,20 +137,25 @@ Verifica disponibilidade.
 }
 ```
 
-### `POST /api/schedules/[id]/blocks`
-Cria bloqueio de período.
+### `POST /api/schedule-blocks`
+Cria o mesmo bloqueio em uma ou mais agendas do tenant (usado pelo botão "Bloqueio de Períodos" da página de Agendas). Mais de uma agenda ⇒ blocos com o mesmo `groupId`. Qualquer agenda de outro tenant ⇒ 404 e nada é criado.
 
-**Body**:
+**Body** (dia inteiro **ou** faixa de horário):
 ```typescript
-{
-  startDate: ISO date
-  endDate: ISO date
-  reason?: string
-  isAllDay: boolean
-}
+// Dia inteiro — endDate opcional (omitido = um dia só), inclusivo
+{ scheduleIds: string[], isAllDay: true, startDate: 'YYYY-MM-DD', endDate?: 'YYYY-MM-DD', reason?: string, confirmConflicts?: boolean }
+
+// Faixa de horário num único dia — horários no fuso do negócio
+{ scheduleIds: string[], isAllDay: false, date: 'YYYY-MM-DD', startTime: 'HH:mm', endTime: 'HH:mm', reason?: string, confirmConflicts?: boolean }
 ```
 
-**Response**: `ScheduleBlock`
+**Response**: `201 { success, schedulesCount, groupId, conflictingAppointments }`, ou `409 BLOCK_HAS_APPOINTMENTS` se já houver agendamentos no período (reenviar com `confirmConflicts: true`; os agendamentos são mantidos).
+
+### `GET /api/schedules/[id]/blocks`
+Lista os bloqueios da agenda. Cada item traz, além do `ScheduleBlock`, `firstDay`/`lastDay` (`YYYY-MM-DD`), `startTime`/`endTime` (`HH:mm`, só faixa) no fuso do negócio e `groupSize`.
+
+### `POST /api/schedules/[id]/blocks`
+Igual ao `POST /api/schedule-blocks` para uma agenda, sem `scheduleIds`; `applyToAll: true` aplica a todas as agendas do tenant.
 
 ---
 

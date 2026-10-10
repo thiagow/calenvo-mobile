@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
-import { deleteBlockGroup } from '@/lib/schedule-blocks'
+import { DEFAULT_TIMEZONE } from '@/lib/timezone'
+import { deleteBlockGroup, parseBlockInput } from '@/lib/schedule-blocks'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,23 +93,24 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { startDate, endDate, reason, isAllDay } = body
+    const { reason } = body
 
-    // Validar que endDate > startDate
-    if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
-      return NextResponse.json(
-        { error: 'Data de fim deve ser posterior à data de início' },
-        { status: 400 }
-      )
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId },
+      select: { timezone: true }
+    })
+    const parsed = parseBlockInput(body, businessConfig?.timezone || DEFAULT_TIMEZONE)
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 })
     }
 
     const block = await prisma.scheduleBlock.update({
       where: { id: blockId },
       data: {
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(endDate && { endDate: new Date(endDate) }),
-        ...(reason !== undefined && { reason }),
-        ...(isAllDay !== undefined && { isAllDay })
+        startDate: parsed.startDate,
+        endDate: parsed.endDate,
+        isAllDay: parsed.isAllDay,
+        ...(reason !== undefined && { reason })
       }
     })
 
