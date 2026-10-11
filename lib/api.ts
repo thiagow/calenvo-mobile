@@ -50,6 +50,10 @@ async function apiRequest<T>(
     if (error instanceof ApiError) {
       throw error
     }
+    // Requisição cancelada de propósito (AbortController): o chamador decide ignorar.
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw error
+    }
     throw new ApiError(500, 'Network error')
   }
 }
@@ -62,20 +66,26 @@ export const appointmentsApi = {
     status?: string
     modality?: string
     specialty?: string
+    /** id do serviço */
+    service?: string
+    /** id do profissional */
     professional?: string
     dateFrom?: string
     dateTo?: string
     view?: string
+    /** Dia de referência da vista, "YYYY-MM-DD" */
     currentDate?: string
-  }) => {
+    /** Lista/timeline: incluir também o passado (padrão: de hoje em diante) */
+    includePast?: boolean
+  }, signal?: AbortSignal) => {
     const searchParams = new URLSearchParams()
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
-        if (value) searchParams.append(key, value)
+        if (value) searchParams.append(key, String(value))
       })
     }
     const query = searchParams.toString()
-    return apiRequest<any[]>(`/appointments${query ? `?${query}` : ''}`)
+    return apiRequest<any[]>(`/appointments${query ? `?${query}` : ''}`, { signal })
   },
 
   // Create appointment

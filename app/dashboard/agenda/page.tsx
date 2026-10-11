@@ -6,13 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Filter, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { format } from 'date-fns'
 import { useSession } from 'next-auth/react'
 import { redirect } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useDialog } from '@/components/providers/dialog-provider'
 
 import { AgendaViewSelector, ViewType } from '@/components/agenda/agenda-view-selector'
-import { AgendaFiltersComponent, AgendaFilters } from '@/components/agenda/agenda-filters'
+import {
+  ActiveFilterChips,
+  AgendaFiltersComponent,
+  AgendaFilters,
+  countActiveFilters,
+  useAgendaFilterOptions,
+} from '@/components/agenda/agenda-filters'
 import { DateNavigation, NavigationType } from '@/components/agenda/date-navigation'
 import { AgendaDayView } from '@/components/agenda/agenda-day-view'
 import { AgendaWeekView } from '@/components/agenda/agenda-week-view'
@@ -32,6 +39,7 @@ export default function AgendaPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<any>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const filterOptions = useAgendaFilterOptions()
 
   const { appointments, loading, error, updateAppointment, deleteAppointment, refetch } = useAppointments({
     search: filters.search,
@@ -41,7 +49,9 @@ export default function AgendaPage() {
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
     view: currentView,
-    currentDate: currentDate.toISOString(),
+    // Dia de calendário (não instante): o servidor monta as janelas no fuso do negócio.
+    currentDate: format(currentDate, 'yyyy-MM-dd'),
+    includePast: filters.includePast,
     autoFetch: !!session,
   })
 
@@ -107,7 +117,19 @@ export default function AgendaPage() {
     return 'week'
   }
 
-  const activeFiltersCount = Object.values(filters).filter(v => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)).length
+  const activeFiltersCount = countActiveFilters(filters)
+  const hasPeriod = Boolean(filters.dateFrom || filters.dateTo)
+  const showFromToday = (currentView === 'list' || currentView === 'timeline') && !hasPeriod && !filters.includePast
+
+  // Escolher um período leva à Lista, que mostra o intervalo inteiro de uma vez;
+  // dia/semana/mês só exibem a janela em torno da data atual.
+  const handleFiltersChange = (next: AgendaFilters) => {
+    const periodChanged = next.dateFrom !== filters.dateFrom || next.dateTo !== filters.dateTo
+    setFilters(next)
+    if (periodChanged && (next.dateFrom || next.dateTo) && ['day', 'week', 'month'].includes(currentView)) {
+      setCurrentView('list')
+    }
+  }
 
   if (status === 'loading') return <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>
   if (!session) { redirect('/login'); return null }
@@ -148,11 +170,18 @@ export default function AgendaPage() {
       </div>
 
       {/* Filtros */}
+      <ActiveFilterChips
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        options={filterOptions}
+        showFromToday={showFromToday}
+      />
       <AgendaFiltersComponent
         filters={filters}
-        onFiltersChange={setFilters}
+        onFiltersChange={handleFiltersChange}
         isOpen={showFilters}
         onToggle={() => setShowFilters(!showFilters)}
+        options={filterOptions}
       />
 
       {/* View */}

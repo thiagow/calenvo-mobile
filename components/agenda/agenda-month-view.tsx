@@ -1,14 +1,13 @@
 
 'use client'
 
+import { useMemo, useRef, useState } from 'react'
+import { format, isSameDay, isSameMonth } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import {
-  Clock,
-  Eye
-} from 'lucide-react'
-import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { AppointmentStatus, ModalityType } from '@prisma/client'
+import { MonthDayPanel } from './month-day-panel'
 
 interface MonthAppointment {
   id: string
@@ -23,245 +22,187 @@ interface MonthAppointment {
   modality: ModalityType
   duration: number
   professional?: string
+  isOverbooked?: boolean
 }
 
 interface AgendaMonthViewProps {
   date: Date
   appointments: MonthAppointment[]
+  /** Abre a vista "Dia" no dia escolhido. */
   onDayClick?: (date: Date) => void
   onAppointmentClick?: (appointment: MonthAppointment) => void
 }
 
-export function AgendaMonthView({
-  date,
-  appointments,
-  onDayClick,
-  onAppointmentClick
-}: AgendaMonthViewProps) {
-  
+const STATUS_DOT: Record<AppointmentStatus, string> = {
+  CONFIRMED: 'bg-green-400',
+  SCHEDULED: 'bg-blue-400',
+  IN_PROGRESS: 'bg-yellow-400',
+  COMPLETED: 'bg-gray-400',
+  CANCELLED: 'bg-red-400',
+  NO_SHOW: 'bg-purple-400',
+}
+
+const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+const WEEKDAYS_MOBILE = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+const MAX_DOTS = 3
+
+/** Dia selecionado por padrão: hoje, se estiver no mês exibido; senão o dia 1. */
+function defaultDay(month: Date): Date {
+  const today = new Date()
+  return isSameMonth(today, month) ? today : new Date(month.getFullYear(), month.getMonth(), 1)
+}
+
+export function AgendaMonthView({ date, appointments, onDayClick, onAppointmentClick }: AgendaMonthViewProps) {
   const today = new Date()
   const year = date.getFullYear()
   const month = date.getMonth()
+  const panelRef = useRef<HTMLElement>(null)
+  const [picked, setPicked] = useState<Date | null>(null)
 
-  // Primeiro dia do mês
-  const firstDayOfMonth = new Date(year, month, 1)
-  // Último dia do mês
-  const lastDayOfMonth = new Date(year, month + 1, 0)
-  
-  // Primeiro dia da primeira semana (pode ser do mês anterior)
-  const firstDayOfGrid = new Date(firstDayOfMonth)
-  firstDayOfGrid.setDate(firstDayOfGrid.getDate() - firstDayOfGrid.getDay())
-  
-  // Último dia da última semana (pode ser do próximo mês)
-  const lastDayOfGrid = new Date(lastDayOfMonth)
-  lastDayOfGrid.setDate(lastDayOfGrid.getDate() + (6 - lastDayOfGrid.getDay()))
+  // Só vale enquanto o mês exibido for o do dia escolhido; ao navegar de mês volta ao padrão.
+  const selectedDay = picked && isSameMonth(picked, date) ? picked : defaultDay(date)
 
-  // Gerar todas as datas do grid (6 semanas x 7 dias = 42 dias)
-  const calendarDays = []
-  const currentDate = new Date(firstDayOfGrid)
-  
-  for (let i = 0; i < 42; i++) {
-    calendarDays.push(new Date(currentDate))
-    currentDate.setDate(currentDate.getDate() + 1)
-  }
+  const calendarDays = useMemo(() => {
+    const start = new Date(year, month, 1)
+    start.setDate(start.getDate() - start.getDay())
+    return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
+  }, [year, month])
 
-  const getAppointmentsForDay = (day: Date) => {
-    return appointments.filter(apt => {
-      const aptDate = new Date(apt.date)
-      return aptDate.toDateString() === day.toDateString()
+  const byDay = useMemo(() => {
+    const map = new Map<string, MonthAppointment[]>()
+    for (const appointment of appointments) {
+      const key = format(new Date(appointment.date), 'yyyy-MM-dd')
+      const list = map.get(key)
+      if (list) list.push(appointment)
+      else map.set(key, [appointment])
+    }
+    return map
+  }, [appointments])
+
+  const forDay = (day: Date) => byDay.get(format(day, 'yyyy-MM-dd')) ?? []
+
+  const selectDay = (day: Date) => {
+    setPicked(day)
+    // Leva o painel à vista sem pular a tela inteira ('nearest') e respeita "reduzir movimento".
+    requestAnimationFrame(() => {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      panelRef.current?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' })
     })
   }
 
-  const isToday = (day: Date) => {
-    return day.toDateString() === today.toDateString()
-  }
-
-  const isCurrentMonth = (day: Date) => {
-    return day.getMonth() === month
-  }
-
-  const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-  const weekdaysMobile = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
-
   return (
-    <div className="space-y-3 sm:space-y-4">
-      {/* Calendar Grid */}
+    <div className="space-y-3">
       <Card>
-        <CardContent className="p-0 overflow-x-hidden">
-          {/* Weekday Headers */}
+        <CardContent className="overflow-x-hidden p-0">
           <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-            {weekdays.map((day, index) => (
-              <div 
+            {WEEKDAYS.map((day, index) => (
+              <div
                 key={day}
-                className="p-2 text-center text-xs font-medium text-gray-600 border-r border-gray-100 last:border-r-0"
+                className="border-r border-gray-100 p-2 text-center text-xs font-medium text-gray-600 last:border-r-0"
               >
-                {/* Show full name on desktop, abbreviated on mobile */}
                 <span className="hidden sm:inline">{day}</span>
-                <span className="sm:hidden">{weekdaysMobile[index]}</span>
+                <span className="sm:hidden">{WEEKDAYS_MOBILE[index]}</span>
               </div>
             ))}
           </div>
 
-          {/* Calendar Days */}
           <div className="grid grid-cols-7">
-            {calendarDays.map((day, index) => {
-              const dayAppointments = getAppointmentsForDay(day)
-              const isCurrentMonthDay = isCurrentMonth(day)
-              const isTodayDate = isToday(day)
-              
+            {calendarDays.map((day) => {
+              const dayAppointments = forDay(day)
+              const inMonth = isSameMonth(day, date)
+              const isToday = isSameDay(day, today)
+              const isSelected = inMonth && isSameDay(day, selectedDay)
+              const count = dayAppointments.length
+
               return (
-                <div
-                  key={index}
-                  className={`
-                    relative border-r border-b border-gray-100 last:border-r-0 
-                    min-h-[60px] sm:min-h-[80px] md:h-32 p-1 sm:p-2
-                    ${isCurrentMonthDay 
-                      ? 'bg-white hover:bg-gray-50 cursor-pointer' 
-                      : 'bg-gray-50 text-gray-400'
-                    }
-                    ${isTodayDate ? 'bg-blue-50 border-blue-200' : ''}
-                  `}
-                  onClick={() => isCurrentMonthDay && onDayClick?.(day)}
+                <button
+                  key={day.toISOString()}
+                  type="button"
+                  disabled={!inMonth}
+                  aria-pressed={isSelected}
+                  aria-label={`${format(day, "d 'de' MMMM", { locale: ptBR })}, ${
+                    count === 0 ? 'sem agendamentos' : `${count} agendamento${count === 1 ? '' : 's'}`
+                  }`}
+                  onClick={() => selectDay(day)}
+                  className={cn(
+                    'relative flex min-h-[56px] flex-col items-stretch border-b border-r border-gray-100 p-1 text-left outline-none last:border-r-0 sm:min-h-[88px] sm:p-2 md:h-32',
+                    'focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-primary',
+                    inMonth ? 'bg-white active:bg-gray-100 sm:hover:bg-gray-50' : 'bg-gray-50 text-gray-300',
+                    isSelected && 'z-[1] bg-blue-50/60 ring-2 ring-inset ring-primary'
+                  )}
                 >
-                  {/* Day Number */}
-                  <div className={`
-                    text-xs sm:text-sm font-medium mb-0.5 sm:mb-1
-                    ${isTodayDate 
-                      ? 'text-blue-700 bg-blue-600 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-[10px] sm:text-xs mx-auto' 
-                      : isCurrentMonthDay 
-                        ? 'text-gray-900 text-center' 
-                        : 'text-gray-400 text-center'
-                    }
-                  `}>
+                  <span
+                    className={cn(
+                      'mx-auto flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium sm:text-sm',
+                      isToday ? 'bg-blue-600 text-white' : inMonth ? 'text-gray-900' : 'text-gray-300'
+                    )}
+                  >
                     {day.getDate()}
-                  </div>
+                  </span>
 
-                  {/* Appointments */}
-                  <div className="space-y-0.5 sm:space-y-1 overflow-hidden">
-                    {/* Mobile: Show dots */}
-                    <div className="flex sm:hidden flex-wrap gap-0.5 justify-center">
-                      {dayAppointments.slice(0, 6).map((appointment, aptIndex) => (
-                        <button
-                          key={aptIndex}
-                          className={`
-                            w-1.5 h-1.5 rounded-full cursor-pointer hover:scale-125 transition-transform
-                            ${appointment.status === 'CONFIRMED' ? 'bg-green-400' :
-                              appointment.status === 'SCHEDULED' ? 'bg-blue-400' :
-                              appointment.status === 'IN_PROGRESS' ? 'bg-yellow-400' :
-                              appointment.status === 'COMPLETED' ? 'bg-gray-400' :
-                              appointment.status === 'CANCELLED' ? 'bg-red-400' :
-                              'bg-purple-400'}
-                          `}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onAppointmentClick?.(appointment)
-                          }}
-                        />
-                      ))}
-                      {dayAppointments.length > 6 && (
-                        <button 
-                          className="text-[8px] text-blue-600 font-medium hover:underline cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (onDayClick) onDayClick(day)
-                          }}
-                        >
-                          +{dayAppointments.length - 6}
-                        </button>
-                      )}
-                    </div>
+                  {count > 0 && (
+                    <>
+                      {/* Mobile: só um resumo — o alvo de toque é a célula inteira, o detalhe fica no painel */}
+                      <span className="mt-1 flex flex-wrap items-center justify-center gap-0.5 sm:hidden" aria-hidden>
+                        {dayAppointments.slice(0, MAX_DOTS).map((appointment) => (
+                          <span key={appointment.id} className={cn('h-1.5 w-1.5 rounded-full', STATUS_DOT[appointment.status])} />
+                        ))}
+                        {count > MAX_DOTS && (
+                          <span className="text-[9px] font-semibold leading-none text-blue-600">+{count - MAX_DOTS}</span>
+                        )}
+                      </span>
 
-                    {/* Tablet and Desktop: Show appointment cards */}
-                    <div className="hidden sm:block">
-                      {dayAppointments.slice(0, 2).map((appointment, aptIndex) => (
-                        <button
-                          key={aptIndex}
-                          className="w-full text-xs p-1 rounded cursor-pointer hover:shadow-md transition-all bg-white border border-blue-200 hover:border-blue-400"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onAppointmentClick?.(appointment)
-                          }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0 text-left">
-                              <div className="flex items-center space-x-1">
-                                <Clock className="h-2 w-2 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-600 text-[10px]">
-                                  {new Date(appointment.date).toLocaleTimeString('pt-BR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              </div>
-                              <div className="truncate font-medium text-gray-800 text-[10px]">
-                                {appointment.patient.name}
-                              </div>
-                              <div className="hidden md:block truncate text-gray-600 text-[10px]">
-                                {appointment.specialty}
-                              </div>
-                            </div>
-                            <div className={`
-                              w-2 h-2 rounded-full flex-shrink-0 ml-1
-                              ${appointment.status === 'CONFIRMED' ? 'bg-green-400' :
-                                appointment.status === 'SCHEDULED' ? 'bg-blue-400' :
-                                appointment.status === 'IN_PROGRESS' ? 'bg-yellow-400' :
-                                appointment.status === 'COMPLETED' ? 'bg-gray-400' :
-                                appointment.status === 'CANCELLED' ? 'bg-red-400' :
-                                'bg-purple-400'}
-                            `} />
-                          </div>
-                        </button>
-                      ))}
-                      
-                      {/* Show more indicator */}
-                      {dayAppointments.length > 2 && (
-                        <button 
-                          className="w-full text-[10px] text-blue-600 font-medium cursor-pointer hover:underline text-center"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (onDayClick) onDayClick(day)
-                          }}
-                        >
-                          +{dayAppointments.length - 2} mais
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                      {/* Tablet e desktop: prévia das duas primeiras */}
+                      <span className="mt-1 hidden space-y-1 overflow-hidden sm:block" aria-hidden>
+                        {dayAppointments.slice(0, 2).map((appointment) => (
+                          <span
+                            key={appointment.id}
+                            className="flex items-center justify-between rounded border border-blue-200 bg-white px-1 py-0.5 text-[10px]"
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              <span className="text-gray-500">{format(new Date(appointment.date), 'HH:mm')}</span>{' '}
+                              <span className="font-medium text-gray-800">{appointment.patient.name}</span>
+                            </span>
+                            <span className={cn('ml-1 h-2 w-2 shrink-0 rounded-full', STATUS_DOT[appointment.status])} />
+                          </span>
+                        ))}
+                        {count > 2 && (
+                          <span className="block text-center text-[10px] font-medium text-blue-600">+{count - 2} mais</span>
+                        )}
+                      </span>
+                    </>
+                  )}
+                </button>
               )
             })}
           </div>
         </CardContent>
       </Card>
 
-      {/* Legend */}
+      <MonthDayPanel
+        ref={panelRef}
+        day={selectedDay}
+        appointments={forDay(selectedDay)}
+        onAppointmentClick={(appointment) => onAppointmentClick?.(appointment)}
+        onOpenDay={(day) => onDayClick?.(day)}
+      />
+
       <Card>
         <CardContent className="p-3 sm:p-4">
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 text-xs">
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-green-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Confirmado</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Agendado</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-yellow-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Em andamento</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gray-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Concluído</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Cancelado</span>
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-purple-400 rounded-full flex-shrink-0"></div>
-              <span className="text-xs">Faltou</span>
-            </div>
+          <div className="grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4">
+            {[
+              ['bg-green-400', 'Confirmado'],
+              ['bg-blue-400', 'Agendado'],
+              ['bg-yellow-400', 'Em andamento'],
+              ['bg-gray-400', 'Concluído'],
+              ['bg-red-400', 'Cancelado'],
+              ['bg-purple-400', 'Faltou'],
+            ].map(([color, label]) => (
+              <div key={label} className="flex items-center space-x-1.5">
+                <div className={cn('h-2.5 w-2.5 flex-shrink-0 rounded-full sm:h-3 sm:w-3', color)} />
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 
 'use client'
 
+import { addDays, addMonths, format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { 
   ChevronLeft, 
@@ -24,41 +25,20 @@ export function DateNavigation({
   appointmentCount = 0
 }: DateNavigationProps) {
   
-  const goToPrevious = () => {
-    const newDate = new Date(currentDate)
-    
+  const shift = (direction: 1 | -1) => {
     switch (navigationType) {
       case 'day':
-        newDate.setDate(currentDate.getDate() - 1)
-        break
+        return addDays(currentDate, direction)
       case 'week':
-        newDate.setDate(currentDate.getDate() - 7)
-        break
+        return addDays(currentDate, 7 * direction)
       case 'month':
-        newDate.setMonth(currentDate.getMonth() - 1)
-        break
+        // addMonths limita ao último dia do mês (31/jan + 1 mês = 28/fev), ao contrário de setMonth
+        return addMonths(currentDate, direction)
     }
-    
-    onDateChange(newDate)
   }
 
-  const goToNext = () => {
-    const newDate = new Date(currentDate)
-    
-    switch (navigationType) {
-      case 'day':
-        newDate.setDate(currentDate.getDate() + 1)
-        break
-      case 'week':
-        newDate.setDate(currentDate.getDate() + 7)
-        break
-      case 'month':
-        newDate.setMonth(currentDate.getMonth() + 1)
-        break
-    }
-    
-    onDateChange(newDate)
-  }
+  const goToPrevious = () => onDateChange(shift(-1))
+  const goToNext = () => onDateChange(shift(1))
 
   const goToToday = () => {
     onDateChange(new Date())
@@ -155,10 +135,11 @@ export function DateNavigation({
           <Button 
             variant="outline" 
             size="sm"
+            aria-label="Anterior"
             onClick={goToPrevious}
-            className="hover:bg-gray-100 h-8 w-8 p-0"
+            className="hover:bg-gray-100 h-10 w-10 p-0"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4" aria-hidden />
           </Button>
           
           <Button 
@@ -167,7 +148,7 @@ export function DateNavigation({
             onClick={goToToday}
             disabled={isToday()}
             className={`
-              px-2 sm:px-3 hover:bg-gray-100 h-8 text-xs sm:text-sm
+              px-3 hover:bg-gray-100 h-10 text-sm
               ${isToday() ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
@@ -177,8 +158,9 @@ export function DateNavigation({
           <Button 
             variant="outline" 
             size="sm"
+            aria-label="Próximo"
             onClick={goToNext}
-            className="hover:bg-gray-100 h-8 w-8 p-0"
+            className="hover:bg-gray-100 h-10 w-10 p-0"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -186,8 +168,19 @@ export function DateNavigation({
 
         {/* Date Display with Appointment Count */}
         <div className="flex-1 flex flex-col items-end min-w-0">
-          <div className="flex items-center space-x-2 max-w-full">
+          <label className="relative flex min-h-10 cursor-pointer items-center space-x-2 max-w-full">
             <Calendar className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <input
+              type="date"
+              aria-label="Ir para uma data"
+              value={format(currentDate, 'yyyy-MM-dd')}
+              onChange={(e) => {
+                if (!e.target.value) return
+                const [y, m, d] = e.target.value.split('-').map(Number)
+                onDateChange(new Date(y, m - 1, d))
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
             {/* Mobile view */}
             <h2 className="block sm:hidden text-sm font-semibold text-gray-900 capitalize whitespace-nowrap truncate">
               {formatCurrentDateMobile()}
@@ -196,7 +189,7 @@ export function DateNavigation({
             <h2 className="hidden sm:block text-base md:text-lg font-semibold text-gray-900 capitalize whitespace-nowrap truncate">
               {formatCurrentDate()}
             </h2>
-          </div>
+          </label>
           <p className="text-xs text-gray-600 mt-0.5 whitespace-nowrap">
             {appointmentCount} consulta{appointmentCount !== 1 ? 's' : ''} agendada{appointmentCount !== 1 ? 's' : ''}
           </p>

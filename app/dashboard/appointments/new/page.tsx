@@ -55,6 +55,12 @@ export default function NewAppointmentPage() {
   const [showClientSuggestions, setShowClientSuggestions] = useState(false)
   const [formData, setFormData] = useState<NewAppointmentForm>(EMPTY)
 
+  // Atalho da agenda: "Novo neste dia" abre o formulário já com a data escolhida (?date=YYYY-MM-DD).
+  useEffect(() => {
+    const preset = new URLSearchParams(window.location.search).get('date')
+    if (preset && /^\d{4}-\d{2}-\d{2}$/.test(preset)) setFormData(p => ({ ...p, date: preset }))
+  }, [])
+
   useEffect(() => {
     if (status === 'unauthenticated') { router.push('/login'); return }
     if (status !== 'authenticated') return

@@ -9,6 +9,7 @@ import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
 import { getRemainingAppointments, shouldNotifyLimitApproaching } from '@/lib/plan-limits'
 import { checkAppointmentQuota, resolveProfessionalForBooking, withBookingLock } from '@/lib/appointment-service'
 import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
+import { resolveAppointmentRange } from '@/lib/agenda-range'
 import { logError } from '@/lib/error-logger'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const modality = searchParams.get('modality') as ModalityType | null
     const specialty = searchParams.get('specialty')
+    const service = searchParams.get('service')
     const professional = searchParams.get('professional')
     const dateFrom = searchParams.get('dateFrom')
     const dateTo = searchParams.get('dateTo')
@@ -83,71 +85,44 @@ export async function GET(request: NextRequest) {
       whereConditions.modality = modality
     }
 
-    // Specialty filter
+    // Specialty filter (legado: nome do serviço em texto)
     if (specialty) {
       whereConditions.specialty = specialty
     }
 
-    // Professional filter
-    if (professional) {
-      whereConditions.professional = professional
+    // Service filter (id do serviço, enviado pelo seletor da agenda)
+    if (service) {
+      whereConditions.serviceId = service
     }
 
-    // Date range filters
-    if (dateFrom || dateTo || (view && currentDate)) {
-      let dateFilter: any = {}
+    // Professional filter: o seletor envia o id do profissional. A coluna
+    // `professional` é só o nome legado em texto e nunca casava com o id.
+    // Para o próprio profissional logado o escopo já está fixado acima.
+    if (professional && !(userRole === 'PROFESSIONAL' && masterId)) {
+      whereConditions.professionalId = professional
+    }
 
-      if (view && currentDate) {
-        const date = new Date(currentDate)
-
-        switch (view) {
-          case 'day':
-            const startOfDay = new Date(date)
-            startOfDay.setHours(0, 0, 0, 0)
-            const endOfDay = new Date(date)
-            endOfDay.setHours(23, 59, 59, 999)
-
-            dateFilter.gte = startOfDay
-            dateFilter.lte = endOfDay
-            break
-
-          case 'week':
-            const startOfWeek = new Date(date)
-            const day = startOfWeek.getDay()
-            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
-            startOfWeek.setDate(diff)
-            startOfWeek.setHours(0, 0, 0, 0)
-
-            const endOfWeek = new Date(startOfWeek)
-            endOfWeek.setDate(startOfWeek.getDate() + 6)
-            endOfWeek.setHours(23, 59, 59, 999)
-
-            dateFilter.gte = startOfWeek
-            dateFilter.lte = endOfWeek
-            break
-
-          case 'month':
-            const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1)
-            const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-            endOfMonth.setHours(23, 59, 59, 999)
-
-            dateFilter.gte = startOfMonth
-            dateFilter.lte = endOfMonth
-            break
-        }
-      } else {
-        if (dateFrom) {
-          dateFilter.gte = new Date(dateFrom)
-        }
-        if (dateTo) {
-          const toDate = new Date(dateTo)
-          toDate.setHours(23, 59, 59, 999)
-          dateFilter.lte = toDate
-        }
-      }
-
-      if (Object.keys(dateFilter).length > 0) {
-        whereConditions.date = dateFilter
+    // Janela de datas: vista ∩ período, em dias de calendário do NEGÓCIO (o
+    // servidor roda em UTC; ver lib/agenda-range.ts).
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId: whereConditions.userId },
+      select: { timezone: true }
+    })
+    const range = resolveAppointmentRange({
+      view,
+      currentDate,
+      dateFrom,
+      dateTo,
+      includePast: searchParams.get('includePast') === 'true',
+      timeZone: businessConfig?.timezone || DEFAULT_TIMEZONE
+    })
+    if (range.empty) {
+      return NextResponse.json([])
+    }
+    if (range.gte || range.lte) {
+      whereConditions.date = {
+        ...(range.gte && { gte: range.gte }),
+        ...(range.lte && { lte: range.lte })
       }
     }
 

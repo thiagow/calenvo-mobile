@@ -1,202 +1,316 @@
-
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useEffect, useMemo, useState } from 'react'
+import { addDays, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek } from 'date-fns'
+import { Search, X } from 'lucide-react'
+import { AppointmentStatus } from '@prisma/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import {
-  Filter,
-  X,
-  Search,
-  Calendar,
-  User,
-  Stethoscope
-} from 'lucide-react'
-import { AppointmentStatus, ModalityType } from '@prisma/client'
-import { STATUS_LABELS, MODALITY_LABELS } from '@/lib/types'
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types'
+import { cn } from '@/lib/utils'
 
 export interface AgendaFilters {
   search?: string
   status?: AppointmentStatus[]
+  /** id do serviço */
   service?: string
+  /** id do profissional */
+  professional?: string
+  /** "YYYY-MM-DD" */
   dateFrom?: string
   dateTo?: string
-  professional?: string
+  /** Lista/timeline: incluir também o passado (padrão: de hoje em diante). */
+  includePast?: boolean
 }
+
+interface Option {
+  id: string
+  name: string
+}
+
+export interface AgendaFilterOptions {
+  services: Option[]
+  professionals: Option[]
+}
+
+/** Serviços e profissionais para os seletores e para os nomes dos chips. */
+export function useAgendaFilterOptions(): AgendaFilterOptions {
+  const [services, setServices] = useState<Option[]>([])
+  const [professionals, setProfessionals] = useState<Option[]>([])
+
+  useEffect(() => {
+    const load = async (url: string, set: (items: Option[]) => void) => {
+      try {
+        const response = await fetch(url)
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data)) set(data)
+        }
+      } catch (error) {
+        console.error(`Error fetching ${url}:`, error)
+      }
+    }
+    load('/api/services', setServices)
+    load('/api/professionals', setProfessionals)
+  }, [])
+
+  return { services, professionals }
+}
+
+/** Quantos filtros o usuário escolheu (o "só futuro" padrão da lista não conta). */
+export function countActiveFilters(filters: AgendaFilters): number {
+  let count = 0
+  if (filters.search) count++
+  if (filters.status?.length) count++
+  if (filters.service) count++
+  if (filters.professional) count++
+  if (filters.dateFrom || filters.dateTo) count++
+  return count
+}
+
+const ymd = (date: Date) => format(date, 'yyyy-MM-dd')
+const dm = (value: string) => `${value.slice(8, 10)}/${value.slice(5, 7)}`
+
+interface PeriodPreset {
+  id: string
+  label: string
+  range: () => { dateFrom: string; dateTo: string }
+}
+
+const PERIOD_PRESETS: PeriodPreset[] = [
+  { id: 'today', label: 'Hoje', range: () => ({ dateFrom: ymd(new Date()), dateTo: ymd(new Date()) }) },
+  {
+    id: 'tomorrow',
+    label: 'Amanhã',
+    range: () => ({ dateFrom: ymd(addDays(new Date(), 1)), dateTo: ymd(addDays(new Date(), 1)) }),
+  },
+  {
+    id: 'week',
+    label: 'Esta semana',
+    range: () => ({
+      dateFrom: ymd(startOfWeek(new Date(), { weekStartsOn: 1 })),
+      dateTo: ymd(endOfWeek(new Date(), { weekStartsOn: 1 })),
+    }),
+  },
+  {
+    id: 'next7',
+    label: 'Próximos 7 dias',
+    range: () => ({ dateFrom: ymd(new Date()), dateTo: ymd(addDays(new Date(), 6)) }),
+  },
+  {
+    id: 'month',
+    label: 'Este mês',
+    range: () => ({ dateFrom: ymd(startOfMonth(new Date())), dateTo: ymd(endOfMonth(new Date())) }),
+  },
+]
 
 interface AgendaFiltersProps {
   filters: AgendaFilters
   onFiltersChange: (filters: AgendaFilters) => void
   isOpen: boolean
   onToggle: () => void
+  options: AgendaFilterOptions
 }
 
-export function AgendaFiltersComponent({
-  filters,
-  onFiltersChange,
-  isOpen,
-  onToggle
-}: AgendaFiltersProps) {
+/** Filtros da agenda num bottom sheet: campos grandes para o toque e "Aplicar" fixo no rodapé. */
+export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onToggle, options }: AgendaFiltersProps) {
+  const [draft, setDraft] = useState<AgendaFilters>(filters)
+  const [customPeriod, setCustomPeriod] = useState(false)
 
-  const [services, setServices] = useState<{ id: string, name: string }[]>([])
-  const [professionals, setProfessionals] = useState<{ id: string, name: string }[]>([])
-
+  // Cada abertura parte do que está aplicado de fato.
   useEffect(() => {
-    fetchServices()
-    fetchProfessionals()
-  }, [])
-
-  const fetchServices = async () => {
-    try {
-      const response = await fetch('/api/services')
-      if (response.ok) {
-        const data = await response.json()
-        setServices(data)
-      }
-    } catch (error) {
-      console.error('Error fetching services:', error)
-    }
-  }
-
-  const fetchProfessionals = async () => {
-    try {
-      const response = await fetch('/api/professionals')
-      if (response.ok) {
-        const data = await response.json()
-        setProfessionals(data)
-      }
-    } catch (error) {
-      console.error('Error fetching professionals:', error)
-    }
-  }
-
-  const updateFilter = <K extends keyof AgendaFilters>(
-    key: K,
-    value: AgendaFilters[K]
-  ) => {
-    onFiltersChange({
-      ...filters,
-      [key]: value
+    if (!isOpen) return
+    setDraft(filters)
+    const matchesPreset = PERIOD_PRESETS.some((p) => {
+      const r = p.range()
+      return r.dateFrom === filters.dateFrom && r.dateTo === filters.dateTo
     })
-  }
+    setCustomPeriod(Boolean((filters.dateFrom || filters.dateTo) && !matchesPreset))
+  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const clearFilters = () => {
-    onFiltersChange({})
-  }
-
-  const toggleStatus = (status: AppointmentStatus) => {
-    const currentStatuses = filters.status || []
-    const newStatuses = currentStatuses.includes(status)
-      ? currentStatuses.filter(s => s !== status)
-      : [...currentStatuses, status]
-
-    updateFilter('status', newStatuses.length > 0 ? newStatuses : undefined)
-  }
-
-  const hasActiveFilters = Object.values(filters).some(value =>
-    value !== undefined && value !== '' &&
-    !(Array.isArray(value) && value.length === 0)
+  const activePreset = useMemo(
+    () =>
+      PERIOD_PRESETS.find((p) => {
+        const r = p.range()
+        return r.dateFrom === draft.dateFrom && r.dateTo === draft.dateTo
+      })?.id,
+    [draft.dateFrom, draft.dateTo]
   )
 
-  const activeFiltersCount = Object.entries(filters).filter(([key, value]) => {
-    if (value === undefined || value === '') return false
-    if (Array.isArray(value) && value.length === 0) return false
-    return true
-  }).length
+  const set = <K extends keyof AgendaFilters>(key: K, value: AgendaFilters[K]) =>
+    setDraft((current) => ({ ...current, [key]: value }))
+
+  const toggleStatus = (status: AppointmentStatus) => {
+    const current = draft.status ?? []
+    const next = current.includes(status) ? current.filter((s) => s !== status) : [...current, status]
+    set('status', next.length > 0 ? next : undefined)
+  }
+
+  const pickPreset = (preset: PeriodPreset) => {
+    if (activePreset === preset.id) {
+      setDraft((d) => ({ ...d, dateFrom: undefined, dateTo: undefined }))
+      return
+    }
+    setCustomPeriod(false)
+    setDraft((d) => ({ ...d, ...preset.range() }))
+  }
+
+  const apply = () => {
+    onFiltersChange({ ...draft, search: draft.search?.trim() || undefined })
+    onToggle()
+  }
+
+  const clearAll = () => {
+    setCustomPeriod(false)
+    setDraft({ includePast: filters.includePast })
+  }
+
+  const draftCount = countActiveFilters(draft)
+  const chip = (selected: boolean) =>
+    cn(
+      'h-10 rounded-full border px-4 text-sm font-medium transition-colors',
+      selected ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background hover:bg-muted'
+    )
 
   return (
-    <Card className={`transition-all duration-200 ${isOpen ? 'shadow-md' : 'shadow-sm'}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center">
-            <Filter className="mr-2 h-4 w-4" />
-            Filtros
-            {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {activeFiltersCount}
-              </Badge>
-            )}
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-xs text-red-600 hover:text-red-700"
-              >
-                <X className="h-3 w-3 mr-1" />
-                Limpar
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onToggle}
-              className="text-xs"
-            >
-              {isOpen ? 'Ocultar' : 'Mostrar'}
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
+    <Sheet open={isOpen} onOpenChange={(open) => open !== isOpen && onToggle()}>
+      <SheetContent
+        side="bottom"
+        className="flex max-h-[90dvh] flex-col gap-0 rounded-t-2xl p-0 sm:mx-auto sm:max-w-lg"
+      >
+        <SheetHeader className="border-b px-5 py-4 text-left">
+          <SheetTitle>Filtros</SheetTitle>
+          <SheetDescription className="sr-only">Filtrar os agendamentos da agenda</SheetDescription>
+        </SheetHeader>
 
-      {isOpen && (
-        <CardContent className="space-y-4">
+        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
           {/* Busca */}
-          <div>
-            <Label className="text-xs font-medium text-gray-700">Buscar</Label>
-            <div className="relative mt-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <div className="space-y-2">
+            <Label htmlFor="agenda-search">Buscar</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por paciente, profissional..."
-                value={filters.search || ''}
-                onChange={(e) => updateFilter('search', e.target.value || undefined)}
-                className="pl-9"
+                id="agenda-search"
+                type="search"
+                inputMode="search"
+                placeholder="Cliente, serviço ou profissional"
+                value={draft.search ?? ''}
+                onChange={(e) => set('search', e.target.value || undefined)}
+                className="h-11 pl-9 pr-10 text-base"
               />
+              {draft.search && (
+                <button
+                  type="button"
+                  aria-label="Limpar busca"
+                  onClick={() => set('search', undefined)}
+                  className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
+          {/* Período */}
+          <div className="space-y-2">
+            <Label>Período</Label>
+            <div className="flex flex-wrap gap-2">
+              {PERIOD_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  aria-pressed={activePreset === preset.id}
+                  onClick={() => pickPreset(preset)}
+                  className={chip(activePreset === preset.id)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              <button
+                type="button"
+                aria-pressed={customPeriod}
+                onClick={() => setCustomPeriod((v) => !v)}
+                className={chip(customPeriod)}
+              >
+                Personalizado
+              </button>
+            </div>
+            {customPeriod && (
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1">
+                  <Label htmlFor="agenda-from" className="text-xs text-muted-foreground">De</Label>
+                  <Input
+                    id="agenda-from"
+                    type="date"
+                    value={draft.dateFrom ?? ''}
+                    max={draft.dateTo || undefined}
+                    onChange={(e) => set('dateFrom', e.target.value || undefined)}
+                    className="h-11 text-base"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="agenda-to" className="text-xs text-muted-foreground">Até</Label>
+                  <Input
+                    id="agenda-to"
+                    type="date"
+                    value={draft.dateTo ?? ''}
+                    min={draft.dateFrom || undefined}
+                    onChange={(e) => set('dateTo', e.target.value || undefined)}
+                    className="h-11 text-base"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Status */}
-          <div>
-            <Label className="text-xs font-medium text-gray-700">Status</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {Object.entries(STATUS_LABELS).map(([status, label]) => {
-                const isSelected = filters.status?.includes(status as AppointmentStatus) || false
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(STATUS_LABELS) as AppointmentStatus[]).map((status) => {
+                const selected = draft.status?.includes(status) ?? false
                 return (
-                  <Button
+                  <button
                     key={status}
-                    variant={isSelected ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleStatus(status as AppointmentStatus)}
-                    className="text-xs h-7"
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleStatus(status)}
+                    className={cn(
+                      'h-10 rounded-full border px-4 text-sm font-medium transition-colors',
+                      selected ? `${STATUS_COLORS[status]} border-current` : 'border-border bg-background hover:bg-muted'
+                    )}
                   >
-                    {label}
-                  </Button>
+                    {STATUS_LABELS[status]}
+                  </button>
                 )
               })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Serviços */}
-            <div>
-              <Label className="text-xs font-medium text-gray-700">Serviços</Label>
+          {/* Serviço e profissional */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Serviço</Label>
               <Select
-                value={filters.service || 'all'}
-                onValueChange={(value) => updateFilter('service', value === 'all' ? undefined : value)}
+                value={draft.service ?? 'all'}
+                onValueChange={(value) => set('service', value === 'all' ? undefined : value)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-11 text-base">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {services.map((service) => (
-                    <SelectItem key={service.id} value={service.name}>
+                  {options.services.map((service) => (
+                    <SelectItem key={service.id} value={service.id}>
                       {service.name}
                     </SelectItem>
                   ))}
@@ -204,19 +318,18 @@ export function AgendaFiltersComponent({
               </Select>
             </div>
 
-            {/* Profissional */}
-            <div>
-              <Label className="text-xs font-medium text-gray-700">Profissional</Label>
+            <div className="space-y-2">
+              <Label>Profissional</Label>
               <Select
-                value={filters.professional || 'all'}
-                onValueChange={(value) => updateFilter('professional', value === 'all' ? undefined : value)}
+                value={draft.professional ?? 'all'}
+                onValueChange={(value) => set('professional', value === 'all' ? undefined : value)}
               >
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="h-11 text-base">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {professionals.map((pro) => (
+                  {options.professionals.map((pro) => (
                     <SelectItem key={pro.id} value={pro.id}>
                       {pro.name}
                     </SelectItem>
@@ -224,32 +337,108 @@ export function AgendaFiltersComponent({
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Período */}
-            <div>
-              <Label className="text-xs font-medium text-gray-700">Período</Label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div>
-                  <Input
-                    type="date"
-                    placeholder="Data inicial"
-                    value={filters.dateFrom || ''}
-                    onChange={(e) => updateFilter('dateFrom', e.target.value || undefined)}
-                  />
-                </div>
-                <div>
-                  <Input
-                    type="date"
-                    placeholder="Data final"
-                    value={filters.dateTo || ''}
-                    onChange={(e) => updateFilter('dateTo', e.target.value || undefined)}
-                  />
-                </div>
-              </div>
-            </div>
           </div>
-        </CardContent>
-      )}
-    </Card>
+        </div>
+
+        <div
+          className="flex gap-3 border-t bg-background px-5 pt-3"
+          style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
+        >
+          <Button type="button" variant="outline" className="h-11 flex-1" onClick={clearAll} disabled={draftCount === 0}>
+            Limpar
+          </Button>
+          <Button type="button" className="h-11 flex-[2]" onClick={apply}>
+            Aplicar{draftCount > 0 ? ` (${draftCount})` : ''}
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+interface ActiveFilterChipsProps {
+  filters: AgendaFilters
+  onFiltersChange: (filters: AgendaFilters) => void
+  options: AgendaFilterOptions
+  /** Lista/timeline sem período e sem histórico: mostra o "A partir de hoje" implícito. */
+  showFromToday: boolean
+}
+
+/** Filtros aplicados como chips removíveis com um toque. */
+export function ActiveFilterChips({ filters, onFiltersChange, options, showFromToday }: ActiveFilterChipsProps) {
+  const chips: { key: string; label: string; remove: () => void }[] = []
+
+  if (filters.search) {
+    chips.push({ key: 'search', label: `“${filters.search}”`, remove: () => onFiltersChange({ ...filters, search: undefined }) })
+  }
+  if (filters.dateFrom || filters.dateTo) {
+    const label =
+      filters.dateFrom && filters.dateTo
+        ? filters.dateFrom === filters.dateTo
+          ? dm(filters.dateFrom)
+          : `${dm(filters.dateFrom)} – ${dm(filters.dateTo)}`
+        : filters.dateFrom
+          ? `A partir de ${dm(filters.dateFrom)}`
+          : `Até ${dm(filters.dateTo!)}`
+    chips.push({
+      key: 'period',
+      label,
+      remove: () => onFiltersChange({ ...filters, dateFrom: undefined, dateTo: undefined }),
+    })
+  } else if (showFromToday) {
+    chips.push({
+      key: 'from-today',
+      label: 'A partir de hoje',
+      remove: () => onFiltersChange({ ...filters, includePast: true }),
+    })
+  } else if (filters.includePast) {
+    chips.push({
+      key: 'include-past',
+      label: 'Com histórico',
+      remove: () => onFiltersChange({ ...filters, includePast: false }),
+    })
+  }
+  for (const status of filters.status ?? []) {
+    chips.push({
+      key: `status-${status}`,
+      label: STATUS_LABELS[status],
+      remove: () => {
+        const next = (filters.status ?? []).filter((s) => s !== status)
+        onFiltersChange({ ...filters, status: next.length > 0 ? next : undefined })
+      },
+    })
+  }
+  if (filters.service) {
+    chips.push({
+      key: 'service',
+      label: options.services.find((s) => s.id === filters.service)?.name ?? 'Serviço',
+      remove: () => onFiltersChange({ ...filters, service: undefined }),
+    })
+  }
+  if (filters.professional) {
+    chips.push({
+      key: 'professional',
+      label: options.professionals.find((p) => p.id === filters.professional)?.name ?? 'Profissional',
+      remove: () => onFiltersChange({ ...filters, professional: undefined }),
+    })
+  }
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label="Filtros aplicados">
+      {chips.map((chip) => (
+        <button
+          key={chip.key}
+          type="button"
+          onClick={chip.remove}
+          className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border bg-muted px-3 text-xs font-medium"
+          aria-label={`Remover filtro ${chip.label}`}
+        >
+          {chip.label}
+          <X className="h-3 w-3" />
+        </button>
+      ))}
+    </div>
   )
 }
