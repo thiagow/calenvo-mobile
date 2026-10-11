@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import sharp from 'sharp'
 import { authOptions } from '@/lib/auth-options'
+import { computeCoverCrop, parseFocal } from '@/lib/cover-crop'
 import { uploadFile, deleteFile } from '@/lib/s3'
 import { prisma } from '@/lib/db'
 
@@ -66,11 +67,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Formato inválido. Use JPG, PNG ou WebP' }, { status: 400 })
     }
 
+    const focalX = parseFocal(formData.get('focalX'))
+    const focalY = parseFocal(formData.get('focalY'))
+
     let output: Buffer
     try {
-      output = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-        .rotate() // respeita a orientação EXIF de fotos de celular
-        .resize(COVER_WIDTH, COVER_HEIGHT, { fit: 'cover', position: 'attention' })
+      // `rotate()` respeita a orientação EXIF de fotos de celular; materializa
+      // antes para medir a imagem já orientada.
+      const { data: oriented, info } = await sharp(input, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+        .rotate()
+        .toBuffer({ resolveWithObject: true })
+
+      // Recorte pelo foco que o dono escolheu arrastando a foto (mesma conta do
+      // preview em CSS `object-position`).
+      const crop = computeCoverCrop({
+        srcWidth: info.width,
+        srcHeight: info.height,
+        targetWidth: COVER_WIDTH,
+        targetHeight: COVER_HEIGHT,
+        focalX,
+        focalY,
+      })
+      output = await sharp(oriented)
+        .resize(crop.resizeWidth, crop.resizeHeight)
+        .extract({ left: crop.left, top: crop.top, width: COVER_WIDTH, height: COVER_HEIGHT })
         .webp({ quality: 82 })
         .toBuffer()
     } catch {
