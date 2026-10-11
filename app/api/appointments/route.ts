@@ -113,7 +113,6 @@ export async function GET(request: NextRequest) {
       currentDate,
       dateFrom,
       dateTo,
-      includePast: searchParams.get('includePast') === 'true',
       timeZone: businessConfig?.timezone || DEFAULT_TIMEZONE
     })
     if (range.empty) {

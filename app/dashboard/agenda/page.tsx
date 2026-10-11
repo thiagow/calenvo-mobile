@@ -41,17 +41,19 @@ export default function AgendaPage() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const filterOptions = useAgendaFilterOptions()
 
+  const isRangeView = currentView === 'list' || currentView === 'timeline'
+
   const { appointments, loading, error, updateAppointment, deleteAppointment, refetch } = useAppointments({
     search: filters.search,
     status: filters.status,
     service: filters.service,
     professional: filters.professional,
-    dateFrom: filters.dateFrom,
-    dateTo: filters.dateTo,
+    // Período só vale em Lista e Linha de Tempo (sempre de hoje em diante).
+    dateFrom: isRangeView ? filters.dateFrom : undefined,
+    dateTo: isRangeView ? filters.dateTo : undefined,
     view: currentView,
     // Dia de calendário (não instante): o servidor monta as janelas no fuso do negócio.
     currentDate: format(currentDate, 'yyyy-MM-dd'),
-    includePast: filters.includePast,
     autoFetch: !!session,
   })
 
@@ -117,19 +119,11 @@ export default function AgendaPage() {
     return 'week'
   }
 
-  const activeFiltersCount = countActiveFilters(filters)
-  const hasPeriod = Boolean(filters.dateFrom || filters.dateTo)
-  const showFromToday = (currentView === 'list' || currentView === 'timeline') && !hasPeriod && !filters.includePast
-
-  // Escolher um período leva à Lista, que mostra o intervalo inteiro de uma vez;
-  // dia/semana/mês só exibem a janela em torno da data atual.
-  const handleFiltersChange = (next: AgendaFilters) => {
-    const periodChanged = next.dateFrom !== filters.dateFrom || next.dateTo !== filters.dateTo
-    setFilters(next)
-    if (periodChanged && (next.dateFrom || next.dateTo) && ['day', 'week', 'month'].includes(currentView)) {
-      setCurrentView('list')
-    }
-  }
+  // Fora de Lista/Linha de Tempo o período fica guardado, mas não conta nem aparece.
+  const visibleFilters: AgendaFilters = isRangeView ? filters : { ...filters, dateFrom: undefined, dateTo: undefined }
+  const activeFiltersCount = countActiveFilters(visibleFilters)
+  const handleChipsChange = (next: AgendaFilters) =>
+    setFilters(isRangeView ? next : { ...next, dateFrom: filters.dateFrom, dateTo: filters.dateTo })
 
   if (status === 'loading') return <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>
   if (!session) { redirect('/login'); return null }
@@ -145,12 +139,23 @@ export default function AgendaPage() {
 
       {/* Toolbar compacta para mobile — navegação de data e seleção de vista em linhas separadas para não espremer */}
       <div className="space-y-2">
-        <DateNavigation
-          currentDate={currentDate}
-          onDateChange={setCurrentDate}
-          navigationType={getNavigationType(currentView)}
-          appointmentCount={viewFilteredAppointments.length}
-        />
+        {isRangeView ? (
+          <div className="flex min-h-10 items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-900">
+              {currentView === 'list' ? 'Lista' : 'Linha de Tempo'} · a partir de hoje
+            </h2>
+            <p className="text-xs text-gray-600">
+              {viewFilteredAppointments.length} agendamento{viewFilteredAppointments.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+        ) : (
+          <DateNavigation
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            navigationType={getNavigationType(currentView)}
+            appointmentCount={viewFilteredAppointments.length}
+          />
+        )}
         <div className="flex items-center justify-between gap-2">
           <AgendaViewSelector currentView={currentView} onViewChange={setCurrentView} />
           <Button
@@ -171,17 +176,17 @@ export default function AgendaPage() {
 
       {/* Filtros */}
       <ActiveFilterChips
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
+        filters={visibleFilters}
+        onFiltersChange={handleChipsChange}
         options={filterOptions}
-        showFromToday={showFromToday}
       />
       <AgendaFiltersComponent
         filters={filters}
-        onFiltersChange={handleFiltersChange}
+        onFiltersChange={setFilters}
         isOpen={showFilters}
         onToggle={() => setShowFilters(!showFilters)}
         options={filterOptions}
+        showPeriod={isRangeView}
       />
 
       {/* View */}

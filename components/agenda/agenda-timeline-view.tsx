@@ -2,22 +2,13 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Phone, 
-  Mail, 
-  Edit2, 
-  Trash2,
-  ChevronRight
-} from 'lucide-react'
-import { formatDateTime, formatPhone } from '@/lib/utils'
-import { STATUS_COLORS, STATUS_LABELS, MODALITY_LABELS } from '@/lib/types'
+import { Clock, Edit2, User } from 'lucide-react'
+import { addDays, format, isSameDay, startOfDay } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
+import { STATUS_COLORS, STATUS_LABELS } from '@/lib/types'
 import { AppointmentStatus, ModalityType } from '@prisma/client'
-
 
 interface TimelineAppointment {
   id: string
@@ -42,192 +33,127 @@ interface AgendaTimelineViewProps {
   onDeleteAppointment?: (id: string) => void
 }
 
-export function AgendaTimelineView({ 
-  appointments, 
-  onEditAppointment,
-  onDeleteAppointment 
-}: AgendaTimelineViewProps) {
-  
+const CARD_COLOR: Record<AppointmentStatus, string> = {
+  CONFIRMED: 'border-green-300 bg-green-50',
+  SCHEDULED: 'border-blue-300 bg-blue-50',
+  IN_PROGRESS: 'border-yellow-300 bg-yellow-50',
+  COMPLETED: 'border-gray-300 bg-gray-50',
+  CANCELLED: 'border-red-300 bg-red-50',
+  NO_SHOW: 'border-purple-300 bg-purple-50',
+}
 
+const DOT_COLOR: Record<AppointmentStatus, string> = {
+  CONFIRMED: 'bg-green-500',
+  SCHEDULED: 'bg-blue-500',
+  IN_PROGRESS: 'bg-yellow-500',
+  COMPLETED: 'bg-gray-500',
+  CANCELLED: 'bg-red-500',
+  NO_SHOW: 'bg-purple-500',
+}
 
-  // Ordenar appointments por data (mais recentes primeiro)
-  const sortedAppointments = [...appointments].sort((a, b) => {
-    return new Date(b.date).getTime() - new Date(a.date).getTime()
-  })
+/** "Hoje", "Amanhã" ou o dia da semana — o texto relativo que acompanha a data. */
+function relativeDayLabel(day: Date): string | null {
+  const today = startOfDay(new Date())
+  if (isSameDay(day, today)) return 'Hoje'
+  if (isSameDay(day, addDays(today, 1))) return 'Amanhã'
+  return null
+}
 
-  const formatTimelineDate = (date: Date) => {
-    const now = new Date()
-    const diffTime = now.getTime() - date.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60))
-    const diffMinutes = Math.ceil(diffTime / (1000 * 60))
-
-    if (diffMinutes < 60) {
-      return diffMinutes <= 0 ? 'Agora' : `${diffMinutes} min atrás`
-    } else if (diffHours < 24) {
-      return `${diffHours} hora${diffHours > 1 ? 's' : ''} atrás`
-    } else if (diffDays < 7) {
-      return `${diffDays} dia${diffDays > 1 ? 's' : ''} atrás`
-    } else {
-      return date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })
-    }
-  }
-
-  const getTimelineColor = (status: AppointmentStatus) => {
-    switch (status) {
-      case 'CONFIRMED':
-        return 'border-green-300 bg-green-50'
-      case 'SCHEDULED':
-        return 'border-blue-300 bg-blue-50'
-      case 'IN_PROGRESS':
-        return 'border-yellow-300 bg-yellow-50'
-      case 'COMPLETED':
-        return 'border-gray-300 bg-gray-50'
-      case 'CANCELLED':
-        return 'border-red-300 bg-red-50'
-      case 'NO_SHOW':
-        return 'border-purple-300 bg-purple-50'
-      default:
-        return 'border-gray-300 bg-gray-50'
-    }
-  }
-
-  const getTimelineDotColor = (status: AppointmentStatus) => {
-    switch (status) {
-      case 'CONFIRMED':
-        return 'bg-green-500'
-      case 'SCHEDULED':
-        return 'bg-blue-500'
-      case 'IN_PROGRESS':
-        return 'bg-yellow-500'
-      case 'COMPLETED':
-        return 'bg-gray-500'
-      case 'CANCELLED':
-        return 'bg-red-500'
-      case 'NO_SHOW':
-        return 'bg-purple-500'
-      default:
-        return 'bg-gray-500'
-    }
+export function AgendaTimelineView({ appointments, onEditAppointment }: AgendaTimelineViewProps) {
+  // Do mais próximo para o mais distante, agrupado por dia.
+  const sorted = [...appointments].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const days: { key: string; day: Date; items: TimelineAppointment[] }[] = []
+  for (const appointment of sorted) {
+    const date = new Date(appointment.date)
+    const key = format(date, 'yyyy-MM-dd')
+    const last = days[days.length - 1]
+    if (last && last.key === key) last.items.push(appointment)
+    else days.push({ key, day: date, items: [appointment] })
   }
 
   if (appointments.length === 0) {
     return (
       <Card>
-        <CardContent className="text-center py-12">
-          <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nenhuma consulta encontrada
-          </h3>
-          <p className="text-gray-600 mb-4">
-            Não há consultas correspondentes aos filtros aplicados.
-          </p>
+        <CardContent className="py-12 text-center">
+          <Clock className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+          <h3 className="mb-2 text-lg font-medium text-gray-900">Nenhum agendamento encontrado</h3>
+          <p className="mb-4 text-gray-600">Não há agendamentos a partir de hoje com os filtros aplicados.</p>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
+    <div className="space-y-3">
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="p-4 pb-3">
           <CardTitle className="flex items-center text-lg">
             <Clock className="mr-2 h-5 w-5 text-blue-600" />
-            Timeline das Consultas
+            Linha de Tempo
           </CardTitle>
           <p className="text-sm text-gray-600">
-            {appointments.length} consulta{appointments.length !== 1 ? 's' : ''} em ordem cronológica
+            {appointments.length} agendamento{appointments.length !== 1 ? 's' : ''} a partir de hoje, em ordem cronológica
           </p>
         </CardHeader>
       </Card>
 
-      {/* Timeline */}
       <Card>
-        <CardContent className="p-6">
-          <div className="relative">
-            {/* Timeline Line */}
-            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+        <CardContent className="p-3 sm:p-6">
+          <ol className="relative space-y-5 border-l-2 border-gray-200 pl-5 sm:pl-8">
+            {days.map(({ key, day, items }) => {
+              const relative = relativeDayLabel(day)
+              return (
+                <li key={key} className="relative">
+                  {/* Cabeçalho do dia, preso ao trilho da linha do tempo */}
+                  <span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white bg-blue-600 shadow sm:-left-[39px]" />
+                  <h3 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-gray-900">
+                    {relative && <span className="text-blue-700">{relative}</span>}
+                    <span className="capitalize">{format(day, "EEE, d 'de' MMMM", { locale: ptBR })}</span>
+                    <span className="text-xs font-normal text-gray-500">
+                      {items.length} agendamento{items.length !== 1 ? 's' : ''}
+                    </span>
+                  </h3>
 
-            {/* Timeline Items */}
-            <div className="space-y-6">
-              {sortedAppointments.map((appointment, index) => {
-                const timelineColor = getTimelineColor(appointment.status)
-                const dotColor = getTimelineDotColor(appointment.status)
-
-                return (
-                  <div key={appointment.id} className="relative">
-                    {/* Timeline Dot */}
-                    <div className={`
-                      absolute left-4 w-4 h-4 rounded-full border-2 border-white ${dotColor} 
-                      shadow-md z-10
-                    `} />
-
-                    {/* Timeline Content */}
-                    <div className="ml-12">
-                      <div 
-                        className={`
-                          rounded-lg border p-4 cursor-pointer transition-all duration-200 
-                          hover:shadow-md hover:border-blue-400 ${timelineColor}
-                        `}
-                        onClick={() => onEditAppointment?.(appointment.id)}
-                      >
-                        {/* Header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-2">
-                              <Clock className="h-4 w-4 text-gray-400" />
-                              <span className="font-medium text-gray-900">
-                                {new Date(appointment.date).toLocaleTimeString('pt-BR', {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                  <ul className="space-y-2">
+                    {items.map((appointment) => (
+                      <li key={appointment.id}>
+                        <button
+                          type="button"
+                          onClick={() => onEditAppointment?.(appointment.id)}
+                          className={cn(
+                            'flex w-full min-w-0 items-start gap-3 rounded-lg border p-3 text-left transition-shadow hover:shadow-md active:shadow-sm',
+                            CARD_COLOR[appointment.status]
+                          )}
+                        >
+                          <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', DOT_COLOR[appointment.status])} />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-base font-semibold tabular-nums text-gray-900">
+                                {format(new Date(appointment.date), 'HH:mm')}
                               </span>
-                              <span className="text-sm text-gray-500">
-                                {formatTimelineDate(appointment.date)}
-                              </span>
+                              <span className="text-xs text-gray-500">{appointment.duration} min</span>
+                              <Badge className={cn(STATUS_COLORS[appointment.status], 'text-[11px]')}>
+                                {STATUS_LABELS[appointment.status]}
+                              </Badge>
                             </div>
-                            <Badge className={STATUS_COLORS[appointment.status]}>
-                              {STATUS_LABELS[appointment.status]}
-                            </Badge>
-                          </div>
-                          <Edit2 className="h-4 w-4 text-gray-400" />
-                        </div>
-
-                        {/* Basic Info */}
-                        <div className="mt-3">
-                          <div className="flex items-center space-x-4 text-sm">
-                            <div className="flex items-center space-x-1">
-                              <User className="h-3 w-3 text-gray-400" />
-                              <span className="font-medium text-gray-900">
-                                {appointment.patient.name}
-                              </span>
+                            <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-900">
+                              <User className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                              <span className="truncate">{appointment.patient.name}</span>
                             </div>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-600">
+                            <p className="break-words text-sm text-gray-600">
                               {appointment.specialty}
-                            </span>
-                            {appointment.professional && (
-                              <>
-                                <span className="text-gray-400">•</span>
-                                <span className="text-gray-600">
-                                  {appointment.professional}
-                                </span>
-                              </>
-                            )}
+                              {appointment.professional ? ` · ${appointment.professional}` : ''}
+                            </p>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+                          <Edit2 className="mt-1 h-4 w-4 shrink-0 text-gray-400" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )
+            })}
+          </ol>
         </CardContent>
       </Card>
     </div>

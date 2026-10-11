@@ -39,17 +39,17 @@ beforeEach(() => {
 
 describe('GET /api/appointments — período e vistas', () => {
   it('lista com período: aplica dateFrom/dateTo (o bug: antes ignorava o período e não filtrava nada)', async () => {
-    await get('view=list&currentDate=2026-10-14&dateFrom=2026-11-24&dateTo=2026-11-26')
+    await get('view=list&currentDate=2099-10-14&dateFrom=2099-11-24&dateTo=2099-11-26')
 
-    expect(whereOf().date.gte.toISOString()).toBe('2026-11-24T03:00:00.000Z')
-    expect(whereOf().date.lte.toISOString()).toBe('2026-11-27T02:59:59.999Z')
+    expect(whereOf().date.gte.toISOString()).toBe('2099-11-24T03:00:00.000Z')
+    expect(whereOf().date.lte.toISOString()).toBe('2099-11-27T02:59:59.999Z')
   })
 
   it('timeline com período também respeita o intervalo', async () => {
-    await get('view=timeline&currentDate=2026-10-14&dateFrom=2026-10-22&dateTo=2026-10-22')
+    await get('view=timeline&currentDate=2099-10-14&dateFrom=2099-10-22&dateTo=2099-10-22')
 
-    expect(whereOf().date.gte.toISOString()).toBe('2026-10-22T03:00:00.000Z')
-    expect(whereOf().date.lte.toISOString()).toBe('2026-10-23T02:59:59.999Z')
+    expect(whereOf().date.gte.toISOString()).toBe('2099-10-22T03:00:00.000Z')
+    expect(whereOf().date.lte.toISOString()).toBe('2099-10-23T02:59:59.999Z')
   })
 
   it('dia/semana/mês com período: interseção (o período não é descartado)', async () => {
@@ -66,32 +66,38 @@ describe('GET /api/appointments — período e vistas', () => {
     expect(findManyMock).not.toHaveBeenCalled()
   })
 
-  it('lista sem período: só de hoje em diante; includePast=true libera o histórico', async () => {
-    await get('view=list&currentDate=2026-10-14')
-    expect(whereOf().date.gte).toBeInstanceOf(Date)
-    expect(whereOf().date.lte).toBeUndefined()
+  it('lista/timeline nunca incluem o passado: sem período, piso = hoje', async () => {
+    for (const view of ['list', 'timeline']) {
+      findManyMock.mockClear()
+      await get(`view=${view}`)
+      expect(whereOf().date.gte).toBeInstanceOf(Date)
+      expect(whereOf().date.gte.getTime()).toBeGreaterThan(Date.now() - 24 * 3600 * 1000)
+      expect(whereOf().date.lte).toBeUndefined()
+    }
+  })
 
-    findManyMock.mockClear()
-    await get('view=list&currentDate=2026-10-14&includePast=true')
-    expect(whereOf().date).toBeUndefined()
+  it('lista com período no passado: nada é consultado', async () => {
+    const res = await get('view=list&dateFrom=2020-01-01&dateTo=2020-01-31')
+    expect(await res.json()).toEqual([])
+    expect(findManyMock).not.toHaveBeenCalled()
   })
 })
 
 describe('GET /api/appointments — serviço e profissional', () => {
   it('service filtra por serviceId', async () => {
-    await get('view=list&includePast=true&service=svc-1')
+    await get('view=list&service=svc-1')
     expect(whereOf().serviceId).toBe('svc-1')
   })
 
   it('professional filtra por professionalId (antes comparava o id com o nome legado e nunca casava)', async () => {
-    await get('view=list&includePast=true&professional=pro-1')
+    await get('view=list&professional=pro-1')
     expect(whereOf().professionalId).toBe('pro-1')
     expect(whereOf().professional).toBeUndefined()
   })
 
   it('profissional logado continua restrito aos próprios agendamentos', async () => {
     mockUser = { id: 'pro-9', role: 'PROFESSIONAL', masterId: 'tenant-a' }
-    await get('view=list&includePast=true&professional=outro-pro')
+    await get('view=list&professional=outro-pro')
 
     expect(whereOf().userId).toBe('tenant-a')
     expect(whereOf().professionalId).toBe('pro-9')

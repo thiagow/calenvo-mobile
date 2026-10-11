@@ -75,8 +75,6 @@ export const appointmentsApi = {
     view?: string
     /** Dia de referência da vista, "YYYY-MM-DD" */
     currentDate?: string
-    /** Lista/timeline: incluir também o passado (padrão: de hoje em diante) */
-    includePast?: boolean
   }, signal?: AbortSignal) => {
     const searchParams = new URLSearchParams()
     if (params) {

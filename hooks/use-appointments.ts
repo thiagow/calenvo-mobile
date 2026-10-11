@@ -16,7 +16,6 @@ export interface UseAppointmentsOptions {
   view?: string
   /** Dia de referência da vista, "YYYY-MM-DD" */
   currentDate?: string
-  includePast?: boolean
   autoFetch?: boolean
 }
 
@@ -61,7 +60,6 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
           dateTo: options.dateTo,
           view: options.view,
           currentDate: options.currentDate,
-          includePast: options.includePast,
         },
         controller.signal
       )
@@ -92,7 +90,6 @@ export function useAppointments(options: UseAppointmentsOptions = {}) {
     options.dateTo,
     options.view,
     options.currentDate,
-    options.includePast,
   ])
 
   const createAppointment = async (appointmentData: any) => {

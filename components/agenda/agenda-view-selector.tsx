@@ -44,9 +44,9 @@ const viewOptions = [
   },
   { 
     id: 'timeline' as ViewType, 
-    label: 'Timeline', 
+    label: 'Linha de Tempo', 
     icon: Clock,
-    description: 'Vista timeline'
+    description: 'Linha de tempo'
   }
 ]
 
@@ -57,7 +57,7 @@ export function AgendaViewSelector({ currentView, onViewChange }: AgendaViewSele
     <>
       {/* Mobile View Selector - Icon-only buttons */}
       <div className="md:hidden flex items-center bg-gray-100 rounded-lg p-0.5">
-        {viewOptions.map(({ id, icon: Icon }) => (
+        {viewOptions.map(({ id, label, icon: Icon }) => (
           <Button
             key={id}
             variant={currentView === id ? "default" : "ghost"}
@@ -70,7 +70,8 @@ export function AgendaViewSelector({ currentView, onViewChange }: AgendaViewSele
                 : "text-gray-600 hover:text-gray-900"
               }
             `}
-            title={id}
+            title={label}
+            aria-label={label}
           >
             <Icon className="h-3.5 w-3.5" />
           </Button>

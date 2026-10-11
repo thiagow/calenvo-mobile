@@ -28,8 +28,6 @@ export interface AgendaFilters {
   /** "YYYY-MM-DD" */
   dateFrom?: string
   dateTo?: string
-  /** Lista/timeline: incluir também o passado (padrão: de hoje em diante). */
-  includePast?: boolean
 }
 
 interface Option {
@@ -119,10 +117,12 @@ interface AgendaFiltersProps {
   isOpen: boolean
   onToggle: () => void
   options: AgendaFilterOptions
+  /** O período só existe nas vistas Lista e Linha de Tempo (que mostram de hoje em diante). */
+  showPeriod: boolean
 }
 
 /** Filtros da agenda num bottom sheet: campos grandes para o toque e "Aplicar" fixo no rodapé. */
-export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onToggle, options }: AgendaFiltersProps) {
+export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onToggle, options, showPeriod }: AgendaFiltersProps) {
   const [draft, setDraft] = useState<AgendaFilters>(filters)
   const [customPeriod, setCustomPeriod] = useState(false)
 
@@ -165,16 +165,22 @@ export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onTog
   }
 
   const apply = () => {
-    onFiltersChange({ ...draft, search: draft.search?.trim() || undefined })
+    onFiltersChange({
+      ...draft,
+      search: draft.search?.trim() || undefined,
+      // Fora da Lista/Linha de Tempo o período não aparece: mantém o já escolhido para quando voltar.
+      ...(showPeriod ? {} : { dateFrom: filters.dateFrom, dateTo: filters.dateTo }),
+    })
     onToggle()
   }
 
   const clearAll = () => {
     setCustomPeriod(false)
-    setDraft({ includePast: filters.includePast })
+    setDraft({})
   }
 
-  const draftCount = countActiveFilters(draft)
+  const draftCount = countActiveFilters(showPeriod ? draft : { ...draft, dateFrom: undefined, dateTo: undefined })
+  const today = ymd(new Date())
   const chip = (selected: boolean) =>
     cn(
       'h-10 rounded-full border px-4 text-sm font-medium transition-colors',
@@ -220,7 +226,8 @@ export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onTog
             </div>
           </div>
 
-          {/* Período */}
+          {/* Período: só Lista e Linha de Tempo, que mostram de hoje em diante */}
+          {showPeriod && (
           <div className="space-y-2">
             <Label>Período</Label>
             <div className="flex flex-wrap gap-2">
@@ -252,6 +259,7 @@ export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onTog
                     id="agenda-from"
                     type="date"
                     value={draft.dateFrom ?? ''}
+                    min={today}
                     max={draft.dateTo || undefined}
                     onChange={(e) => set('dateFrom', e.target.value || undefined)}
                     className="h-11 text-base"
@@ -263,7 +271,7 @@ export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onTog
                     id="agenda-to"
                     type="date"
                     value={draft.dateTo ?? ''}
-                    min={draft.dateFrom || undefined}
+                    min={draft.dateFrom && draft.dateFrom > today ? draft.dateFrom : today}
                     onChange={(e) => set('dateTo', e.target.value || undefined)}
                     className="h-11 text-base"
                   />
@@ -271,6 +279,7 @@ export function AgendaFiltersComponent({ filters, onFiltersChange, isOpen, onTog
               </div>
             )}
           </div>
+          )}
 
           {/* Status */}
           <div className="space-y-2">
@@ -360,12 +369,10 @@ interface ActiveFilterChipsProps {
   filters: AgendaFilters
   onFiltersChange: (filters: AgendaFilters) => void
   options: AgendaFilterOptions
-  /** Lista/timeline sem período e sem histórico: mostra o "A partir de hoje" implícito. */
-  showFromToday: boolean
 }
 
 /** Filtros aplicados como chips removíveis com um toque. */
-export function ActiveFilterChips({ filters, onFiltersChange, options, showFromToday }: ActiveFilterChipsProps) {
+export function ActiveFilterChips({ filters, onFiltersChange, options }: ActiveFilterChipsProps) {
   const chips: { key: string; label: string; remove: () => void }[] = []
 
   if (filters.search) {
@@ -384,18 +391,6 @@ export function ActiveFilterChips({ filters, onFiltersChange, options, showFromT
       key: 'period',
       label,
       remove: () => onFiltersChange({ ...filters, dateFrom: undefined, dateTo: undefined }),
-    })
-  } else if (showFromToday) {
-    chips.push({
-      key: 'from-today',
-      label: 'A partir de hoje',
-      remove: () => onFiltersChange({ ...filters, includePast: true }),
-    })
-  } else if (filters.includePast) {
-    chips.push({
-      key: 'include-past',
-      label: 'Com histórico',
-      remove: () => onFiltersChange({ ...filters, includePast: false }),
     })
   }
   for (const status of filters.status ?? []) {

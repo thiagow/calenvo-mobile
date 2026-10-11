@@ -59,26 +59,42 @@ describe('resolveAppointmentRange', () => {
 
   it('lista com período: só o período, sem janela de vista (o bug original)', () => {
     const r = resolveAppointmentRange({
-      view: 'list', currentDate: '2026-10-14', dateFrom: '2026-11-24', dateTo: '2026-11-26', timeZone: SP,
+      view: 'list', currentDate: '2026-10-14', dateFrom: '2026-11-24', dateTo: '2026-11-26', timeZone: SP, now: NOW,
     })
     expect(iso(r.gte)).toBe('2026-11-24T03:00:00.000Z')
     expect(iso(r.lte)).toBe('2026-11-27T02:59:59.999Z')
   })
 
   it('só dateFrom ou só dateTo deixam o outro lado aberto', () => {
-    const from = resolveAppointmentRange({ view: 'timeline', dateFrom: '2026-11-24', timeZone: SP })
+    const from = resolveAppointmentRange({ view: 'timeline', dateFrom: '2026-11-24', timeZone: SP, now: NOW })
     expect(from.gte).toBeDefined()
     expect(from.lte).toBeUndefined()
-    const to = resolveAppointmentRange({ view: 'list', dateTo: '2026-11-24', timeZone: SP })
-    expect(to.gte).toBeUndefined()
+    const to = resolveAppointmentRange({ view: 'list', dateTo: '2026-11-24', timeZone: SP, now: NOW })
+    expect(iso(to.gte)).toBe('2026-10-14T03:00:00.000Z') // piso: hoje
     expect(iso(to.lte)).toBe('2026-11-25T02:59:59.999Z')
   })
 
-  it('lista sem período: de hoje em diante; includePast libera o histórico', () => {
-    const r = resolveAppointmentRange({ view: 'list', timeZone: SP, now: NOW })
+  it('lista/timeline sem período: de hoje em diante', () => {
+    for (const view of ['list', 'timeline']) {
+      const r = resolveAppointmentRange({ view, timeZone: SP, now: NOW })
+      expect(iso(r.gte)).toBe('2026-10-14T03:00:00.000Z')
+      expect(r.lte).toBeUndefined()
+    }
+  })
+
+  it('lista/timeline nunca mostram o passado: período que começa antes de hoje é cortado em hoje', () => {
+    const r = resolveAppointmentRange({
+      view: 'list', dateFrom: '2026-10-01', dateTo: '2026-10-20', timeZone: SP, now: NOW,
+    })
     expect(iso(r.gte)).toBe('2026-10-14T03:00:00.000Z')
-    expect(r.lte).toBeUndefined()
-    expect(resolveAppointmentRange({ view: 'list', includePast: true, timeZone: SP, now: NOW })).toEqual({})
+    expect(iso(r.lte)).toBe('2026-10-21T02:59:59.999Z')
+  })
+
+  it('lista/timeline: período inteiro no passado não retorna nada', () => {
+    const r = resolveAppointmentRange({
+      view: 'timeline', dateFrom: '2026-10-01', dateTo: '2026-10-10', timeZone: SP, now: NOW,
+    })
+    expect(r).toEqual({ empty: true })
   })
 
   it('aceita currentDate como instante ISO (clientes antigos) usando o fuso do negócio', () => {
@@ -87,7 +103,7 @@ describe('resolveAppointmentRange', () => {
   })
 
   it('ignora datas inválidas', () => {
-    const r = resolveAppointmentRange({ view: 'list', dateFrom: 'lixo', dateTo: '31/12/2026', includePast: true, timeZone: SP })
+    const r = resolveAppointmentRange({ view: 'day', dateFrom: 'lixo', dateTo: '31/12/2026', timeZone: SP })
     expect(r).toEqual({})
   })
 })
