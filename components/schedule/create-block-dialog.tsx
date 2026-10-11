@@ -162,7 +162,8 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
             {/* Agendas */}
             <div className="space-y-2">
               <Label>Aplicar a</Label>
-              <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+              {/* modal: o popover sai do Dialog (portal) e o bloqueio de rolagem do Dialog travava a lista; modal libera a rolagem dentro dele */}
+              <Popover open={pickerOpen} onOpenChange={setPickerOpen} modal>
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
@@ -177,9 +178,13 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0"
+                  align="start"
+                  collisionPadding={12}
+                >
                   <Command>
-                    <CommandList>
+                    <CommandList className="max-h-[min(18rem,var(--radix-popover-content-available-height))] overscroll-contain">
                       <CommandEmpty>Nenhuma agenda</CommandEmpty>
                       <CommandGroup>
                         <CommandItem value="todas-as-agendas" onSelect={toggleAll}>
