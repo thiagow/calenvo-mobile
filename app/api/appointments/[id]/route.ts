@@ -58,7 +58,7 @@ export async function GET(
         phone: appointment.client.phone,
         email: appointment.client.email
       },
-      specialty: appointment.specialty || 'Consulta Geral',
+      specialty: appointment.specialty || 'Sem serviço',
       status: appointment.status,
       modality: appointment.modality,
       duration: appointment.duration,
@@ -421,7 +421,7 @@ export async function PUT(
         phone: updatedAppointment.client.phone,
         email: updatedAppointment.client.email
       },
-      specialty: updatedAppointment.specialty || 'Consulta Geral',
+      specialty: updatedAppointment.specialty || 'Sem serviço',
       status: updatedAppointment.status,
       modality: updatedAppointment.modality,
       duration: updatedAppointment.duration,

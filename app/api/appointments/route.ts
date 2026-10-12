@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
         phone: appointment.client.phone,
         email: appointment.client.email
       },
-      specialty: appointment.service?.name || appointment.specialty || 'Consulta Geral',
+      specialty: appointment.service?.name || appointment.specialty || 'Sem serviço',
       status: appointment.status,
       modality: appointment.modality,
       duration: appointment.duration,
@@ -446,7 +446,7 @@ export async function POST(request: NextRequest) {
         phone: appointment.client.phone,
         email: appointment.client.email
       },
-      specialty: appointment.specialty || 'Consulta Geral',
+      specialty: appointment.specialty || 'Sem serviço',
       status: appointment.status,
       modality: appointment.modality,
       duration: appointment.duration,

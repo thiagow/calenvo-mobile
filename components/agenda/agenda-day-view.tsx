@@ -144,10 +144,6 @@ export function AgendaDayView({
                               )}
                             </div>
 
-                            <div className="text-xs text-muted-foreground/70">
-                              🏥 {appointment.insurance}
-                            </div>
-
                             {appointment.notes && (
                               <div className="text-xs text-muted-foreground/70 mt-1">
                                 {appointment.notes}

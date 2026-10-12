@@ -109,7 +109,7 @@ export function AgendaWeekView({
                         </div>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {dayAppointments.length} consulta{dayAppointments.length !== 1 ? 's' : ''}
+                        {dayAppointments.length} agenda{dayAppointments.length !== 1 ? 's' : ''}
                       </div>
                     </div>
 
@@ -150,7 +150,7 @@ export function AgendaWeekView({
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground/70 italic text-center py-2">
-                        Nenhuma consulta agendada
+                        Nenhuma agenda marcada
                       </div>
                     )}
                   </div>

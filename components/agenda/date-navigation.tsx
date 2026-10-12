@@ -191,7 +191,7 @@ export function DateNavigation({
             </h2>
           </label>
           <p className="text-xs text-gray-600 mt-0.5 whitespace-nowrap">
-            {appointmentCount} consulta{appointmentCount !== 1 ? 's' : ''} agendada{appointmentCount !== 1 ? 's' : ''}
+            {appointmentCount} agenda{appointmentCount !== 1 ? 's' : ''}
           </p>
         </div>
       </div>

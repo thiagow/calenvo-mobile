@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
           workingDays,
           startTime,
           endTime,
-          defaultDuration: Number(defaultDuration),
+          ...(defaultDuration !== undefined && Number.isFinite(Number(defaultDuration)) && { defaultDuration: Number(defaultDuration) }),
           lunchStart,
           lunchEnd,
           address,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
           ...(autoConfirm !== undefined && { autoConfirm: Boolean(autoConfirm) }),
           ...(allowOnlineBooking !== undefined && { allowOnlineBooking: Boolean(allowOnlineBooking) }),
           ...(allowClientCancellation !== undefined && { allowClientCancellation: Boolean(allowClientCancellation) }),
-          ...(cancellationHours !== undefined && { cancellationHours: Number(cancellationHours) })
+          ...(cancellationHours !== undefined && Number.isFinite(Number(cancellationHours)) && { cancellationHours: Number(cancellationHours) })
         }
       })
     } else {
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
           workingDays,
           startTime,
           endTime,
-          defaultDuration: Number(defaultDuration),
+          ...(defaultDuration !== undefined && Number.isFinite(Number(defaultDuration)) && { defaultDuration: Number(defaultDuration) }),
           lunchStart,
           lunchEnd,
           address,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
           ...(autoConfirm !== undefined && { autoConfirm: Boolean(autoConfirm) }),
           ...(allowOnlineBooking !== undefined && { allowOnlineBooking: Boolean(allowOnlineBooking) }),
           ...(allowClientCancellation !== undefined && { allowClientCancellation: Boolean(allowClientCancellation) }),
-          ...(cancellationHours !== undefined && { cancellationHours: Number(cancellationHours) })
+          ...(cancellationHours !== undefined && Number.isFinite(Number(cancellationHours)) && { cancellationHours: Number(cancellationHours) })
         }
       })
     }

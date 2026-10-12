@@ -300,7 +300,7 @@ export function AppointmentsList() {
                             <Clock className="mr-1 h-3 w-3" />
                             {format(appointmentDate, 'HH:mm')}
                           </div>
-                          <span>{appointment.specialty || 'Consulta Geral'}</span>
+                          <span>{appointment.specialty || 'Sem serviço'}</span>
                           {appointment.professional && (
                             <span>• {appointment.professional}</span>
                           )}

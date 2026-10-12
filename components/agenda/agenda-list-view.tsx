@@ -12,7 +12,6 @@ import {
   Mail,
   Eye,
   Trash2,
-  MapPin,
   FileText
 } from 'lucide-react'
 import { formatDateTime, formatPhone } from '@/lib/utils'
@@ -109,10 +108,10 @@ export function AgendaListView({
         <CardContent className="text-center py-12">
           <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Nenhuma consulta encontrada
+            Nenhuma agenda encontrada
           </h3>
           <p className="text-gray-600 mb-4">
-            Não há consultas correspondentes aos filtros aplicados.
+            Não há agendas correspondentes aos filtros aplicados.
           </p>
         </CardContent>
       </Card>
@@ -126,10 +125,10 @@ export function AgendaListView({
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center text-lg">
             <Calendar className="mr-2 h-5 w-5 text-blue-600" />
-            Lista de Consultas
+            Lista de Agendas
           </CardTitle>
           <p className="text-sm text-gray-600">
-            {appointments.length} consulta{appointments.length !== 1 ? 's' : ''} encontrada{appointments.length !== 1 ? 's' : ''}
+            {appointments.length} agenda{appointments.length !== 1 ? 's' : ''} encontrada{appointments.length !== 1 ? 's' : ''}
           </p>
         </CardHeader>
       </Card>
@@ -152,7 +151,7 @@ export function AgendaListView({
               </div>
               <div className="flex-1 h-px bg-gray-200"></div>
               <Badge variant="outline" className="text-xs">
-                {dayAppointments.length} consulta{dayAppointments.length !== 1 ? 's' : ''}
+                {dayAppointments.length} agenda{dayAppointments.length !== 1 ? 's' : ''}
               </Badge>
             </div>
 
@@ -216,10 +215,6 @@ export function AgendaListView({
                                   <span className="break-all">{appointment.patient.email}</span>
                                 </div>
                               )}
-                              <div className="flex items-center">
-                                <MapPin className="h-3 w-3 mr-2 flex-shrink-0" />
-                                <span>{appointment.insurance}</span>
-                              </div>
                             </div>
                           </div>
 
@@ -227,18 +222,18 @@ export function AgendaListView({
                           <div>
                             <div className="space-y-2 text-xs sm:text-sm">
                               <div className="flex items-start">
-                                <span className="font-medium text-gray-700 w-20 sm:w-24 flex-shrink-0">Especialidade:</span>
+                                <span className="font-medium text-gray-700 w-24 sm:w-28 flex-shrink-0">Serviço:</span>
                                 <span className="text-gray-600">{appointment.specialty}</span>
                               </div>
                               {appointment.professional && (
                                 <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-20 sm:w-24 flex-shrink-0">Profissional:</span>
+                                  <span className="font-medium text-gray-700 w-24 sm:w-28 flex-shrink-0">Profissional:</span>
                                   <span className="text-gray-600">{appointment.professional}</span>
                                 </div>
                               )}
                               {appointment.notes && (
                                 <div className="flex items-start">
-                                  <span className="font-medium text-gray-700 w-20 sm:w-24 flex-shrink-0">Observações:</span>
+                                  <span className="font-medium text-gray-700 w-24 sm:w-28 flex-shrink-0">Observações:</span>
                                   <span className="text-gray-600 text-xs break-words">{appointment.notes}</span>
                                 </div>
                               )}
