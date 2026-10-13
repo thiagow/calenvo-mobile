@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { parseServiceReactivationFields } from '@/lib/service-reactivation-fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Serviço não encontrado' }, { status: 404 })
     }
 
+    const reactivation = await parseServiceReactivationFields(userId, body)
+    if (!reactivation.ok) {
+      return NextResponse.json({ error: reactivation.error }, { status: 400 })
+    }
+
     const service = await prisma.service.update({
       where: { id: params.id },
       data: {
@@ -101,7 +107,8 @@ export async function PUT(
         category,
         requiresDeposit,
         depositAmount: depositAmount ? parseFloat(depositAmount) : null,
-        isActive
+        isActive,
+        ...reactivation.data
       },
       include: {
         schedules: {

@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { formatDate, formatPhone, applyPhoneMask } from '@/lib/utils'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { BRAZILIAN_STATES } from '@/lib/brazilian-states'
+import { ClientsTabs } from '@/components/clients/clients-tabs'
 
 interface Client {
   id: string
@@ -135,6 +136,8 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-4">
+      <ClientsTabs />
+
       {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -15,11 +15,18 @@ const confirmationDeleteCalls: any[] = []
 let confirmationCreateShouldFail = false
 let confirmationRequestSendResult = true
 const reminderCalls: any[] = []
+let mockReactivation: any
+let futureSameServiceAppointment: any
+let mockWhatsAppConfig: any
+const reactivationUpdates: any[] = []
+const sendTextCalls: any[] = []
+let sendTextShouldFail = false
 
 vi.mock('@/lib/db', () => ({
   prisma: {
     appointment: {
       findFirst: vi.fn(async ({ where }: any) => {
+        if (where.serviceId) return futureSameServiceAppointment
         if (!mockAppointment) return null
         if (where.id !== mockAppointment.id) return null
         if (Array.isArray(where.status?.in) && !where.status.in.includes(mockAppointment.status)) return null
@@ -43,7 +50,26 @@ vi.mock('@/lib/db', () => ({
         return args
       }),
     },
+    reactivationMessage: {
+      findUnique: vi.fn(async ({ where }: any) => (mockReactivation?.id === where.id ? mockReactivation : null)),
+      update: vi.fn(async (args: any) => {
+        reactivationUpdates.push(args)
+        return args
+      }),
+    },
+    whatsAppConfig: {
+      findUnique: vi.fn(async () => mockWhatsAppConfig),
+    },
   },
+}))
+
+vi.mock('@/lib/crypto', () => ({ decryptSecret: (v: string) => `dec:${v}` }))
+vi.mock('@/lib/error-logger', () => ({ logError: vi.fn(async () => {}) }))
+vi.mock('@/lib/uazapi', () => ({
+  sendText: vi.fn(async (...args: any[]) => {
+    sendTextCalls.push(args)
+    if (sendTextShouldFail) throw new Error('Uazapi 500')
+  }),
 }))
 
 vi.mock('@/lib/whatsapp-trigger', () => ({
@@ -70,6 +96,20 @@ beforeEach(() => {
   confirmationCreateShouldFail = false
   confirmationRequestSendResult = true
   reminderCalls.length = 0
+  reactivationUpdates.length = 0
+  sendTextCalls.length = 0
+  sendTextShouldFail = false
+  futureSameServiceAppointment = null
+  mockWhatsAppConfig = { isConnected: true, apiKey: 'enc-token' }
+  mockReactivation = {
+    id: 'msg-1',
+    userId: 'tenant-a',
+    clientId: 'client-1',
+    serviceId: 'service-1',
+    status: 'QUEUED',
+    renderedBody: 'Olá Ana! Hora de voltar.',
+    client: { phone: '11999999999' },
+  }
   mockAppointment = {
     id: 'appt-1',
     userId: 'tenant-a',
@@ -148,5 +188,56 @@ describe('POST /api/internal/dispatch-whatsapp', () => {
 
     expect(res.status).toBe(200)
     expect(reminderCalls).toHaveLength(0)
+  })
+
+  it('reactivation: envia o texto já renderizado e marca SENT', async () => {
+    const { POST } = await import('./route')
+
+    const res = await POST(makeRequest({ kind: 'reactivation', messageId: 'msg-1' }))
+
+    expect(res.status).toBe(200)
+    expect(sendTextCalls).toEqual([['dec:enc-token', '5511999999999', 'Olá Ana! Hora de voltar.']])
+    expect(reactivationUpdates[0].data.status).toBe('SENT')
+    expect(reactivationUpdates[0].data.sentAt).toBeInstanceOf(Date)
+  })
+
+  it('reactivation: cliente agendou o serviço nesse meio-tempo → SKIPPED, sem envio', async () => {
+    futureSameServiceAppointment = { id: 'appt-future' }
+    const { POST } = await import('./route')
+
+    await POST(makeRequest({ kind: 'reactivation', messageId: 'msg-1' }))
+
+    expect(sendTextCalls).toHaveLength(0)
+    expect(reactivationUpdates[0].data.status).toBe('SKIPPED')
+  })
+
+  it('reactivation: já processado (retry do QStash) → não reenvia', async () => {
+    mockReactivation.status = 'SENT'
+    const { POST } = await import('./route')
+
+    await POST(makeRequest({ kind: 'reactivation', messageId: 'msg-1' }))
+
+    expect(sendTextCalls).toHaveLength(0)
+    expect(reactivationUpdates).toHaveLength(0)
+  })
+
+  it('reactivation: falha na Uazapi → FAILED com o erro, sem lançar', async () => {
+    sendTextShouldFail = true
+    const { POST } = await import('./route')
+
+    const res = await POST(makeRequest({ kind: 'reactivation', messageId: 'msg-1' }))
+
+    expect(res.status).toBe(200)
+    expect(reactivationUpdates[0].data).toEqual({ status: 'FAILED', error: 'Uazapi 500' })
+  })
+
+  it('reactivation: WhatsApp desconectado → FAILED sem tentar enviar', async () => {
+    mockWhatsAppConfig = { isConnected: false, apiKey: 'enc-token' }
+    const { POST } = await import('./route')
+
+    await POST(makeRequest({ kind: 'reactivation', messageId: 'msg-1' }))
+
+    expect(sendTextCalls).toHaveLength(0)
+    expect(reactivationUpdates[0].data.status).toBe('FAILED')
   })
 })

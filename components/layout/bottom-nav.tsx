@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { useUserPermissions } from '@/hooks/use-user-permissions'
+import { useReactivationSummary } from '@/hooks/use-reactivation-summary'
 
 const mainNav = [
   { name: 'Hoje', href: '/dashboard', icon: CalendarCheck, exact: true },
@@ -23,6 +24,9 @@ const mainNav = [
 export function BottomNav() {
   const pathname = usePathname()
   const permissions = useUserPermissions()
+  const { counts: returnCounts } = useReactivationSummary()
+  // Badge só para atrasados: é o que pede ação agora
+  const badges: Record<string, number> = { '/dashboard/clients': returnCounts?.overdue ?? 0 }
 
   const visibleNav = mainNav.filter(item =>
     !item.permission || permissions[item.permission]
@@ -46,7 +50,17 @@ export function BottomNav() {
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+              <span className="relative">
+                <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                {!!badges[item.href] && (
+                  <span
+                    className="absolute -right-2.5 -top-1.5 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[9px] font-semibold leading-4 text-white tabular-nums ring-2 ring-card"
+                    aria-label={`${badges[item.href]} com retorno atrasado`}
+                  >
+                    {badges[item.href] > 99 ? '99+' : badges[item.href]}
+                  </span>
+                )}
+              </span>
               <span className="text-[10px] font-medium truncate">{item.name}</span>
               {isActive && (
                 <span className="absolute bottom-0 w-8 h-0.5 bg-primary rounded-full" />

@@ -8,9 +8,10 @@ import { Lock, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
 import { WhatsAppConnection } from './_components/whatsapp-connection'
 import { NotificationSettings } from './_components/notification-settings'
+import { MessageTemplates } from './_components/message-templates'
 import { BackButton } from '@/components/dashboard/back-button'
 
-interface ExtendedUser { id: string; email: string; planType?: string }
+interface ExtendedUser { id: string; email: string; planType?: string; role?: string }
 interface ExtendedSession { user: ExtendedUser }
 
 export default async function CanaisAtendimentoPage() {
@@ -107,6 +108,9 @@ export default async function CanaisAtendimentoPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Modelos do lembrete de retorno — edição só do MASTER (a API também bloqueia) */}
+          {session.user.role === 'MASTER' && <MessageTemplates />}
         </div>
       )}
     </div>

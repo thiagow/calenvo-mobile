@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Save } from 'lucide-react'
 import { toast } from 'sonner'
+import { ReturnIntervalField } from '@/components/services/return-interval-field'
 
 export default function EditServicePage() {
   const router = useRouter()
@@ -28,6 +29,8 @@ export default function EditServicePage() {
     priceIsStartingFrom: false,
     requiresDeposit: false,
     depositAmount: '',
+    returnIntervalDays: null as number | null,
+    reactivationTemplateId: null as string | null,
     isActive: true
   })
 
@@ -51,6 +54,8 @@ export default function EditServicePage() {
           priceIsStartingFrom: data.priceIsStartingFrom,
           requiresDeposit: data.requiresDeposit,
           depositAmount: data.depositAmount?.toString() || '',
+          returnIntervalDays: data.returnIntervalDays ?? null,
+          reactivationTemplateId: data.reactivationTemplateId ?? null,
           isActive: data.isActive
         })
       }
@@ -202,6 +207,11 @@ export default function EditServicePage() {
             )}
           </CardContent>
         </Card>
+
+        <ReturnIntervalField
+          value={{ returnIntervalDays: formData.returnIntervalDays, reactivationTemplateId: formData.reactivationTemplateId }}
+          onChange={v => setFormData({ ...formData, ...v })}
+        />
 
         <Card>
           <CardHeader>

@@ -5,10 +5,11 @@ import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { prisma } from '@/lib/db';
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger';
 import { generateConfirmationToken, buildConfirmationUrl } from '@/lib/confirmation-token';
-
-type DispatchJob =
-  | { kind: 'reminder'; appointmentId: string }
-  | { kind: 'confirmation-request'; appointmentId: string };
+import { decryptSecret } from '@/lib/crypto';
+import { sendText } from '@/lib/uazapi';
+import { formatWhatsAppNumber } from '@/lib/utils';
+import { logError } from '@/lib/error-logger';
+import type { DispatchJob } from '@/lib/whatsapp-dispatch-queue';
 
 /**
  * Processa UMA notificação de WhatsApp por vez. Publicado pelo cron
@@ -22,16 +23,16 @@ type DispatchJob =
  * (fail closed).
  */
 async function handler(request: NextRequest) {
-  const job = (await request.json()) as DispatchJob;
+  const job = (await request.json()) as Partial<DispatchJob> | null;
 
-  if (!job?.appointmentId || !job?.kind) {
-    return NextResponse.json({ error: 'Job inválido' }, { status: 400 });
-  }
-
-  if (job.kind === 'reminder') {
+  if (job?.kind === 'reactivation' && 'messageId' in job && job.messageId) {
+    await dispatchReactivation(job.messageId);
+  } else if (job?.kind === 'reminder' && 'appointmentId' in job && job.appointmentId) {
     await dispatchReminder(job.appointmentId);
-  } else {
+  } else if (job?.kind === 'confirmation-request' && 'appointmentId' in job && job.appointmentId) {
     await dispatchConfirmationRequest(job.appointmentId);
+  } else {
+    return NextResponse.json({ error: 'Job inválido' }, { status: 400 });
   }
 
   return NextResponse.json({ success: true });
@@ -108,6 +109,63 @@ async function dispatchConfirmationRequest(appointmentId: string) {
   } else {
     // Libera o agendamento para ser reconsiderado no próximo disparo diário.
     await prisma.appointmentConfirmation.delete({ where: { appointmentId: appointment.id } });
+  }
+}
+
+/**
+ * Lembrete de retorno (envio manual pela tela de Retorno). O texto já foi
+ * renderizado no enfileiramento (`renderedBody`). Sem retry do QStash em
+ * falha de envio: `sendText` já tenta de novo em 429/5xx, e repetir o job
+ * arriscaria mensagem duplicada para o cliente.
+ */
+async function dispatchReactivation(messageId: string) {
+  const message = await prisma.reactivationMessage.findUnique({
+    where: { id: messageId },
+    include: { client: { select: { phone: true } } },
+  });
+  if (!message || message.status !== 'QUEUED') return; // já processado (retry/duplicata)
+
+  // O cliente pode ter agendado o serviço entre o enfileiramento e agora.
+  const alreadyBooked = await prisma.appointment.findFirst({
+    where: {
+      userId: message.userId,
+      clientId: message.clientId,
+      serviceId: message.serviceId,
+      status: { in: ['SCHEDULED', 'CONFIRMED'] },
+      date: { gte: new Date() },
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  if (alreadyBooked) {
+    await prisma.reactivationMessage.update({ where: { id: messageId }, data: { status: 'SKIPPED' } });
+    return;
+  }
+
+  const config = await prisma.whatsAppConfig.findUnique({
+    where: { userId: message.userId },
+    select: { isConnected: true, apiKey: true },
+  });
+  if (!config?.isConnected || !config.apiKey || !message.client.phone) {
+    await prisma.reactivationMessage.update({
+      where: { id: messageId },
+      data: { status: 'FAILED', error: !message.client.phone ? 'Cliente sem telefone' : 'WhatsApp desconectado' },
+    });
+    return;
+  }
+
+  try {
+    await sendText(decryptSecret(config.apiKey), formatWhatsAppNumber(message.client.phone), message.renderedBody);
+    await prisma.reactivationMessage.update({
+      where: { id: messageId },
+      data: { status: 'SENT', sentAt: new Date() },
+    });
+  } catch (error) {
+    await prisma.reactivationMessage.update({
+      where: { id: messageId },
+      data: { status: 'FAILED', error: error instanceof Error ? error.message.slice(0, 500) : 'Erro desconhecido' },
+    });
+    await logError({ functionality: 'whatsapp_reactivation', error, userId: message.userId, metadata: { messageId } });
   }
 }
 

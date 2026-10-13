@@ -146,6 +146,9 @@ model User {
 
   appointmentConfirmations AppointmentConfirmation[]
 
+  messageTemplates     MessageTemplate[]
+  reactivationMessages ReactivationMessage[]
+
   @@unique([email, role])
 }
 
@@ -197,6 +200,7 @@ model Client {
   packages     ClientPackage[] // Pacotes adquiridos pelo cliente
   loyaltyBalance      LoyaltyBalance[]      @relation("ClientLoyaltyBalance")
   loyaltyTransactions LoyaltyTransaction[]  @relation("ClientLoyaltyTransactions")
+  reactivationMessages ReactivationMessage[]
 
   @@unique([cpf, userId])
   @@unique([userId, phone])
@@ -325,6 +329,13 @@ model Service {
   requiresDeposit Boolean @default(false)
   depositAmount   Float?
 
+  // Reativação: prazo médio (dias) até o cliente voltar para este serviço.
+  // Null = serviço não gera retorno (ex.: procedimento avulso).
+  returnIntervalDays     Int?
+  // Template sugerido para o lembrete de retorno deste serviço (null = padrão do tenant)
+  reactivationTemplateId String?
+  reactivationTemplate   MessageTemplate? @relation(fields: [reactivationTemplateId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -332,6 +343,7 @@ model Service {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Relações
+  reactivationMessages ReactivationMessage[]
   schedules    ScheduleService[]
   appointments Appointment[]
   packageItems ClientPackageItem[] // Itens de pacote vinculados a este serviço
@@ -416,6 +428,7 @@ model Appointment {
   @@index([userId, date])
   @@index([userId, status, date])
   @@index([professionalId, date])
+  @@index([userId, clientId, date])
 }
 
 enum PackageStatus {
@@ -799,4 +812,60 @@ model LoyaltyTransaction {
   @@index([clientId])
   @@index([userId])
   @@index([createdAt])
+}
+
+enum MessageTemplateKind {
+  REACTIVATION // Lembrete de retorno (envio manual pela tela de Retorno)
+}
+
+/// Templates de mensagem parametrizáveis, editados pelo MASTER. O `kind`
+/// permite reaproveitar a tabela para outros envios manuais no futuro.
+/// No máximo um `isDefault` por userId+kind — garantido pela API (transação).
+model MessageTemplate {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      MessageTemplateKind @default(REACTIVATION)
+  name      String
+  body      String              @db.Text
+  isDefault Boolean             @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services             Service[]
+  reactivationMessages ReactivationMessage[]
+
+  @@index([userId, kind])
+}
+
+enum ReactivationMessageStatus {
+  QUEUED  // enfileirado no QStash
+  SENT    // enviado pela Uazapi
+  FAILED  // falhou no envio
+  SKIPPED // cliente agendou entre o enfileiramento e o envio
+}
+
+/// Lembrete de retorno enviado a um cliente sobre um serviço. Histórico,
+/// trava anti-duplicata (7 dias por cliente+serviço) e base da métrica de
+/// conversão ("voltou" = agendou o serviço depois do sentAt).
+model ReactivationMessage {
+  id           String                    @id @default(cuid())
+  userId       String
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  serviceId    String
+  service      Service                   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  templateId   String?
+  template     MessageTemplate?          @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  /// Texto exato enviado — o template pode ser editado depois.
+  renderedBody String                    @db.Text
+  status       ReactivationMessageStatus @default(QUEUED)
+  error        String?                   @db.Text
+  sentAt       DateTime?
+  createdAt    DateTime                  @default(now())
+
+  @@index([userId, clientId, serviceId, createdAt])
+  @@index([userId, status, sentAt])
 }

@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Save, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
+import { ReturnIntervalField } from '@/components/services/return-interval-field'
 
 export default function NewServicePage() {
   const router = useRouter()
@@ -26,7 +27,9 @@ export default function NewServicePage() {
     showPriceOnBooking: false,
     priceIsStartingFrom: false,
     requiresDeposit: false,
-    depositAmount: ''
+    depositAmount: '',
+    returnIntervalDays: null as number | null,
+    reactivationTemplateId: null as string | null
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,6 +172,11 @@ export default function NewServicePage() {
         </Card>
 
         {/* Deposit */}
+        <ReturnIntervalField
+          value={{ returnIntervalDays: formData.returnIntervalDays, reactivationTemplateId: formData.reactivationTemplateId }}
+          onChange={v => setFormData({ ...formData, ...v })}
+        />
+
         <Card>
           <CardHeader>
             <CardTitle>Sinal/Depósito</CardTitle>

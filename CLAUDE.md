@@ -77,6 +77,10 @@ All API routes follow: **auth → validation → logic → response**.
 
 Calenvo talks to the Uazapi server directly — no n8n, no Evolution API (both removed 2026-09). The client lives in `/lib/uazapi.ts` (instance lifecycle, `sendText`, webhook config, webhook payload types), server actions in `/app/actions/whatsapp.ts`, automated notification triggers in `/lib/whatsapp-trigger.ts`, and the inbound webhook handler at `/app/api/webhooks/uazapi/route.ts`. The instance token is stored encrypted at rest in `WhatsAppConfig.apiKey` (AES-256-GCM, `/lib/crypto.ts`) and is never sent to the client — any query that reads `WhatsAppConfig` for a client component (Server Component prop, server action) must use Prisma's `omit: { apiKey: true }`.
 
+### Reativação de clientes (Clientes → Retorno)
+
+`Service.returnIntervalDays` defines how often clients come back for that service. `/lib/reactivation-service.ts` classifies each client+service pair (last valid past appointment) into upcoming / overdue / lost — **all thresholds are relative to the service interval** (Calenvo serves segments from barbershops to dentists; never hardcode day counts). Sending is manual and MASTER-only (`/api/reactivation/send`, also enforced server-side): one WhatsApp per client+service, rendered from `MessageTemplate` (pure helpers in `/lib/message-template.ts`, shared by preview and send), queued through the existing QStash dispatch (`kind: 'reactivation'`), tracked in `ReactivationMessage` (7-day resend cooldown + conversion metric). Full design: `docs/propostas/reativacao-e-google-agenda.md`.
+
 ### Multi-tenancy
 
 Each business is a `User` record with a unique `slug`. Public booking uses `/booking/[slug]` routes. Dashboard is scoped to the authenticated user's own data via session.

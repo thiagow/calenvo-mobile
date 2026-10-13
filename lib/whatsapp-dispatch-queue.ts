@@ -4,7 +4,8 @@ import { randomStepMs, msToQstashDelay } from '@/lib/whatsapp-throttle';
 
 export type DispatchJob =
   | { kind: 'reminder'; appointmentId: string }
-  | { kind: 'confirmation-request'; appointmentId: string };
+  | { kind: 'confirmation-request'; appointmentId: string }
+  | { kind: 'reactivation'; messageId: string };
 
 let cachedClient: Client | null | undefined;
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { parseServiceReactivationFields } from '@/lib/service-reactivation-fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,6 +112,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const reactivation = await parseServiceReactivationFields(userId, body)
+    if (!reactivation.ok) {
+      return NextResponse.json({ error: reactivation.error }, { status: 400 })
+    }
+
     const service = await prisma.service.create({
       data: {
         userId: userId,
@@ -122,7 +128,8 @@ export async function POST(request: NextRequest) {
         priceIsStartingFrom: priceIsStartingFrom ?? false,
         category,
         requiresDeposit: requiresDeposit || false,
-        depositAmount: depositAmount ? parseFloat(depositAmount) : null
+        depositAmount: depositAmount ? parseFloat(depositAmount) : null,
+        ...reactivation.data
       }
     })
 

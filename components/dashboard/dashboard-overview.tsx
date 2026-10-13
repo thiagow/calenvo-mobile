@@ -5,11 +5,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Calendar, Users, AlertCircle, CalendarCheck, Clock, Plus, ChevronRight } from 'lucide-react'
+import { Calendar, Users, AlertCircle, CalendarCheck, Clock, Plus, ChevronRight, RotateCcw } from 'lucide-react'
 import { PLAN_CONFIGS } from '@/lib/types'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useReactivationSummary } from '@/hooks/use-reactivation-summary'
+import { useSegmentConfig } from '@/contexts/segment-context'
 
 interface DashboardOverviewProps {
   sessionData: {
@@ -37,6 +39,8 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
   const [stats, setStats] = useState({ todayAppointments: 0, weekAppointments: 0, monthAppointments: 0, totalClients: 0, pendingAppointments: 0, completedAppointments: 0 })
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { counts: returnCounts } = useReactivationSummary()
+  const t = useSegmentConfig().config.terminology
 
   useEffect(() => {
     fetch('/api/dashboard/stats')
@@ -79,6 +83,27 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
           </Card>
         ))}
       </div>
+
+      {/* Clientes para reativar */}
+      {returnCounts && returnCounts.overdue + returnCounts.upcoming > 0 && (
+        <Link href="/dashboard/clients/retorno" className="block">
+          <Card className="border border-amber-500/25 bg-amber-500/5 transition-colors hover:bg-amber-500/10">
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                <RotateCcw className="h-5 w-5 text-amber-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{t.clients} para reativar</p>
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  {returnCounts.overdue} {returnCounts.overdue === 1 ? 'atrasado' : 'atrasados'} · {returnCounts.upcoming}{' '}
+                  {returnCounts.upcoming === 1 ? 'retorno próximo' : 'retornos próximos'}
+                </p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* Uso do plano */}
       {planConfig?.monthlyLimit !== -1 && (
