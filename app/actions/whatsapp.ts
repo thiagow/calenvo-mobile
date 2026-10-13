@@ -15,7 +15,11 @@ import { logError } from '@/lib/error-logger';
 import { parseWhatsAppError, USER_FRIENDLY_ERRORS } from '@/lib/error-messages';
 import { encryptSecret, decryptSecret } from '@/lib/crypto';
 import * as uazapi from '@/lib/uazapi';
-import { DEFAULT_PROFESSIONAL_CANCEL_MESSAGE, DEFAULT_PROFESSIONAL_BOOKING_MESSAGE } from '@/lib/whatsapp-trigger';
+import {
+  DEFAULT_NOTIFICATION_MESSAGES,
+  DEFAULT_PROFESSIONAL_CANCEL_MESSAGE,
+  DEFAULT_PROFESSIONAL_BOOKING_MESSAGE,
+} from '@/lib/whatsapp-trigger';
 
 /**
  * Extended user interface for NextAuth session
@@ -83,13 +87,9 @@ const WhatsAppSettingsSchema = z.object({
  * Default message templates for notifications
  */
 const DEFAULT_TEMPLATES = {
-  createMessage: 'Olá {{nome_cliente}}! Seu agendamento foi confirmado para {{data}} às {{hora}}. Serviço: {{servico}}. Até breve!',
-  cancelMessage: 'Olá {{nome_cliente}}, seu agendamento do dia {{data}} às {{hora}} foi cancelado. Entre em contato para reagendar.',
+  ...DEFAULT_NOTIFICATION_MESSAGES,
   professionalCancelMessage: DEFAULT_PROFESSIONAL_CANCEL_MESSAGE,
   professionalBookingMessage: DEFAULT_PROFESSIONAL_BOOKING_MESSAGE,
-  confirmationMessage: 'Olá {{nome_cliente}}! Você tem {{servico}} em {{data}} às {{hora}}. Confirme sua presença: {{link_confirmacao}}',
-  reminderMessage: 'Oi {{nome_cliente}}! Seu atendimento é daqui a poucas horas ({{hora}}). Te esperamos!',
-  completedMessage: 'Olá {{nome_cliente}}, obrigado pela visita! Se puder, deixe sua avaliação: {{link_avaliacao}}',
 };
 
 /**

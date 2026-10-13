@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs';
 import { prisma } from '@/lib/db';
 import { enqueueAccountJobs, type DispatchJob } from '@/lib/whatsapp-dispatch-queue';
+import { reminderWindow } from '@/lib/reminder-window';
 
 /**
  * Disparado a cada hora pelo QStash (ver scripts/setup-qstash-schedules.ts).
@@ -31,16 +32,15 @@ async function handler(_request: NextRequest) {
     for (const config of activeConfigs) {
       const reminderHours = config.reminderHours || 24;
 
-      // Janela alvo: hora exata do lembrete, com folga de 30min pra cada lado.
-      const targetTime = new Date(now.getTime() + reminderHours * 60 * 60 * 1000);
-      const windowStart = new Date(targetTime.getTime() - 30 * 60 * 1000);
-      const windowEnd = new Date(targetTime.getTime() + 30 * 60 * 1000);
+      // Janela [início, fim) ancorada na hora cheia — rodadas seguidas não se sobrepõem
+      // (antes: lembrete duplicado em horários :30) nem deixam vão (ver lib/reminder-window.ts).
+      const { start: windowStart, end: windowEnd } = reminderWindow(now, reminderHours);
 
       const appointments = await prisma.appointment.findMany({
         where: {
           userId: config.userId,
           status: { in: ['SCHEDULED', 'CONFIRMED'] },
-          date: { gte: windowStart, lte: windowEnd },
+          date: { gte: windowStart, lt: windowEnd },
           deletedAt: null,
           // Sem flag de dedupe própria ainda (gap pré-existente — ver TODO
           // original) — fora do escopo desta migração, só o disparo mudou.

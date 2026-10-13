@@ -138,3 +138,61 @@ describe('horário das mensagens (fuso do negócio, não do servidor)', () => {
     expect((sendText.mock.calls[0] as unknown as string[])[2]).toBe('14/10/2026 16:00')
   })
 })
+
+describe('mensagem em branco usa o texto padrão (bug: concluído ligado + texto vazio não enviava)', () => {
+  const completedConfig = {
+    enabled: true,
+    isConnected: true,
+    apiKey: 'enc',
+    notifyOnCompleted: true,
+    completedMessage: '',
+    reviewLink: 'https://g.page/r/abc/review',
+  }
+  const withPhone = (overrides: Record<string, unknown> = {}) =>
+    makeAppointment({ client: { name: 'Maria', phone: '62933333333' }, ...overrides })
+
+  beforeEach(() => {
+    findUnique.mockReset()
+    sendText.mockClear()
+    findBusinessConfig.mockResolvedValue({ timezone: 'America/Sao_Paulo' })
+  })
+
+  it('concluído com texto vazio envia o padrão, com o link de avaliação', async () => {
+    findUnique.mockResolvedValue(completedConfig)
+    await WhatsAppTriggerService.onAppointmentCompleted(withPhone(), 'Corte')
+    expect(sendText).toHaveBeenCalledTimes(1)
+    const text = (sendText.mock.calls[0] as unknown as string[])[2]
+    expect(text).toContain('Maria')
+    expect(text).toContain('https://g.page/r/abc/review')
+  })
+
+  it('concluído com texto null também usa o padrão', async () => {
+    findUnique.mockResolvedValue({ ...completedConfig, completedMessage: null })
+    await WhatsAppTriggerService.onAppointmentCompleted(withPhone(), 'Corte')
+    expect(sendText).toHaveBeenCalledTimes(1)
+  })
+
+  it('texto personalizado continua valendo', async () => {
+    findUnique.mockResolvedValue({ ...completedConfig, completedMessage: 'Valeu, {{nome_cliente}}!' })
+    await WhatsAppTriggerService.onAppointmentCompleted(withPhone(), 'Corte')
+    expect((sendText.mock.calls[0] as unknown as string[])[2]).toBe('Valeu, Maria!')
+  })
+
+  it('concluído com o toggle desligado não envia', async () => {
+    findUnique.mockResolvedValue({ ...completedConfig, notifyOnCompleted: false })
+    await WhatsAppTriggerService.onAppointmentCompleted(withPhone(), 'Corte')
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it('criação, cancelamento e lembrete em branco também caem no padrão', async () => {
+    const base = { enabled: true, isConnected: true, apiKey: 'enc' }
+    findUnique.mockResolvedValue({ ...base, notifyOnCreate: true, createMessage: '' })
+    await WhatsAppTriggerService.onAppointmentCreated(withPhone(), 'Corte')
+    findUnique.mockResolvedValue({ ...base, notifyOnCancel: true, cancelMessage: null })
+    await WhatsAppTriggerService.onAppointmentCancelled(withPhone(), 'Corte')
+    findUnique.mockResolvedValue({ ...base, notifyReminder: true, reminderMessage: '' })
+    await WhatsAppTriggerService.onAppointmentReminder(withPhone(), 'Corte')
+    expect(sendText).toHaveBeenCalledTimes(3)
+    for (const call of sendText.mock.calls as unknown as string[][]) expect(call[2].trim().length).toBeGreaterThan(10)
+  })
+})

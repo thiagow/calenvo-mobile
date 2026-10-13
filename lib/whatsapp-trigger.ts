@@ -18,6 +18,20 @@ export const DEFAULT_PROFESSIONAL_CANCEL_MESSAGE =
 export const DEFAULT_PROFESSIONAL_BOOKING_MESSAGE =
   'Novo agendamento: {{nome_cliente}} agendou {{servico}} em {{data}} às {{hora}}.';
 
+/**
+ * Texto de reserva de cada notificação ao cliente. Usado quando o negócio ligou o
+ * toggle mas deixou a mensagem em branco — sem isso o envio real saía VAZIO (a
+ * Uazapi recusa) enquanto o botão "enviar teste" funcionava, porque o teste já
+ * tinha esse fallback. Fonte única: o app/actions/whatsapp.ts também lê daqui.
+ */
+export const DEFAULT_NOTIFICATION_MESSAGES = {
+  createMessage: 'Olá {{nome_cliente}}! Seu agendamento foi confirmado para {{data}} às {{hora}}. Serviço: {{servico}}. Até breve!',
+  cancelMessage: 'Olá {{nome_cliente}}, seu agendamento do dia {{data}} às {{hora}} foi cancelado. Entre em contato para reagendar.',
+  confirmationMessage: 'Olá {{nome_cliente}}! Você tem {{servico}} em {{data}} às {{hora}}. Confirme sua presença: {{link_confirmacao}}',
+  reminderMessage: 'Oi {{nome_cliente}}! Seu atendimento é daqui a poucas horas ({{hora}}). Te esperamos!',
+  completedMessage: 'Olá {{nome_cliente}}, obrigado pela visita! Se puder, deixe sua avaliação: {{link_avaliacao}}',
+} as const;
+
 export class WhatsAppTriggerService {
   /**
    * WhatsApp do profissional responsável, com fallback para o dono do negócio.
@@ -98,6 +112,11 @@ export class WhatsAppTriggerService {
   ): Promise<boolean> {
     const formattedRecipient = formatWhatsAppNumber(recipient);
 
+    if (!message.trim()) {
+      console.error(`[WhatsAppTrigger] Mensagem vazia para ${formattedRecipient} — envio cancelado`);
+      return false;
+    }
+
     try {
       await sendText(decryptSecret(encryptedInstanceToken), formattedRecipient, message);
       console.log(`[WhatsAppTrigger] Message sent to ${formattedRecipient}`);
@@ -124,7 +143,7 @@ export class WhatsAppTriggerService {
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCreate) return;
       if (!appointment.client.phone) return;
 
-      const message = this.replaceVariables(config.createMessage || '', {
+      const message = this.replaceVariables(config.createMessage || DEFAULT_NOTIFICATION_MESSAGES.createMessage, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         timeZone: await this.getTenantTimeZone(appointment.userId),
@@ -155,7 +174,7 @@ export class WhatsAppTriggerService {
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCancel) return;
       if (!appointment.client.phone) return;
 
-      const message = this.replaceVariables(config.cancelMessage || '', {
+      const message = this.replaceVariables(config.cancelMessage || DEFAULT_NOTIFICATION_MESSAGES.cancelMessage, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         timeZone: await this.getTenantTimeZone(appointment.userId),
@@ -266,7 +285,7 @@ export class WhatsAppTriggerService {
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyConfirmation) return false;
       if (!appointment.client.phone) return false;
 
-      const message = this.replaceVariables(config.confirmationMessage || '', {
+      const message = this.replaceVariables(config.confirmationMessage || DEFAULT_NOTIFICATION_MESSAGES.confirmationMessage, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         timeZone: await this.getTenantTimeZone(appointment.userId),
@@ -299,7 +318,7 @@ export class WhatsAppTriggerService {
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyReminder) return;
       if (!appointment.client.phone) return;
 
-      const message = this.replaceVariables(config.reminderMessage || '', {
+      const message = this.replaceVariables(config.reminderMessage || DEFAULT_NOTIFICATION_MESSAGES.reminderMessage, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         timeZone: await this.getTenantTimeZone(appointment.userId),
@@ -330,7 +349,7 @@ export class WhatsAppTriggerService {
       if (!config || !config.enabled || !config.isConnected || !config.apiKey || !config.notifyOnCompleted) return;
       if (!appointment.client.phone) return;
 
-      const message = this.replaceVariables(config.completedMessage || '', {
+      const message = this.replaceVariables(config.completedMessage || DEFAULT_NOTIFICATION_MESSAGES.completedMessage, {
         clientName: appointment.client.name,
         appointmentDate: appointment.date,
         timeZone: await this.getTenantTimeZone(appointment.userId),
