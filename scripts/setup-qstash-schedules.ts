@@ -29,7 +29,9 @@ if (/localhost|127\.0\.0\.1/.test(appUrl)) {
   process.exit(1)
 }
 
-const client = new Client({ token: qstashToken })
+// Mesma regra de lib/whatsapp-dispatch-queue.ts: sem QSTASH_URL o SDK usa eu-central-1.
+const qstashUrl = process.env.QSTASH_URL
+const client = new Client({ token: qstashToken, ...(qstashUrl && { baseUrl: qstashUrl }) })
 
 // Cron do QStash roda em UTC. Brasil não tem horário de verão desde 2019,
 // então "12:00 UTC" = "09:00 America/Sao_Paulo" é uma constante estável.

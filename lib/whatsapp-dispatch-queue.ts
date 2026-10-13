@@ -12,7 +12,11 @@ let cachedClient: Client | null | undefined;
 function getClient(): Client | null {
   if (cachedClient !== undefined) return cachedClient;
   const token = process.env.QSTASH_TOKEN;
-  cachedClient = token ? new Client({ token }) : null;
+  // O SDK (build Node) sempre aponta para eu-central-1 se não receber baseUrl.
+  // Conta criada em outra região (ex.: us-east-1) precisa de QSTASH_URL, senão
+  // todo publish falha com "user not found in this region".
+  const baseUrl = process.env.QSTASH_URL;
+  cachedClient = token ? new Client({ token, ...(baseUrl && { baseUrl }) }) : null;
   return cachedClient;
 }
 
