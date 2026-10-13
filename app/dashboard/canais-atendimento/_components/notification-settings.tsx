@@ -367,7 +367,7 @@ export function NotificationSettings({ config, disabled = false }: NotificationS
             <div className="flex items-start gap-3">
               <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-1" />
               <div className="space-y-1">
-                <CardTitle className="text-base">Notificação de Atendimento</CardTitle>
+                <CardTitle className="text-base">Solicitação de Avaliação Google</CardTitle>
                 <CardDescription>
                   Enviada imediatamente quando o agendamento é marcado como "Atendido"
                 </CardDescription>
