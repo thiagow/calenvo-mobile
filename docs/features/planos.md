@@ -91,6 +91,8 @@ Limites de agendas e serviços (`lib/plan-limits.ts` → `PLAN_LIMITS`, não exi
 
 ## 🔗 Mapeamento PlanType ↔ Stripe (Product IDs / Price IDs)
 
+> Para **alterar preços ou limites**, siga o passo a passo em [`docs/manuais/alteracao-de-planos-e-valores.md`](../manuais/alteracao-de-planos-e-valores.md).
+
 Fonte da verdade em runtime: `lib/stripe.ts` → `STRIPE_PRICE_IDS`, populado a partir das env vars abaixo. Auditado contra a conta Stripe em 2026-07-15 (modo test) — todos os 12 Price IDs conferem com os produtos ativos.
 
 ### Plano Básico — `prod_TjoIVH50jDNyQB`
