@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { Suspense, useState, useMemo } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,7 @@ import { Plus, Filter, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
+import { redirect, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { useDialog } from '@/components/providers/dialog-provider'
 
@@ -28,14 +28,28 @@ import { AgendaListView } from '@/components/agenda/agenda-list-view'
 import { AgendaTimelineView } from '@/components/agenda/agenda-timeline-view'
 import { EditAppointmentDialog } from '@/components/agenda/edit-appointment-dialog'
 import { useAppointments } from '@/hooks/use-appointments'
+import { parseAgendaParams } from '@/lib/dashboard-links'
 
 export default function AgendaPage() {
+  // useSearchParams exige Suspense no Next 14
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+      <AgendaContent />
+    </Suspense>
+  )
+}
+
+function AgendaContent() {
   const { data: session, status } = useSession() || {}
   const { confirm } = useDialog()
 
-  const [currentView, setCurrentView] = useState<ViewType>('day')
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [filters, setFilters] = useState<AgendaFilters>({})
+  // Links do Dashboard abrem a Agenda já na vista/dia/filtro certos (/agenda?view=week&date=…&status=…).
+  // Só vale como estado inicial; depois o usuário navega livremente.
+  const searchParams = useSearchParams()
+  const [initial] = useState(() => parseAgendaParams(searchParams))
+  const [currentView, setCurrentView] = useState<ViewType>(initial.view ?? 'day')
+  const [currentDate, setCurrentDate] = useState(() => (initial.date ? new Date(`${initial.date}T12:00:00`) : new Date()))
+  const [filters, setFilters] = useState<AgendaFilters>(() => (initial.status ? { status: initial.status } : {}))
   const [showFilters, setShowFilters] = useState(false)
   const [editingAppointment, setEditingAppointment] = useState<any>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)

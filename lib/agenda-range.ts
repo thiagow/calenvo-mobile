@@ -23,7 +23,7 @@ function toCalendarDay(value: string | null | undefined, timeZone: string): stri
 }
 
 /** Primeiro/último dia (calendário) da janela da vista: dia, semana (seg–dom) ou mês. */
-function viewWindow(view: string, day: string): { first: string; last: string } | null {
+export function viewWindow(view: string, day: string): { first: string; last: string } | null {
   switch (view) {
     case 'day':
       return { first: day, last: day }

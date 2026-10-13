@@ -5,13 +5,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Calendar, Users, AlertCircle, CalendarCheck, Clock, Plus, ChevronRight, RotateCcw } from 'lucide-react'
+import { Calendar, CalendarDays, CalendarCheck, CircleCheck, Hourglass, Clock, Plus, ChevronRight, RotateCcw } from 'lucide-react'
 import { PLAN_CONFIGS } from '@/lib/types'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useReactivationSummary } from '@/hooks/use-reactivation-summary'
 import { useSegmentConfig } from '@/contexts/segment-context'
+import { ACTIVE_STATUSES } from '@/lib/dashboard-stats'
+import { agendaLink } from '@/lib/dashboard-links'
+import { cn } from '@/lib/utils'
 
 interface DashboardOverviewProps {
   sessionData: {
@@ -36,7 +39,8 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
   const firstName = sessionData?.user?.name?.split(' ')[0]
 
-  const [stats, setStats] = useState({ todayAppointments: 0, weekAppointments: 0, monthAppointments: 0, totalClients: 0, pendingAppointments: 0, completedAppointments: 0 })
+  const [stats, setStats] = useState({ weekAppointments: 0, monthAppointments: 0, pendingWeek: 0, confirmedWeek: 0, planMonthAppointments: 0 })
+  const [periods, setPeriods] = useState<{ week: { from: string; to: string }; month: { from: string; to: string }; today: string } | null>(null)
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { counts: returnCounts } = useReactivationSummary()
@@ -45,11 +49,54 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
   useEffect(() => {
     fetch('/api/dashboard/stats')
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) { setStats(data.stats); setRecentAppointments(data.recentAppointments || []) } })
+      .then(data => { if (data) { setStats(data.stats); setPeriods(data.periods); setRecentAppointments(data.recentAppointments || []) } })
       .finally(() => setLoading(false))
   }, [])
 
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })
+
+  // Datas vêm do servidor (calendário do negócio) — o navegador não recalcula semana/mês.
+  const weekFrom = periods?.week.from ?? ''
+  const referenceDay = periods?.today ?? ''
+  const shortDay = (d: string) => format(new Date(`${d}T12:00:00`), "d 'de' MMM", { locale: ptBR })
+  const weekLabel = periods ? `${format(new Date(`${periods.week.from}T12:00:00`), 'd', { locale: ptBR })} a ${shortDay(periods.week.to)}` : ''
+  const monthLabel = periods ? format(new Date(`${periods.month.from}T12:00:00`), 'MMMM', { locale: ptBR }) : ''
+  const confirmedPct = stats.weekAppointments > 0 ? Math.round((stats.confirmedWeek / stats.weekAppointments) * 100) : 0
+
+  const indicators = [
+    {
+      label: 'Esta semana',
+      value: stats.weekAppointments,
+      sub: weekLabel,
+      href: agendaLink({ view: 'week', date: referenceDay || weekFrom, status: ACTIVE_STATUSES }),
+      icon: CalendarDays,
+      tone: 'text-primary',
+    },
+    {
+      label: 'Total do mês',
+      value: stats.monthAppointments,
+      sub: monthLabel ? `${monthLabel} · sem cancelados` : '',
+      href: agendaLink({ view: 'month', date: referenceDay || weekFrom, status: ACTIVE_STATUSES }),
+      icon: CalendarCheck,
+      tone: 'text-violet-600',
+    },
+    {
+      label: 'Pendentes',
+      value: stats.pendingWeek,
+      sub: stats.pendingWeek === 0 ? 'nada pendente' : 'aguardando confirmação',
+      href: agendaLink({ view: 'week', date: referenceDay || weekFrom, status: ['SCHEDULED'] }),
+      icon: Hourglass,
+      tone: 'text-amber-600',
+    },
+    {
+      label: 'Confirmados',
+      value: stats.confirmedWeek,
+      sub: stats.weekAppointments > 0 ? `${confirmedPct}% da semana` : 'sem agendamentos',
+      href: agendaLink({ view: 'week', date: referenceDay || weekFrom, status: ['CONFIRMED'] }),
+      icon: CircleCheck,
+      tone: 'text-green-600',
+    },
+  ]
 
   return (
     <div className="space-y-5">
@@ -59,28 +106,36 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
         <h2 className="text-xl font-bold mt-0.5">Olá, {firstName}!</h2>
       </div>
 
-      {/* KPI cards — scroll horizontal em telas muito pequenas */}
+      {/* Indicadores — cada card abre a Agenda já na vista e no filtro que mostram o mesmo número */}
       <div className="grid grid-cols-2 gap-3">
-        {[
-          { label: 'Hoje', value: stats.todayAppointments, icon: Calendar, color: 'text-primary' },
-          { label: 'Esta semana', value: stats.weekAppointments, icon: CalendarCheck, color: 'text-green-600' },
-          { label: 'Clientes', value: stats.totalClients, icon: Users, color: 'text-purple-600' },
-          { label: 'Pendentes', value: stats.pendingAppointments, icon: AlertCircle, color: 'text-yellow-600' },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="border border-border">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  {loading
-                    ? <Skeleton className="h-7 w-10 mt-1" />
-                    : <p className="text-2xl font-bold mt-0.5">{value}</p>
-                  }
+        {indicators.map(({ label, value, sub, href, icon: Icon, tone }) => (
+          <Link
+            key={label}
+            href={href}
+            className="group rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <Card className="h-full border border-border transition-colors group-hover:bg-muted/40 group-active:bg-muted">
+              <CardContent className="flex min-h-[7rem] flex-col justify-between p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <Icon className={cn('h-5 w-5 shrink-0', tone)} />
                 </div>
-                <Icon className={`h-5 w-5 ${color} mt-0.5`} />
-              </div>
-            </CardContent>
-          </Card>
+                <div>
+                  {loading
+                    ? <Skeleton className="h-8 w-12" />
+                    : <p className="text-3xl font-bold leading-none tabular-nums">{value}</p>
+                  }
+                  <div className="mt-1.5 flex items-center justify-between gap-1">
+                    {loading
+                      ? <Skeleton className="h-3 w-24" />
+                      : <p className="truncate text-[11px] text-muted-foreground">{sub}</p>
+                    }
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 
@@ -119,11 +174,11 @@ export function DashboardOverview({ sessionData }: DashboardOverviewProps) {
               <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${Math.min((stats.monthAppointments / (planConfig?.monthlyLimit || 1)) * 100, 100)}%` }}
+                  style={{ width: `${Math.min((stats.planMonthAppointments / (planConfig?.monthlyLimit || 1)) * 100, 100)}%` }}
                 />
               </div>
               <span className="text-xs font-medium tabular-nums whitespace-nowrap">
-                {stats.monthAppointments}/{planConfig?.monthlyLimit}
+                {stats.planMonthAppointments}/{planConfig?.monthlyLimit}
               </span>
             </div>
             {userPlan === 'BASICO' && (

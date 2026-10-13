@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
-import { AppointmentStatus } from '@prisma/client'
-import { DEFAULT_TIMEZONE, formatInZone } from '@/lib/timezone'
+import { DEFAULT_TIMEZONE, formatInZone, tenantCalendarDayWindow } from '@/lib/timezone'
+import { ACTIVE_STATUSES, dashboardPeriods } from '@/lib/dashboard-stats'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,114 +30,68 @@ export async function GET(request: NextRequest) {
       masterId = user?.masterId || userId
     }
 
-    // Data de hoje (início e fim)
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date()
-    todayEnd.setHours(23, 59, 59, 999)
+    const businessConfig = await prisma.businessConfig.findUnique({
+      where: { userId: masterId },
+      select: { timezone: true }
+    })
+    const timeZone = businessConfig?.timezone || DEFAULT_TIMEZONE
 
-    // Início da semana (domingo)
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-    weekStart.setHours(0, 0, 0, 0)
+    // Semana (seg–dom, igual à Agenda) e mês no calendário do NEGÓCIO
+    const periods = dashboardPeriods(timeZone)
+    const todayEnd = tenantCalendarDayWindow(timeZone, periods.today).end
 
-    // Início do mês
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    // Os indicadores abrem a Agenda ao clicar, e a Agenda do profissional só mostra
+    // os agendamentos dele — então o número do card precisa ser do mesmo escopo.
+    const scopedFilter = userRole === 'PROFESSIONAL'
+      ? { userId: masterId, professionalId: userId, deletedAt: null }
+      : { userId: masterId, deletedAt: null }
 
-    // Definir filtros baseados no role
-    // For general dashboard stats, professional sees the global ecosystem data
-    // to match the master/manager view as requested
-    const appointmentFilter = { userId: masterId, deletedAt: null }
+    // Uso do plano é do tenant inteiro, independente de quem está logado
+    const planFilter = { userId: masterId, deletedAt: null }
 
-    const clientFilter = { userId: masterId }
+    const activeStatus = { in: [...ACTIVE_STATUSES] }
+    const weekRange = { gte: periods.week.gte, lte: periods.week.lte }
+    const monthRange = { gte: periods.month.gte, lte: periods.month.lte }
 
-    // This filter is for the "Recent Appointments" list - we'll keep this PERSONAL
-    // so the professional still sees their own upcoming work
+    // "Hoje" (lista abaixo dos indicadores): pessoal para o profissional
     const recentAppointmentFilter = userRole === 'PROFESSIONAL'
       ? { professionalId: userId, deletedAt: null }
       : { userId, deletedAt: null }
 
-    // This filter is SPECIFICALLY for plan usage calculation (global ecosystem)
-    const globalAppointmentFilter = { userId: masterId, deletedAt: null }
-
-    // Buscar estatísticas em paralelo
     const [
-      todayAppointments,
       weekAppointments,
       monthAppointments,
-      totalClients,
-      pendingAppointments,
-      completedAppointments,
+      pendingWeek,
+      confirmedWeek,
+      planMonthAppointments,
       recentAppointments
     ] = await Promise.all([
-      // Agendamentos de hoje
+      // Esta semana: tudo que está de pé (sem cancelados/faltas)
       prisma.appointment.count({
-        where: {
-          ...appointmentFilter,
-          date: {
-            gte: todayStart,
-            lte: todayEnd
-          },
-          status: {
-            notIn: ['CANCELLED', 'NO_SHOW']
-          }
-        }
+        where: { ...scopedFilter, date: weekRange, status: activeStatus }
       }),
 
-      // Agendamentos desta semana
+      // Total do mês inteiro
       prisma.appointment.count({
-        where: {
-          ...appointmentFilter,
-          date: {
-            gte: weekStart,
-            lte: todayEnd
-          },
-          status: {
-            notIn: ['CANCELLED', 'NO_SHOW']
-          }
-        }
+        where: { ...scopedFilter, date: monthRange, status: activeStatus }
       }),
 
-      // Agendamentos deste mês (GLOBAL for plan usage)
+      // Pendentes: agendados, ainda sem confirmação do cliente
       prisma.appointment.count({
-        where: {
-          ...globalAppointmentFilter,
-          date: {
-            gte: monthStart
-          },
-          status: {
-            notIn: ['CANCELLED', 'NO_SHOW']
-          }
-        }
+        where: { ...scopedFilter, date: weekRange, status: 'SCHEDULED' }
       }),
 
-      // Total de clientes/pacientes
-      prisma.client.count({
-        where: clientFilter
-      }),
-
-      // Agendamentos pendentes (aguardando confirmação)
+      // Confirmados
       prisma.appointment.count({
-        where: {
-          ...appointmentFilter,
-          status: 'SCHEDULED',
-          date: {
-            gte: todayStart
-          }
-        }
+        where: { ...scopedFilter, date: weekRange, status: 'CONFIRMED' }
       }),
 
-      // Total de agendamentos completados
+      // Uso do plano (mês do negócio, global)
       prisma.appointment.count({
-        where: {
-          ...appointmentFilter,
-          status: 'COMPLETED'
-        }
+        where: { ...planFilter, date: monthRange, status: { notIn: ['CANCELLED', 'NO_SHOW'] } }
       }),
 
-      // Próximos agendamentos de hoje (KEEP PERSONAL for professional)
+      // Próximos agendamentos de hoje (pessoal para o profissional)
       prisma.appointment.findMany({
         where: {
           ...recentAppointmentFilter,
@@ -173,20 +127,18 @@ export async function GET(request: NextRequest) {
       })
     ])
 
-    const businessConfig = await prisma.businessConfig.findUnique({
-      where: { userId: masterId },
-      select: { timezone: true }
-    })
-    const timeZone = businessConfig?.timezone || DEFAULT_TIMEZONE
-
     return NextResponse.json({
       stats: {
-        todayAppointments,
         weekAppointments,
         monthAppointments,
-        totalClients,
-        pendingAppointments,
-        completedAppointments
+        pendingWeek,
+        confirmedWeek,
+        planMonthAppointments
+      },
+      periods: {
+        week: { from: periods.week.from, to: periods.week.to },
+        month: { from: periods.month.from, to: periods.month.to },
+        today: periods.today
       },
       recentAppointments: recentAppointments.map(apt => ({
         id: apt.id,
