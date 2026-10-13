@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { cn } from '@/lib/utils'
+import { EXAMPLE_REACTIVATION_VARS, pickTemplate, renderTemplate } from '@/lib/message-template'
 
 const PRESETS: { label: string; days: number }[] = [
   { label: '1 semana', days: 7 },
@@ -31,19 +32,29 @@ export interface ReturnIntervalValue {
 interface TemplateOption {
   id: string
   name: string
+  body: string
   isDefault: boolean
 }
 
 interface ReturnIntervalFieldProps {
   value: ReturnIntervalValue
   onChange: (value: ReturnIntervalValue) => void
+  /** Nome do serviço sendo editado — deixa a prévia com o texto real dele */
+  serviceName?: string
+}
+
+/** Data de calendário de N dias atrás, "DD/MM/AAAA" — só para a prévia. */
+function dateDaysAgo(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toLocaleDateString('pt-BR')
 }
 
 /**
  * Prazo médio de retorno do serviço (alimenta a tela de Retorno) e o modelo
  * de mensagem sugerido para o lembrete. "Sem retorno" é o padrão.
  */
-export function ReturnIntervalField({ value, onChange }: ReturnIntervalFieldProps) {
+export function ReturnIntervalField({ value, onChange, serviceName }: ReturnIntervalFieldProps) {
   const { config } = useSegmentConfig()
   const t = config.terminology
   const [templates, setTemplates] = useState<TemplateOption[]>([])
@@ -63,6 +74,19 @@ export function ReturnIntervalField({ value, onChange }: ReturnIntervalFieldProp
   }, [])
 
   const setDays = (next: number | null) => onChange({ ...value, returnIntervalDays: next })
+
+  // Mesma escolha de modelo e renderização usadas no envio real (lib/message-template.ts),
+  // simulando um cliente que chega exatamente no dia previsto do retorno.
+  const preview =
+    days !== null
+      ? renderTemplate(pickTemplate({ reactivationTemplateId: value.reactivationTemplateId }, templates).body, {
+          ...EXAMPLE_REACTIVATION_VARS,
+          servico: serviceName?.trim() || EXAMPLE_REACTIVATION_VARS.servico,
+          dias_desde_ultimo: String(days),
+          dias_atraso: '0',
+          ultimo_atendimento: dateDaysAgo(days),
+        })
+      : ''
 
   const chip = (active: boolean) =>
     cn(
@@ -166,6 +190,12 @@ export function ReturnIntervalField({ value, onChange }: ReturnIntervalFieldProp
                 ))}
               </SelectContent>
             </Select>
+            <div className="space-y-1.5 pt-2">
+              <p className="text-xs font-medium text-muted-foreground">Exemplo de como o {t.client.toLowerCase()} recebe</p>
+              <div className="max-w-md rounded-2xl rounded-tl-sm bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-950 whitespace-pre-wrap break-words dark:bg-emerald-950/40 dark:text-emerald-50">
+                {preview}
+              </div>
+            </div>
             <p className="text-xs text-muted-foreground">
               Crie e edite modelos em{' '}
               <Link href="/dashboard/canais-atendimento#modelos" className="text-primary underline-offset-2 hover:underline">

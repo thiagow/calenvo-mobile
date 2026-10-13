@@ -211,6 +211,7 @@ export default function EditServicePage() {
         <ReturnIntervalField
           value={{ returnIntervalDays: formData.returnIntervalDays, reactivationTemplateId: formData.reactivationTemplateId }}
           onChange={v => setFormData({ ...formData, ...v })}
+          serviceName={formData.name}
         />
 
         <Card>
