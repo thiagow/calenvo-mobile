@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAvailableSlotsForService, getMaxBookableDate } from '@/lib/availability-service'
+import { getAvailableSlotsForService, getMaxBookableDate, getNoSlotsReasonForService } from '@/lib/availability-service'
 import { resolveTenantBySlug } from '@/lib/tenant-resolver'
 
 export const dynamic = 'force-dynamic'
@@ -47,7 +47,16 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ slots, maxDate })
+    // Sem horário livre: motivo em linguagem para o cliente final (nunca o motivo interno do bloqueio).
+    const reason = await getNoSlotsReasonForService({
+      serviceId,
+      date,
+      userId: tenant.id,
+      ...(professionalId && { professionalId }),
+      slots,
+    })
+
+    return NextResponse.json({ slots, maxDate, reason: reason ? { code: reason.code, message: reason.publicMessage } : null })
   } catch (error) {
     console.error('Erro ao buscar horários:', error)
     return NextResponse.json(

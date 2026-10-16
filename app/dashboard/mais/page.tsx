@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Calendar,
+  CalendarOff,
   Briefcase,
   UserCog,
   Package,
@@ -30,6 +31,7 @@ const menuGroups = [
     label: 'Gestão',
     items: [
       { name: 'Agendas', href: '/dashboard/schedules', icon: Calendar, permission: 'canManageSchedules' as const },
+      { name: 'Meus bloqueios', href: '/dashboard/bloqueios', icon: CalendarOff, permission: 'canManageOwnBlocks' as const },
       { name: 'Serviços', href: '/dashboard/services', icon: Briefcase, permission: 'canManageServices' as const },
       { name: 'Profissionais', href: '/dashboard/professionals', icon: UserCog, permission: 'canManageProfessionals' as const },
       { name: 'Pacotes', href: '/dashboard/packages', icon: Package, permission: 'canManageServices' as const },

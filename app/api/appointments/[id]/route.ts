@@ -218,6 +218,7 @@ export async function PUT(
             scheduleId: existingAppointment.scheduleId!,
             date: newDate!,
             duration: duration ? Number(duration) : existingAppointment.duration,
+            professionalId: existingAppointment.professionalId,
             tx
           }))
         ) {

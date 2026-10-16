@@ -277,6 +277,259 @@ describe('getAvailableSlots', () => {
   })
 })
 
+describe('início encaixado logo após um compromisso', () => {
+  // Caso real (Bellae, 04/12): expediente 15:00–19:00, serviço de 120 min, agendamento
+  // das 13:30 às 15:30. A grade fixa só tinha 15:00 e 17:00; o 15:30 livre sumia.
+  function alinhamentoSchedule() {
+    mockSchedulesById['schedule-1'] = baseSchedule({
+      useCustomDayConfig: true,
+      dayConfigs: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        dayOfWeek, isActive: true, timeSlots: [{ startTime: '15:00', endTime: '19:00' }],
+      })),
+      services: [{ service: { id: 'service-1', duration: 120 } }],
+      professionals: [{ professionalId: 'p1' }],
+    })
+  }
+
+  it('oferece o horário em que o agendamento anterior termina', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    alinhamentoSchedule()
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.map((s) => `${s.time}${s.available ? '' : '✗'}`)).toEqual(['15:00✗', '15:30', '17:00'])
+  })
+
+  it('não oferece início que estoura o fim do expediente', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    alinhamentoSchedule()
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 16, 30), duration: 120, professionalId: 'p1' }]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    // termina 18:30; 18:30 + 120min passaria das 19:00 → não entra na grade
+    expect(result!.map((s) => s.time)).toEqual(['15:00', '17:00'])
+  })
+
+  it('respeita o intervalo entre atendimentos (bufferTime) ao encaixar', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    alinhamentoSchedule()
+    mockSchedulesById['schedule-1'].bufferTime = 15
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.some((s) => s.time === '15:45' && s.available)).toBe(true)
+    expect(result!.some((s) => s.time === '15:30')).toBe(false)
+  })
+
+  it('não duplica horário que já está na grade', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    // 09:00 + 30 min termina 09:30, que já é um passo da grade de 30 min
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 9), duration: 30, professionalId: 'p1' }]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    const times = result!.map((s) => s.time)
+    expect(new Set(times).size).toBe(times.length)
+    expect(times).toEqual([...times].sort())
+  })
+})
+
+describe('motivo para o cliente final (página pública e chat)', () => {
+
+  it('nunca expõe o motivo interno do bloqueio na mensagem pública', async () => {
+    const { getAvailableSlots, getNoSlotsReason } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].blocks = [
+      { startDate: new Date(`${date}T00:00:00.000Z`), endDate: new Date(`${date}T00:00:00.000Z`), isAllDay: true, professionalId: null, reason: 'Consulta médica da dona' },
+    ]
+    const params = { scheduleId: 'schedule-1', userId: 'tenant-a', date }
+    const slots = (await getAvailableSlots({ ...params, serviceId: 'service-1' }))!
+    const reason = (await getNoSlotsReason({ ...params, slots }))!
+
+    expect(reason.message).toContain('Consulta médica da dona') // painel vê
+    expect(reason.publicMessage).not.toContain('Consulta')       // cliente não
+    expect(reason.publicMessage).toBe('Não haverá atendimento nesta data')
+  })
+
+  it('várias agendas do serviço: "tudo preenchido" vence "fora da janela", e a janela mais distante vence', async () => {
+    const { getNoSlotsReasonForService } = await import('@/lib/availability-service')
+    const date = futureDateStr(40)
+    mockScheduleList = [{ id: 'schedule-1' }, { id: 'schedule-2' }]
+    mockSchedulesById = {
+      'schedule-1': baseSchedule({ advanceBookingDays: 10 }),
+      'schedule-2': baseSchedule({ id: 'schedule-2', advanceBookingDays: 30 }),
+    }
+
+    const reason = await getNoSlotsReasonForService({ userId: 'tenant-a', serviceId: 'service-1', date, slots: [] })
+
+    expect(reason?.code).toBe('BEYOND_ADVANCE_WINDOW')
+    expect(reason?.lastBookableDate).toBe(futureDateStr(30)) // a agenda de 30 dias, não a de 10
+    expect(reason?.publicMessage).toContain('Agendamentos abertos até')
+  })
+
+  it('com horário livre não há motivo', async () => {
+    const { getNoSlotsReasonForService } = await import('@/lib/availability-service')
+
+    expect(
+      await getNoSlotsReasonForService({ userId: 'tenant-a', serviceId: 'service-1', date: futureDateStr(5), slots: [{ time: '09:00', available: true }] })
+    ).toBeNull()
+  })
+})
+
+describe('antecedência máxima e motivo de "sem horários"', () => {
+  it('ignoreAdvanceWindow libera o dia além da janela (tela interna do painel)', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    mockSchedulesById['schedule-1'].advanceBookingDays = 30
+    const date = futureDateStr(49)
+
+    const publicView = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+    const internal = await getAvailableSlots({
+      scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', ignoreAdvanceWindow: true,
+    })
+
+    expect(publicView).toEqual([])
+    expect(internal!.length).toBeGreaterThan(0)
+  })
+
+  it('ignoreAdvanceWindow não libera o passado nem dia sem atendimento', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    mockSchedulesById['schedule-1'].workingDays = []
+
+    expect(
+      await getAvailableSlots({
+        scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(5), userId: 'tenant-a', ignoreAdvanceWindow: true,
+      })
+    ).toEqual([])
+    expect(
+      await getAvailableSlots({
+        scheduleId: 'schedule-1', serviceId: 'service-1', date: futureDateStr(-2), userId: 'tenant-a', ignoreAdvanceWindow: true,
+      })
+    ).toEqual([])
+  })
+
+  async function reasonFor(date: string, extra: Record<string, unknown> = {}) {
+    const { getAvailableSlots, getNoSlotsReason } = await import('@/lib/availability-service')
+    const params = { scheduleId: 'schedule-1', userId: 'tenant-a', date, ...extra }
+    const slots = (await getAvailableSlots({ ...params, serviceId: 'service-1' }))!
+    return getNoSlotsReason({ ...params, slots })
+  }
+
+  it('além da antecedência: explica a data limite', async () => {
+    mockSchedulesById['schedule-1'].advanceBookingDays = 30
+    const reason = await reasonFor(futureDateStr(49))
+
+    expect(reason?.code).toBe('BEYOND_ADVANCE_WINDOW')
+    expect(reason?.message).toContain('30 dias')
+  })
+
+  it('dia sem atendimento, bloqueado (com motivo) e dia desativado têm motivos distintos', async () => {
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].workingDays = []
+    expect((await reasonFor(date))?.code).toBe('NOT_WORKING_DAY')
+
+    mockSchedulesById['schedule-1'].workingDays = [0, 1, 2, 3, 4, 5, 6]
+    mockSchedulesById['schedule-1'].blocks = [
+      { startDate: new Date(`${date}T00:00:00.000Z`), endDate: new Date(`${date}T00:00:00.000Z`), isAllDay: true, professionalId: null, reason: 'VIAGEM' },
+    ]
+    const blocked = await reasonFor(date)
+    expect(blocked?.code).toBe('DAY_BLOCKED')
+    expect(blocked?.message).toContain('VIAGEM')
+
+    mockSchedulesById['schedule-1'].blocks = []
+    mockSchedulesById['schedule-1'].useCustomDayConfig = true
+    mockSchedulesById['schedule-1'].dayConfigs = []
+    expect((await reasonFor(date))?.code).toBe('DAY_INACTIVE')
+  })
+
+  it('serviço maior que a janela do dia: SERVICE_DOES_NOT_FIT', async () => {
+    mockSchedulesById['schedule-1'].services = [{ service: { id: 'service-1', duration: 720 } }]
+
+    expect((await reasonFor(futureDateStr(5)))?.code).toBe('SERVICE_DOES_NOT_FIT')
+  })
+
+  it('grade cheia (tudo ocupado): FULLY_BOOKED; com horário livre não há motivo', async () => {
+    const date = futureDateStr(5)
+    expect(await reasonFor(date)).toBeNull()
+
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 8), duration: 600, professionalId: 'p1' }]
+    expect((await reasonFor(date))?.code).toBe('FULLY_BOOKED')
+  })
+})
+
+describe('bloqueio pessoal de profissional', () => {
+  const allDayFor = (date: string, professionalId: string | null) => ({
+    startDate: new Date(`${date}T00:00:00.000Z`),
+    endDate: new Date(`${date}T00:00:00.000Z`),
+    isAllDay: true,
+    professionalId,
+  })
+
+  it('dia inteiro de um profissional não fecha o dia: o colega vinculado continua atendendo', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
+    mockSchedulesById['schedule-1'].blocks = [allDayFor(date, 'p1')]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.length).toBeGreaterThan(0)
+    expect(result!.every((s) => s.available)).toBe(true)
+  })
+
+  it('todos os vinculados bloqueados no dia: dia fechado (sem slots)', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
+    mockSchedulesById['schedule-1'].blocks = [allDayFor(date, 'p1'), allDayFor(date, 'p2')]
+
+    expect(await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })).toEqual([])
+  })
+
+  it('profissional pedido está bloqueado: sem slots, mesmo com colega livre', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
+    mockSchedulesById['schedule-1'].blocks = [allDayFor(date, 'p1')]
+
+    expect(
+      await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', professionalId: 'p1' })
+    ).toEqual([])
+  })
+
+  it('faixa de horário pessoal tira só os slots dentro da faixa', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }]
+    mockSchedulesById['schedule-1'].blocks = [
+      { startDate: dateAt(date, 9), endDate: dateAt(date, 10), isAllDay: false, professionalId: 'p1' },
+    ]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.find((s) => s.time === '09:00')?.available).toBe(false)
+    expect(result!.find((s) => s.time === '09:30')?.available).toBe(false)
+    expect(result!.find((s) => s.time === '10:00')?.available).toBe(true)
+  })
+
+  it('bloqueio da agenda inteira (sem profissional) continua fechando todos', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    mockSchedulesById['schedule-1'].professionals = [{ professionalId: 'p1' }, { professionalId: 'p2' }]
+    mockSchedulesById['schedule-1'].blocks = [allDayFor(date, null)]
+
+    expect(await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })).toEqual([])
+  })
+})
+
 describe('resolveCandidateSchedules', () => {
   it('busca agendas ativas do tenant filtrando por serviço', async () => {
     const { resolveCandidateSchedules } = await import('@/lib/availability-service')

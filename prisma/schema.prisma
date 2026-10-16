@@ -125,6 +125,7 @@ model User {
   schedules                Schedule[] // Agendas criadas (apenas para master)
   services                 Service[] // Serviços criados (apenas para master)
   scheduleProfessionals    ScheduleProfessional[] // Agendas vinculadas como profissional
+  scheduleBlocks           ScheduleBlock[]        @relation("ProfessionalScheduleBlocks") // Bloqueios pessoais (como profissional)
   notifications            Notification[] // Notificações do usuário
   whatsappConfig           WhatsAppConfig? // Configuração WhatsApp
   clientPackages           ClientPackage[] // Pacotes vendidos
@@ -293,11 +294,17 @@ model ScheduleBlock {
   // (um bloco por agenda). Null = bloqueio criado para uma agenda só.
   groupId String?
 
+  // Bloqueio pessoal de um profissional: fecha só ele (um bloco por agenda em que
+  // está vinculado, sempre com groupId). Null = vale para a agenda inteira.
+  professionalId String?
+  professional   User?   @relation("ProfessionalScheduleBlocks", fields: [professionalId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([scheduleId, startDate, endDate])
   @@index([groupId])
+  @@index([professionalId])
 }
 
 // Tabela de junção: Agenda <-> Profissionais

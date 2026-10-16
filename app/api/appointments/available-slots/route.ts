@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
-import { getAvailableSlots } from '@/lib/availability-service'
+import { getAvailableSlots, getNoSlotsReason } from '@/lib/availability-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,19 +47,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Agenda não encontrada' }, { status: 404 })
     }
 
-    const slots = await getAvailableSlots({
+    // Tela interna do painel: a antecedência máxima é regra do cliente final (página
+    // pública e chat). Quem agenda pelo painel (telefone, balcão) marca além dela — a
+    // criação nunca a bloqueou, só esta grade.
+    const slotParams = {
       scheduleId,
-      serviceId,
       date,
       userId: schedule.userId,
+      ignoreAdvanceWindow: true,
       ...(professionalId && { professionalId }),
-    })
+    }
+    const slots = await getAvailableSlots({ ...slotParams, serviceId })
 
     if (slots === null) {
       return NextResponse.json({ error: 'Agenda ou serviço não encontrado' }, { status: 404 })
     }
 
-    return NextResponse.json({ slots })
+    // Sem horário livre: diz o motivo (dia bloqueado, agenda não atende, tudo ocupado...)
+    const reason = await getNoSlotsReason({ ...slotParams, slots })
+
+    return NextResponse.json({ slots, reason })
   } catch (error) {
     console.error('Error fetching available slots:', error)
     return NextResponse.json(

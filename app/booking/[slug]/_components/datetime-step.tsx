@@ -15,6 +15,8 @@ interface DateTimeStepProps {
   loadingSlots: boolean
   /** Último dia reservável ("YYYY-MM-DD"); null enquanto desconhecido. */
   maxDate: string | null
+  /** Por que a data não tem horário (texto para o cliente), quando o servidor sabe. */
+  noSlotsReason?: string | null
   selectedTime: string
   onSelectTime: (time: string) => void
 }
@@ -25,6 +27,7 @@ export function DateTimeStep({
   slots,
   loadingSlots,
   maxDate,
+  noSlotsReason,
   selectedTime,
   onSelectTime,
 }: DateTimeStepProps) {
@@ -76,9 +79,10 @@ export function DateTimeStep({
             </div>
           ) : (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              {isBeyondWindow
-                ? `Agendamentos abertos até ${maxDateLabel}`
-                : 'Não há horários disponíveis para esta data'}
+              {noSlotsReason ??
+                (isBeyondWindow
+                  ? `Agendamentos abertos até ${maxDateLabel}`
+                  : 'Não há horários disponíveis para esta data')}
             </p>
           )}
         </div>

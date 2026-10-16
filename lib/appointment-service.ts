@@ -5,7 +5,12 @@ import { PlanType, AppointmentStatus, Prisma } from '@prisma/client'
 import { formatWhatsAppNumber } from '@/lib/utils'
 import { NotificationService } from '@/lib/notification-service'
 import { WhatsAppTriggerService } from '@/lib/whatsapp-trigger'
-import { BLOCKED_DATE_ERROR, isIntervalBlocked } from '@/lib/schedule-blocks'
+import {
+  BLOCKED_DATE_ERROR,
+  PROFESSIONAL_BLOCKED_ERROR,
+  blocksForProfessional,
+  isIntervalBlocked,
+} from '@/lib/schedule-blocks'
 import { DEFAULT_TIMEZONE, calendarDateInZone } from '@/lib/timezone'
 
 const OPEN_APPOINTMENT_STATUSES: AppointmentStatus[] = ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS']
@@ -160,7 +165,7 @@ export async function resolveProfessionalForBooking(params: {
     where: { id: scheduleId, userId },
     select: {
       professionals: { select: { professionalId: true } },
-      blocks: { select: { startDate: true, endDate: true, isAllDay: true } },
+      blocks: { select: { startDate: true, endDate: true, isAllDay: true, professionalId: true } },
       user: { select: { businessConfig: { select: { timezone: true } } } },
     },
   })
@@ -171,22 +176,28 @@ export async function resolveProfessionalForBooking(params: {
   // Bloqueio de data vale para TODO novo agendamento, inclusive encaixe — por
   // isso roda antes de qualquer checagem de conflito e ignora `allowOverbook`.
   const timeZone = schedule.user.businessConfig?.timezone || DEFAULT_TIMEZONE
-  if (
+  const dateStr = calendarDateInZone(date, timeZone)
+  const blockedFor = (professionalId: string | null) =>
     isIntervalBlocked({
-      dateStr: calendarDateInZone(date, timeZone),
+      dateStr,
       start: date,
       durationMinutes: duration,
-      blocks: schedule.blocks,
+      blocks: blocksForProfessional(schedule.blocks, professionalId),
     })
-  ) {
+  if (blockedFor(null)) {
     return { professionalId: null, hadConflict: false, error: BLOCKED_DATE_ERROR }
   }
 
-  const linkedIds = schedule.professionals.map((p) => p.professionalId)
+  const allLinkedIds = schedule.professionals.map((p) => p.professionalId)
+  // Bloqueio pessoal tira só o profissional dele: os colegas seguem recebendo.
+  const linkedIds = allLinkedIds.filter((id) => !blockedFor(id))
 
   if (requestedProfessionalId) {
-    if (!linkedIds.includes(requestedProfessionalId)) {
+    if (!allLinkedIds.includes(requestedProfessionalId)) {
       return { professionalId: null, hadConflict: false, error: 'Profissional não vinculado a esta agenda' }
+    }
+    if (!linkedIds.includes(requestedProfessionalId)) {
+      return { professionalId: null, hadConflict: false, error: PROFESSIONAL_BLOCKED_ERROR }
     }
     // Mesmo em encaixe a checagem roda — não pra bloquear, mas pra registrar se
     // o horário estava realmente ocupado (`isOverbooked`).
@@ -199,12 +210,17 @@ export async function resolveProfessionalForBooking(params: {
 
   // Agenda legada sem nenhum profissional vinculado: mantém o comportamento
   // histórico (sem atribuição, conflito checado pra agenda inteira).
-  if (linkedIds.length === 0) {
+  if (allLinkedIds.length === 0) {
     const conflict = await checkBookingConflict({ scheduleId, date, duration, tx })
     if (conflict && !allowOverbook) {
       return { professionalId: null, hadConflict: true, error: 'Este horário acabou de ficar indisponível' }
     }
     return { professionalId: null, hadConflict: conflict }
+  }
+
+  // Todos os vinculados estão com bloqueio pessoal nesse período.
+  if (linkedIds.length === 0) {
+    return { professionalId: null, hadConflict: false, error: PROFESSIONAL_BLOCKED_ERROR }
   }
 
   for (const id of linkedIds) {

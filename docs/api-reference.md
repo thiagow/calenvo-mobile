@@ -143,16 +143,33 @@ Cria o mesmo bloqueio em uma ou mais agendas do tenant (usado pelo botão "Bloqu
 **Body** (dia inteiro **ou** faixa de horário):
 ```typescript
 // Dia inteiro — endDate opcional (omitido = um dia só), inclusivo
-{ scheduleIds: string[], isAllDay: true, startDate: 'YYYY-MM-DD', endDate?: 'YYYY-MM-DD', reason?: string, confirmConflicts?: boolean }
+{ scheduleIds: string[], isAllDay: true, startDate: 'YYYY-MM-DD', endDate?: 'YYYY-MM-DD', reason?: string, confirmConflicts?: boolean, confirmOverlaps?: boolean }
 
 // Faixa de horário num único dia — horários no fuso do negócio
-{ scheduleIds: string[], isAllDay: false, date: 'YYYY-MM-DD', startTime: 'HH:mm', endTime: 'HH:mm', reason?: string, confirmConflicts?: boolean }
+{ scheduleIds: string[], isAllDay: false, date: 'YYYY-MM-DD', startTime: 'HH:mm', endTime: 'HH:mm', reason?: string, confirmConflicts?: boolean, confirmOverlaps?: boolean }
 ```
 
-**Response**: `201 { success, schedulesCount, groupId, conflictingAppointments }`, ou `409 BLOCK_HAS_APPOINTMENTS` se já houver agendamentos no período (reenviar com `confirmConflicts: true`; os agendamentos são mantidos).
+**Response**: `201 { success, schedulesCount, groupId, conflictingAppointments }`, ou `409 BLOCK_OVERLAPS_EXISTING` se já existir bloqueio cobrindo parte do período nas agendas-alvo (`overlapping[]`, um item por período/grupo; reenviar com `confirmOverlaps: true` — sobrepor faz o dia continuar fechado mesmo depois de apagar um deles), ou `409 BLOCK_HAS_APPOINTMENTS` se já houver agendamentos no período (reenviar com `confirmConflicts: true`; os agendamentos são mantidos). A sobreposição é checada primeiro.
+
+**Papéis** (todas as rotas de bloqueio usam `getSessionScope`): o administrador (MASTER) cria bloqueios da agenda inteira e gerencia todos. O **PROFESSIONAL** cria bloqueios **pessoais**: o servidor grava `professionalId` = quem está logado (nunca vem do corpo), só nas agendas em que ele está vinculado (outra ⇒ 404), sempre com `groupId` (mesmo com 1 agenda). Bloqueio pessoal fecha só aquele profissional (os colegas seguem atendendo); só quando **todos** os vinculados estão bloqueados o dia fica fechado. Profissional vê os da agenda inteira (para entender o dia fechado) mas só remove/edita os próprios (outro ⇒ 403).
+
+### `GET /api/schedule-blocks`
+Bloqueios **gerais** (2+ agendas) e **pessoais de profissional** do tenant: `{ groups: [{ groupId, firstDay, lastDay, startTime, endTime, isAllDay, reason, isPast, professional, canManage, schedules[], missingSchedules[] }] }`. `professional` = `{ id, name }` ou `null` (agenda inteira). `canManage` = quem consulta pode remover/estender. `missingSchedules` são as agendas que ficaram fora do grupo (ex.: criadas depois; para bloqueio pessoal, só as vinculadas ao profissional) e vêm vazias quando `canManage` é falso. Alimenta o diálogo **Bloqueios gerais** (Agendas) e a página **Meus bloqueios** (profissional).
+
+### `DELETE /api/schedule-blocks/[groupId]`
+Remove o bloqueio geral inteiro (todas as agendas do grupo, escopado ao tenant). Idempotente: grupo inexistente ⇒ `200 { success: true, removed: 0 }`.
+
+### `POST /api/schedule-blocks/[groupId]`
+Body `{ scheduleIds: string[] }`: estende o bloqueio geral às agendas do tenant que ainda não estão no grupo (copia período e motivo). `404` se o grupo não é do tenant.
 
 ### `GET /api/schedules/[id]/blocks`
-Lista os bloqueios da agenda. Cada item traz, além do `ScheduleBlock`, `firstDay`/`lastDay` (`YYYY-MM-DD`), `startTime`/`endTime` (`HH:mm`, só faixa) no fuso do negócio e `groupSize`.
+`{ blocks, generalBlocksCount }`. `blocks`: só os bloqueios **desta agenda** (sem grupo, ou grupo que sobrou com 1 bloco), cada um com `firstDay`/`lastDay` (`YYYY-MM-DD`), `startTime`/`endTime` (`HH:mm`, só faixa) no fuso do negócio e `isPast`. `generalBlocksCount`: bloqueios gerais ainda vigentes que também fecham esta agenda (a aba mostra um aviso apontando para Agendas → Bloqueios gerais).
+
+### `PUT /api/schedules/[id]/blocks/[blockId]`
+Edita um bloqueio. `409` se ele pertence a um bloqueio de várias agendas (remover e criar de novo).
+
+### `DELETE /api/schedules/[id]/blocks/[blockId]`
+Remove um bloqueio (`?scope=all` remove o grupo inteiro). `404` se já não existe — o cliente trata como sucesso e recarrega a lista.
 
 ### `POST /api/schedules/[id]/blocks`
 Igual ao `POST /api/schedule-blocks` para uma agenda, sem `scheduleIds`; `applyToAll: true` aplica a todas as agendas do tenant.

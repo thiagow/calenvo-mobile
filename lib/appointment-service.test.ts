@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // paralelo.
 let mockAppointments: any[] = []
 let mockCandidateScheduleIds: string[] = ['schedule-1']
-let mockBlocksBySchedule: Record<string, { startDate: Date; endDate: Date }[]> = {}
+let mockBlocksBySchedule: Record<string, { startDate: Date; endDate: Date; isAllDay?: boolean; professionalId?: string | null }[]> = {}
 let mockProfessionalsBySchedule: Record<string, { professionalId: string }[]> = {
   'schedule-1': [{ professionalId: 'p1' }, { professionalId: 'p2' }, { professionalId: 'p3' }],
 }
@@ -225,6 +225,50 @@ describe('resolveProfessionalForBooking', () => {
       const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date: bookingDate, duration, requestedProfessionalId: 'p2' })
 
       expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
+    })
+
+    describe('bloqueio pessoal de profissional', () => {
+      const personal = (professionalId: string) => ({
+        startDate: new Date('2099-01-01T00:00:00.000Z'),
+        endDate: new Date('2099-01-01T00:00:00.000Z'),
+        isAllDay: true,
+        professionalId,
+      })
+
+      it('profissional pedido com bloqueio pessoal: recusa, mesmo em encaixe', async () => {
+        mockBlocksBySchedule = { 'schedule-1': [personal('p2')] }
+        const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+        const { PROFESSIONAL_BLOCKED_ERROR } = await import('@/lib/schedule-blocks')
+
+        const result = await resolveProfessionalForBooking({
+          scheduleId, userId: TENANT_ID, date: bookingDate, duration, requestedProfessionalId: 'p2', allowOverbook: true,
+        })
+
+        expect(result.professionalId).toBeNull()
+        expect(result.error).toBe(PROFESSIONAL_BLOCKED_ERROR)
+      })
+
+      it('sem preferência: pula o bloqueado e atribui um colega livre', async () => {
+        mockBlocksBySchedule = { 'schedule-1': [personal('p1')] }
+        const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+
+        const result = await resolveProfessionalForBooking({ scheduleId, userId: TENANT_ID, date: bookingDate, duration })
+
+        expect(result).toEqual({ professionalId: 'p2', hadConflict: false })
+      })
+
+      it('todos os vinculados com bloqueio pessoal: recusa', async () => {
+        mockBlocksBySchedule = { 'schedule-1': [personal('p1'), personal('p2'), personal('p3')] }
+        const { resolveProfessionalForBooking } = await import('@/lib/appointment-service')
+        const { PROFESSIONAL_BLOCKED_ERROR } = await import('@/lib/schedule-blocks')
+
+        const result = await resolveProfessionalForBooking({
+          scheduleId, userId: TENANT_ID, date: bookingDate, duration, allowOverbook: true,
+        })
+
+        expect(result.professionalId).toBeNull()
+        expect(result.error).toBe(PROFESSIONAL_BLOCKED_ERROR)
+      })
     })
 
     it('respeita o fuso do negócio: 01:30Z do dia 02 ainda é dia 01 em São Paulo', async () => {

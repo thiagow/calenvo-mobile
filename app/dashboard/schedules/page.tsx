@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
 import { BackButton } from '@/components/dashboard/back-button'
 import { CreateBlockDialog } from '@/components/schedule/create-block-dialog'
+import { GeneralBlocksDialog } from '@/components/schedule/general-blocks-dialog'
 
 interface Schedule {
   id: string; name: string; description: string | null; color: string
@@ -28,6 +29,12 @@ export default function SchedulesPage() {
   const { confirm } = useDialog()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
+  const [generalBlocksOpen, setGeneralBlocksOpen] = useState(false)
+
+  // Link da aba de bloqueios de uma agenda ("Ver bloqueios gerais") abre o diálogo direto.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('bloqueios') === 'gerais') setGeneralBlocksOpen(true)
+  }, [])
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -57,7 +64,15 @@ export default function SchedulesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <BackButton />
-        {schedules.length > 0 && <CreateBlockDialog />}
+        {schedules.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setGeneralBlocksOpen(true)}>
+              <Layers className="h-4 w-4 mr-1.5" />
+              Bloqueios gerais
+            </Button>
+            <CreateBlockDialog />
+          </div>
+        )}
       </div>
       {schedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
@@ -125,6 +140,8 @@ export default function SchedulesPage() {
           ))}
         </div>
       )}
+
+      <GeneralBlocksDialog open={generalBlocksOpen} onOpenChange={setGeneralBlocksOpen} />
 
       {/* FAB */}
       <button

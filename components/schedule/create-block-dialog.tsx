@@ -29,6 +29,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useUserRole } from '@/hooks/use-user-role'
+import { formatBlockPeriod, type BlockPeriod } from './format-block-period'
 
 export interface BlockableSchedule {
   id: string
@@ -43,6 +45,11 @@ interface BlockConflictInfo {
   sample: { date: string; clientName: string; serviceName: string }[]
 }
 
+interface BlockOverlapInfo {
+  overlappingTotal: number
+  overlapping: (BlockPeriod & { key: string; reason: string | null; scheduleNames: string[] })[]
+}
+
 interface CreateBlockDialogProps {
   onCreated?: () => void
 }
@@ -50,6 +57,7 @@ interface CreateBlockDialogProps {
 const EMPTY_FORM = { startDate: '', endDate: '', date: '', startTime: '', endTime: '', reason: '', isAllDay: true }
 
 export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
+  const { isProfessional } = useUserRole()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -58,6 +66,9 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [conflict, setConflict] = useState<BlockConflictInfo | null>(null)
+  const [overlap, setOverlap] = useState<BlockOverlapInfo | null>(null)
+  // Sobreposição já confirmada pelo dono: vale para o reenvio que segue o aviso de agendamentos.
+  const [overlapConfirmed, setOverlapConfirmed] = useState(false)
 
   const allSelected = schedules.length > 0 && selectedIds.length === schedules.length
 
@@ -78,9 +89,17 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
       setForm(EMPTY_FORM)
       setSelectedIds([])
       setConflict(null)
+      setOverlap(null)
+      setOverlapConfirmed(false)
       fetch('/api/schedules?includeInactive=true')
         .then((res) => (res.ok ? res.json() : []))
-        .then((data) => setSchedules(Array.isArray(data) ? data : []))
+        .then((data) => {
+          const list: BlockableSchedule[] = Array.isArray(data) ? data : []
+          setSchedules(list)
+          // Profissional bloqueia o próprio tempo: por padrão em todas as agendas dele
+          // (senão continuaria reservável por uma agenda que ele esqueceu de marcar).
+          if (isProfessional) setSelectedIds(list.map((s) => s.id))
+        })
         .catch(() => toast.error('Erro ao carregar agendas'))
     }
   }
@@ -98,7 +117,7 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
     return null
   }
 
-  const submit = async (confirmConflicts: boolean) => {
+  const submit = async ({ confirmConflicts, confirmOverlaps }: { confirmConflicts: boolean; confirmOverlaps: boolean }) => {
     setLoading(true)
     try {
       const period = form.isAllDay
@@ -108,9 +127,22 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
       const response = await fetch('/api/schedule-blocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...period, reason: form.reason, scheduleIds: selectedIds, confirmConflicts }),
+        body: JSON.stringify({
+          ...period,
+          reason: form.reason,
+          scheduleIds: selectedIds,
+          confirmConflicts,
+          confirmOverlaps,
+        }),
       })
       const data = await response.json().catch(() => ({}))
+
+      // Já existe bloqueio cobrindo o período: nada foi criado. Sobrepor faz o dia
+      // continuar fechado mesmo depois de apagar um deles.
+      if (response.status === 409 && data.code === 'BLOCK_OVERLAPS_EXISTING') {
+        setOverlap(data as BlockOverlapInfo)
+        return
+      }
 
       // Já existem agendamentos no período: nada foi criado ainda. Pede
       // confirmação ao dono antes de concluir (os existentes serão mantidos).
@@ -123,6 +155,7 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
       const count = data.schedulesCount ?? selectedIds.length
       toast.success(count > 1 ? `Bloqueio criado em ${count} agendas!` : 'Bloqueio criado com sucesso!')
       setConflict(null)
+      setOverlap(null)
       setOpen(false)
       onCreated?.()
     } catch (error) {
@@ -139,7 +172,14 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
       toast.error(problem)
       return
     }
-    await submit(false)
+    setOverlapConfirmed(false)
+    await submit({ confirmConflicts: false, confirmOverlaps: false })
+  }
+
+  const confirmOverlapAndSubmit = async () => {
+    setOverlap(null)
+    setOverlapConfirmed(true)
+    await submit({ confirmConflicts: false, confirmOverlaps: true })
   }
 
   return (
@@ -222,8 +262,9 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
                 </PopoverContent>
               </Popover>
               <p className="text-xs text-muted-foreground">
-                Ninguém poderá agendar nestas datas (painel, página pública e chat). Agendamentos já marcados são
-                mantidos.
+                {isProfessional
+                  ? 'Você não poderá receber agendamentos nestas datas (painel, página pública e chat); seus colegas continuam disponíveis. Agendamentos já marcados são mantidos.'
+                  : 'Ninguém poderá agendar nestas datas (painel, página pública e chat). Agendamentos já marcados são mantidos.'}
               </p>
             </div>
 
@@ -260,7 +301,7 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
                   />
                 </div>
                 <p className="sm:col-span-2 -mt-1 text-xs text-muted-foreground">
-                  Deixe o término em branco para bloquear apenas um dia.
+                  O último dia também fica bloqueado. Deixe o término em branco para bloquear apenas um dia.
                 </p>
               </div>
             ) : (
@@ -358,8 +399,54 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
             <Button variant="outline" onClick={() => setConflict(null)} disabled={loading}>
               Cancelar
             </Button>
-            <Button onClick={() => submit(true)} disabled={loading}>
+            <Button onClick={() => submit({ confirmConflicts: true, confirmOverlaps: overlapConfirmed })} disabled={loading}>
               {loading ? 'Criando...' : 'Bloquear mesmo assim'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Já existe bloqueio no período: avisar antes de sobrepor */}
+      <Dialog open={overlap !== null} onOpenChange={(next) => !next && setOverlap(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Já existe bloqueio neste período
+            </DialogTitle>
+            <DialogDescription>
+              {overlap?.overlappingTotal === 1 ? 'Este bloqueio já cobre' : 'Estes bloqueios já cobrem'} parte do
+              período escolhido. Se você criar outro por cima, ao remover um deles o dia continuará fechado pelo outro.
+            </DialogDescription>
+          </DialogHeader>
+
+          {overlap && (
+            <ul className="space-y-2 rounded-md border p-3 text-sm">
+              {overlap.overlapping.map((item) => (
+                <li key={item.key} className="space-y-0.5">
+                  <div className="font-medium">{formatBlockPeriod(item)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.reason ? `${item.reason} · ` : ''}
+                    {item.scheduleNames.length === 1
+                      ? item.scheduleNames[0]
+                      : `${item.scheduleNames.length} agendas`}
+                  </div>
+                </li>
+              ))}
+              {overlap.overlappingTotal > overlap.overlapping.length && (
+                <li className="text-xs text-muted-foreground">
+                  e mais {overlap.overlappingTotal - overlap.overlapping.length}…
+                </li>
+              )}
+            </ul>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setOverlap(null)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmOverlapAndSubmit} disabled={loading}>
+              {loading ? 'Criando...' : 'Criar mesmo assim'}
             </Button>
           </div>
         </DialogContent>

@@ -252,7 +252,7 @@ async function getAvailability(scheduleId: string, date: Date) {
 ```
 
 ### Criar Bloqueio
-Criado pelo botão **Bloqueio de Períodos** na página de Agendas (combobox com "Todas as agendas" ou uma seleção de agendas). A aba "Bloqueios" da agenda só exibe e remove.
+Criado pelo botão **Bloqueio de Períodos** na página de Agendas (combobox com "Todas as agendas" ou uma seleção de agendas). A aba "Bloqueios" da agenda mostra e remove apenas os bloqueios **daquela** agenda; os criados para várias agendas ficam no botão **Bloqueios gerais** (mesma página), onde a remoção vale para todas as agendas do grupo e dá para "Aplicar também" às agendas que ficaram de fora. A aba exibe um aviso com a contagem de bloqueios gerais que também a fecham. O **profissional** não acessa Agendas: ele usa **Mais → Meus bloqueios** (`/dashboard/bloqueios`), cria bloqueios pessoais (por padrão em todas as agendas dele) que fecham só ele — a grade (`getAvailableSlots`), o agendamento (`resolveProfessionalForBooking`) e o reagendamento respeitam isso por profissional, igual à ocupação. Criar por cima de um bloqueio existente exige confirmação (`BLOCK_OVERLAPS_EXISTING`), e blocos encerrados ficam ocultos por padrão.
 
 ```typescript
 // Dia inteiro (sem endDate = um dia só) ou período

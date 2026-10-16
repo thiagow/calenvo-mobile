@@ -89,7 +89,7 @@ async function main() {
       console.log(`   bloqueios que tocam o dia: ${covering.length}`)
       for (const b of covering) {
         console.log(
-          `     • ${b.id} isAllDay=${b.isAllDay} ${b.startDate.toISOString()} → ${b.endDate.toISOString()} group=${b.groupId ?? '-'} motivo=${b.reason ?? '-'}`
+          `     • ${b.id} isAllDay=${b.isAllDay} ${b.startDate.toISOString()} → ${b.endDate.toISOString()} group=${b.groupId ?? '-'} profissional=${b.professionalId ?? 'agenda inteira'} motivo=${b.reason ?? '-'}`
         )
       }
 

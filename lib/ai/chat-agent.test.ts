@@ -41,9 +41,11 @@ vi.mock('@/lib/appointment-service', () => ({
 }))
 
 const getAvailableSlotsForServiceMock = vi.fn(async () => [{ time: '10:00', available: true }])
+const getNoSlotsReasonForServiceMock = vi.fn(async () => null as null | { code: string; message: string; publicMessage: string })
 
 vi.mock('@/lib/availability-service', () => ({
   getAvailableSlotsForService: getAvailableSlotsForServiceMock,
+  getNoSlotsReasonForService: getNoSlotsReasonForServiceMock,
   parseCalendarDate: (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number)
     return new Date(year, month - 1, day)
@@ -120,6 +122,23 @@ describe('executeTool: check_availability', () => {
     expect(getAvailableSlotsForServiceMock).toHaveBeenCalledWith(
       expect.objectContaining({ serviceId: 'service-1', date: '2099-01-01', userId: tenant.id })
     )
+    // Com horário livre não gasta consulta extra para explicar nada
+    expect(getNoSlotsReasonForServiceMock).not.toHaveBeenCalled()
+  })
+
+  it('sem horário livre: devolve o motivo seguro para o cliente (nunca o interno)', async () => {
+    const { executeTool } = await import('@/lib/ai/chat-agent')
+    getAvailableSlotsForServiceMock.mockResolvedValueOnce([])
+    getNoSlotsReasonForServiceMock.mockResolvedValueOnce({
+      code: 'DAY_BLOCKED',
+      message: 'Dia bloqueado na agenda (VIAGEM)',
+      publicMessage: 'Não haverá atendimento nesta data',
+    })
+
+    const result = await executeTool('check_availability', { serviceId: 'service-1', date: '2099-01-01' }, tenant)
+
+    expect(result).toEqual({ slots: [], reason: 'Não haverá atendimento nesta data', reasonCode: 'DAY_BLOCKED' })
+    expect(JSON.stringify(result)).not.toContain('VIAGEM')
   })
 })
 

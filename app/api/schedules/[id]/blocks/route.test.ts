@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => ({ user: { id: 'tenant-a' } })) }))
+const { sessionMock } = vi.hoisted(() => ({ sessionMock: vi.fn() }))
+vi.mock('next-auth', () => ({ getServerSession: sessionMock }))
+
+const MASTER = { user: { id: 'tenant-a', role: 'MASTER' } }
+const PROFESSIONAL = { user: { id: 'pro-1', role: 'PROFESSIONAL', masterId: 'tenant-a' } }
 vi.mock('@/lib/auth-options', () => ({ authOptions: {} }))
 
 let mockSchedules: { id: string; userId: string }[] = []
 let mockOpenAppointments: any[] = []
+let mockStoredBlocks: any[] = []
+let mockGroupSizes: { groupId: string; _count: { _all: number } }[] = []
 const { createManyMock, appointmentWriteMock } = vi.hoisted(() => ({
   createManyMock: vi.fn(async ({ data }: { data: unknown[] }) => ({ count: data.length })),
   appointmentWriteMock: vi.fn(),
@@ -28,11 +34,15 @@ vi.mock('@/lib/db', () => ({
       delete: appointmentWriteMock,
       deleteMany: appointmentWriteMock,
     },
-    scheduleBlock: { createMany: createManyMock, findMany: vi.fn(async () => []) },
+    scheduleBlock: {
+      createMany: createManyMock,
+      findMany: vi.fn(async () => mockStoredBlocks),
+      groupBy: vi.fn(async () => mockGroupSizes),
+    },
   },
 }))
 
-import { POST } from './route'
+import { GET, POST } from './route'
 
 const body = { startDate: '2026-12-24', endDate: '2026-12-26', reason: 'Natal', isAllDay: true }
 
@@ -47,6 +57,7 @@ function post(extra: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  sessionMock.mockResolvedValue(MASTER)
   mockSchedules = [
     { id: 's1', userId: 'tenant-a' },
     { id: 's2', userId: 'tenant-a' },
@@ -54,8 +65,87 @@ beforeEach(() => {
     { id: 'outro', userId: 'tenant-b' },
   ]
   mockOpenAppointments = []
+  mockStoredBlocks = []
+  mockGroupSizes = []
   createManyMock.mockClear()
   appointmentWriteMock.mockClear()
+})
+
+describe('GET /api/schedules/[id]/blocks', () => {
+  const stored = (id: string, groupId: string | null, start: string, end: string) => ({
+    id,
+    scheduleId: 's1',
+    groupId,
+    reason: null,
+    isAllDay: true,
+    startDate: new Date(`${start}T00:00:00.000Z`),
+    endDate: new Date(`${end}T00:00:00.000Z`),
+  })
+  const get = () => GET(new NextRequest('http://localhost/api/schedules/s1/blocks'), { params: { id: 's1' } })
+
+  it('lista só os bloqueios da própria agenda; os gerais viram contagem', async () => {
+    mockStoredBlocks = [
+      stored('own', null, '2099-01-10', '2099-01-12'),
+      stored('geral', 'g1', '2099-02-01', '2099-02-03'),
+      stored('solo', 'g-solo', '2099-03-01', '2099-03-01'),
+    ]
+    mockGroupSizes = [
+      { groupId: 'g1', _count: { _all: 13 } },
+      { groupId: 'g-solo', _count: { _all: 1 } },
+    ]
+
+    const json = await (await get()).json()
+
+    expect(json.blocks.map((b: { id: string }) => b.id)).toEqual(['own', 'solo'])
+    expect(json.blocks[0]).toMatchObject({ firstDay: '2099-01-10', lastDay: '2099-01-12', isPast: false, groupId: null })
+    expect(json.generalBlocksCount).toBe(1)
+  })
+
+  it('bloqueio geral já encerrado não entra na contagem do aviso', async () => {
+    mockStoredBlocks = [stored('velho', 'g1', '2020-01-01', '2020-01-02')]
+    mockGroupSizes = [{ groupId: 'g1', _count: { _all: 13 } }]
+
+    expect((await (await get()).json()).generalBlocksCount).toBe(0)
+  })
+})
+
+describe('sobreposição na criação', () => {
+  it('período já coberto por outro bloqueio: 409 BLOCK_OVERLAPS_EXISTING e NADA é criado', async () => {
+    mockStoredBlocks = [
+      {
+        id: 'velho',
+        groupId: null,
+        reason: 'Curso',
+        isAllDay: true,
+        startDate: new Date('2026-12-24T00:00:00.000Z'),
+        endDate: new Date('2026-12-25T00:00:00.000Z'),
+        schedule: { name: 'Corte' },
+      },
+    ]
+    const res = await post()
+    const json = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(json.code).toBe('BLOCK_OVERLAPS_EXISTING')
+    expect(json.overlapping[0]).toMatchObject({ firstDay: '2026-12-24', lastDay: '2026-12-25', reason: 'Curso' })
+    expect(createManyMock).not.toHaveBeenCalled()
+  })
+
+  it('com confirmOverlaps cria normalmente', async () => {
+    mockStoredBlocks = [
+      {
+        id: 'velho',
+        groupId: null,
+        reason: null,
+        isAllDay: true,
+        startDate: new Date('2026-12-24T00:00:00.000Z'),
+        endDate: new Date('2026-12-25T00:00:00.000Z'),
+        schedule: { name: 'Corte' },
+      },
+    ]
+    expect((await post({ confirmOverlaps: true })).status).toBe(201)
+    expect(createManyMock).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('POST /api/schedules/[id]/blocks', () => {

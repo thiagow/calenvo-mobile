@@ -44,6 +44,7 @@ export default function NewAppointmentPage() {
   const [availableServices, setAvailableServices] = useState<any[]>([])
   const [availableProfessionals, setAvailableProfessionals] = useState<any[]>([])
   const [availableTimeSlots, setAvailableTimeSlots] = useState<any[]>([])
+  const [noSlotsReason, setNoSlotsReason] = useState<string | null>(null)
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [allowsMultipleProfessionals, setAllowsMultipleProfessionals] = useState(false)
   const [canOverbook, setCanOverbook] = useState(false)
@@ -114,7 +115,7 @@ export default function NewAppointmentPage() {
       if (formData.professionalId) params.append('professionalId', formData.professionalId)
       fetch(`/api/appointments/available-slots?${params}`)
         .then(r => r.ok ? r.json() : null)
-        .then(d => setAvailableTimeSlots(d?.slots || []))
+        .then(d => { setAvailableTimeSlots(d?.slots || []); setNoSlotsReason(d?.reason?.message ?? null) })
         .catch(() => toast.error('Erro ao carregar horários'))
         .finally(() => setLoadingSlots(false))
     } else { setAvailableTimeSlots([]) }
@@ -374,7 +375,7 @@ export default function NewAppointmentPage() {
               ) : availableSlots.length === 0 ? (
                 <div className="mt-1 flex items-center gap-2 text-xs text-amber-600 bg-amber-500/10 rounded-lg px-3 py-2.5">
                   <AlertCircle className="h-3.5 w-3.5" />
-                  Nenhum horário disponível nesta data
+                  {noSlotsReason ? `Nenhum horário disponível: ${noSlotsReason}` : 'Nenhum horário disponível nesta data'}
                 </div>
               ) : (
                 <div className="mt-1 grid grid-cols-4 gap-1.5">
