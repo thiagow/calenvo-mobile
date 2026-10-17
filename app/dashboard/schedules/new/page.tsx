@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Save } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomDayConfig, type DayConfig } from '@/components/schedule/custom-day-config'
+import { SlotSettingsCard } from '@/components/schedule/slot-settings-card'
 
 const COLORS = [
   { value: '#3B82F6', label: 'Azul' },
@@ -53,6 +54,8 @@ export default function NewSchedulePage() {
     description: '',
     color: '#3B82F6',
     bufferTime: 0,
+    startInterval: 30,
+    smartScheduling: true,
     advanceBookingDays: 90,
     minNoticeHours: 2,
     selectedServices: [] as string[],
@@ -143,6 +146,8 @@ export default function NewSchedulePage() {
           color: formData.color,
           workingDays: activeDays,
           bufferTime: formData.bufferTime,
+          startInterval: formData.startInterval,
+          smartScheduling: formData.smartScheduling,
           advanceBookingDays: formData.advanceBookingDays,
           minNoticeHours: formData.minNoticeHours,
           serviceIds: formData.selectedServices,
@@ -372,6 +377,12 @@ export default function NewSchedulePage() {
             </div>
           </CardContent>
         </Card>
+
+        <SlotSettingsCard
+          startInterval={formData.startInterval}
+          smartScheduling={formData.smartScheduling}
+          onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+        />
 
         <div className="flex justify-end gap-4 sticky bottom-0 bg-white py-4 border-t">
           <Button type="button" variant="outline" onClick={() => router.back()}>

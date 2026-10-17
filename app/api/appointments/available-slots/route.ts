@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
       date,
       userId: schedule.userId,
       ignoreAdvanceWindow: true,
+      // Painel mostra todos os inícios válidos; o filtro inteligente é para o cliente final.
+      ignoreSmartScheduling: true,
       ...(professionalId && { professionalId }),
     }
     const slots = await getAvailableSlots({ ...slotParams, serviceId })

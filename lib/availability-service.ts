@@ -201,6 +201,51 @@ export async function getNoSlotsReason(params: {
   )
 }
 
+/** Intervalo em minutos desde 00:00 do dia do negócio (pode ser negativo/maior que 1440 para compromissos que cruzam o dia). */
+export interface MinuteInterval {
+  start: number
+  end: number
+}
+
+/**
+ * Agendamento inteligente (função pura): o serviço em [start, end) deixa uma "sobra órfã" —
+ * vão livre menor que o menor serviço da agenda, que ninguém consegue preencher — antes ou
+ * depois dele? As sobras são medidas até o compromisso/bloqueio/almoço vizinho ou até a borda
+ * do expediente.
+ *
+ * Mantém o início quando não há sobra órfã, ou quando ele encosta numa borda (sobra 0 de um
+ * lado): aí o resto do vão é inevitável e nunca se esconde um vão onde o serviço cabe. Só
+ * esconde o que deixa sobra órfã dos DOIS lados (ex.: vão de 180 min, serviço de 120, passo
+ * de 30: mantém +0 e +60, esconde +30).
+ */
+export function isSmartStart(params: {
+  start: number
+  end: number
+  /** Expediente do dia, em minutos. */
+  windows: MinuteInterval[]
+  /** Tempo ocupado (agendamentos já com a folga, faixas bloqueadas, almoço). */
+  busy: MinuteInterval[]
+  /** Duração do menor serviço da agenda. */
+  minServiceMinutes: number
+}): boolean {
+  const { start, end, windows, busy, minServiceMinutes } = params
+  const window = windows.find((w) => start >= w.start && end <= w.end)
+  if (!window) return true // fora de qualquer expediente conhecido: não é papel deste filtro
+
+  let before = window.start
+  let after = window.end
+  for (const b of busy) {
+    if (b.end <= start && b.end > before) before = b.end
+    if (b.start >= end && b.start < after) after = b.start
+  }
+
+  const gapBefore = start - before
+  const gapAfter = after - end
+  const orphan = (gap: number) => gap > 0 && gap < minServiceMinutes
+  if (!orphan(gapBefore) && !orphan(gapAfter)) return true
+  return gapBefore === 0 || gapAfter === 0
+}
+
 /** Do mais ao menos útil para o cliente quando várias agendas do serviço estão sem horário. */
 const REASON_PRIORITY: NoSlotsCode[] = [
   'FULLY_BOOKED',
@@ -278,8 +323,14 @@ export async function getAvailableSlots(params: {
    * a criação pelo painel nunca a aplicou — só a grade, por compartilhar este motor.
    */
   ignoreAdvanceWindow?: boolean
+  /**
+   * Mostra todos os inícios válidos, sem o filtro do agendamento inteligente. Só para a tela
+   * interna do painel: a equipe conhece o contexto e pode preencher qualquer vão (há também o
+   * "encaixe"). Página pública e chat sempre aplicam a regra da agenda.
+   */
+  ignoreSmartScheduling?: boolean
 }): Promise<AvailabilitySlot[] | null> {
-  const { scheduleId, serviceId, date: dateStr, userId, professionalId, ignoreAdvanceWindow } = params
+  const { scheduleId, serviceId, date: dateStr, userId, professionalId, ignoreAdvanceWindow, ignoreSmartScheduling } = params
 
   const schedule = await prisma.schedule.findFirst({
     where: { id: scheduleId, userId },
@@ -321,6 +372,9 @@ export async function getAvailableSlots(params: {
 
   const slots: AvailabilitySlot[] = []
   const serviceDuration = service.duration || schedule.slotDuration
+  // Passo entre inícios oferecidos: fixo (15/30/60) ou, com 0, a duração do serviço + folga (grade antiga).
+  const startInterval = schedule.startInterval ?? 0
+  const gridStep = startInterval > 0 ? startInterval : serviceDuration + (schedule.bufferTime || 0)
 
   for (const workHour of workingHours) {
     const [startHour, startMinute] = workHour.startTime.split(':').map(Number)
@@ -349,7 +403,7 @@ export async function getAvailableSlots(params: {
         slots.push({ time: timeStr, available: true })
       }
 
-      currentMinutes += serviceDuration + (schedule.bufferTime || 0)
+      currentMinutes += gridStep
     }
   }
 
@@ -430,6 +484,38 @@ export async function getAvailableSlots(params: {
 
   const minBookingTime = new Date(now.getTime() + schedule.minNoticeHours * 60 * 60 * 1000)
 
+  // Agendamento inteligente: esconde inícios que deixariam vãos menores que o menor serviço
+  // da agenda (`slotDuration` é derivado como o menor `duration` dos serviços vinculados).
+  const smartEnabled = Boolean(schedule.smartScheduling) && !ignoreSmartScheduling
+  const minServiceMinutes = Math.min(schedule.slotDuration || serviceDuration, serviceDuration)
+  const windows: MinuteInterval[] = workingHours.map((w) => ({ start: toMinutes(w.startTime), end: toMinutes(w.endTime) }))
+  const busyCache = new Map<string | null, MinuteInterval[]>()
+  // Tempo ocupado de um profissional (null = agenda legada sem profissional): agendamentos
+  // (com a folga dos dois lados), faixas bloqueadas (da agenda e pessoais dele) e almoço.
+  const busyFor = (professional: string | null): MinuteInterval[] => {
+    const cached = busyCache.get(professional)
+    if (cached) return cached
+    const folga = startInterval > 0 ? bufferMinutes : 0
+    const appointments = professional ? appointmentsByProfessional.get(professional) ?? [] : existingAppointments
+    const busy: MinuteInterval[] = appointments.map((apt) => ({
+      start: minutesOfDay(apt.date) - folga,
+      end: minutesOfDay(apt.date) + apt.duration + folga,
+    }))
+    const blocks = professional
+      ? [...wideBlocks, ...professionalOwnBlocks(schedule.blocks, professional)]
+      : wideBlocks
+    for (const block of blocks) {
+      if (block.isAllDay === false) {
+        busy.push({ start: minutesOfDay(new Date(block.startDate)), end: minutesOfDay(new Date(block.endDate)) })
+      }
+    }
+    if (lunchStartMin !== null && lunchEndMin !== null) busy.push({ start: lunchStartMin, end: lunchEndMin })
+    busyCache.set(professional, busy)
+    return busy
+  }
+  const keepsSmartStart = (start: number, busy: MinuteInterval[]) =>
+    isSmartStart({ start, end: start + serviceDuration, windows, busy, minServiceMinutes })
+
   for (const slot of slots) {
     const slotDate = wallTimeToInstant(dateStr, slot.time, timeZone)
 
@@ -444,11 +530,16 @@ export async function getAvailableSlots(params: {
       continue
     }
 
+    const slotStartMin = toMinutes(slot.time)
+    // Com passo fixo (startInterval > 0) a folga entre atendimentos deixa de estar implícita
+    // no passo da grade: passa a ser exigida aqui, dos dois lados do agendamento vizinho.
+    const pad = startInterval > 0 ? bufferMinutes : 0
+
     if (relevantProfessionalIds.length > 0) {
       // Disponível se pelo menos um profissional do conjunto (o pedido, ou
       // todos os vinculados quando "qualquer um") estiver livre nesse slot:
       // sem bloqueio pessoal cobrindo o horário e sem agendamento sobreposto.
-      const someoneFree = relevantProfessionalIds.some((id) => {
+      const freeIds = relevantProfessionalIds.filter((id) => {
         if (
           isIntervalBlocked({
             dateStr,
@@ -460,13 +551,19 @@ export async function getAvailableSlots(params: {
           return false
         }
         const theirAppointments = appointmentsByProfessional.get(id) ?? []
-        return !theirAppointments.some((apt) => overlaps(slotDate, serviceDuration, apt.date, apt.duration))
+        return !theirAppointments.some((apt) => overlaps(slotDate, serviceDuration + pad, apt.date, apt.duration + pad))
       })
-      if (!someoneFree) slot.available = false
+      if (freeIds.length === 0) {
+        slot.available = false
+      } else if (smartEnabled && !freeIds.some((id) => keepsSmartStart(slotStartMin, busyFor(id)))) {
+        // Livre, mas deixaria sobras que ninguém consegue preencher em todos os profissionais livres.
+        slot.available = false
+      }
     } else {
       // Agenda legada sem profissional vinculado: capacidade 1 pra agenda inteira.
-      const occupied = existingAppointments.some((apt) => overlaps(slotDate, serviceDuration, apt.date, apt.duration))
+      const occupied = existingAppointments.some((apt) => overlaps(slotDate, serviceDuration + pad, apt.date, apt.duration + pad))
       if (occupied) slot.available = false
+      else if (smartEnabled && !keepsSmartStart(slotStartMin, busyFor(null))) slot.available = false
     }
   }
 

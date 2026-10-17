@@ -15,6 +15,7 @@ import { ArrowLeft, Save, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { CustomDayConfig, type DayConfig } from '@/components/schedule/custom-day-config'
 import { ScheduleBlocks } from '@/components/schedule/schedule-blocks'
+import { SlotSettingsCard } from '@/components/schedule/slot-settings-card'
 import { ScheduleTabsList } from '@/components/schedule/schedule-tabs-list'
 
 const COLORS = [
@@ -51,6 +52,8 @@ export default function EditSchedulePage() {
     description: '',
     color: '#3B82F6',
     bufferTime: 0,
+    startInterval: 30,
+    smartScheduling: true,
     advanceBookingDays: 90,
     minNoticeHours: 2,
     isActive: true,
@@ -83,6 +86,8 @@ export default function EditSchedulePage() {
           description: scheduleData.description || '',
           color: scheduleData.color,
           bufferTime: scheduleData.bufferTime,
+          startInterval: scheduleData.startInterval ?? 30,
+          smartScheduling: scheduleData.smartScheduling ?? true,
           advanceBookingDays: scheduleData.advanceBookingDays,
           minNoticeHours: scheduleData.minNoticeHours,
           isActive: scheduleData.isActive,
@@ -173,6 +178,8 @@ export default function EditSchedulePage() {
           color: formData.color,
           workingDays: activeDays,
           bufferTime: formData.bufferTime,
+          startInterval: formData.startInterval,
+          smartScheduling: formData.smartScheduling,
           advanceBookingDays: formData.advanceBookingDays,
           minNoticeHours: formData.minNoticeHours,
           isActive: formData.isActive,
@@ -411,6 +418,12 @@ export default function EditSchedulePage() {
                 </div>
               </CardContent>
             </Card>
+
+            <SlotSettingsCard
+              startInterval={formData.startInterval}
+              smartScheduling={formData.smartScheduling}
+              onChange={(next) => setFormData((prev: any) => ({ ...prev, ...next }))}
+            />
 
             <div className="flex justify-end gap-4 sticky bottom-0 bg-white py-4 border-t">
               <Button type="button" variant="outline" onClick={() => router.back()}>

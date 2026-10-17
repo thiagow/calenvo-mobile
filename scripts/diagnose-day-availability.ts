@@ -75,7 +75,7 @@ async function main() {
       )
       console.log(
         `   workingDays=${schedule.workingDays.map((d) => DOW[d]).join(',')} · ${schedule.startTime}-${schedule.endTime} · ` +
-          `customDayConfig=${schedule.useCustomDayConfig} · advance=${schedule.advanceBookingDays}d (até ${addCalendarDays(todayInZone(tz), schedule.advanceBookingDays)}) · minNotice=${schedule.minNoticeHours}h · profissionais=${schedule.professionals.map((p) => p.professional.name).join(', ') || 'nenhum'}`
+          `customDayConfig=${schedule.useCustomDayConfig} · passo=${schedule.startInterval}min inteligente=${schedule.smartScheduling} · advance=${schedule.advanceBookingDays}d (até ${addCalendarDays(todayInZone(tz), schedule.advanceBookingDays)}) · minNotice=${schedule.minNoticeHours}h · profissionais=${schedule.professionals.map((p) => p.professional.name).join(', ') || 'nenhum'}`
       )
       if (schedule.useCustomDayConfig) {
         const cfg = schedule.dayConfigs.find((c) => c.dayOfWeek === dayOfWeekFromDateStr(date))

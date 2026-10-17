@@ -104,10 +104,13 @@ Cria nova agenda.
   startTime: string
   endTime: string
   slotDuration: number
+  startInterval?: 0 | 15 | 30 | 60   // de quanto em quanto tempo oferecer inícios; 0 = igual à duração do serviço (padrão 30)
+  smartScheduling?: boolean          // esconde inícios que deixam vãos curtos demais (padrão true)
   serviceIds?: string[]
   professionalIds?: string[]
 }
 ```
+`startInterval` fora de {0,15,30,60} ou `smartScheduling` não booleano ⇒ `400`. No `PUT`, campos ausentes não são alterados. Detalhes em `docs/features/agenda.md` ("Horários oferecidos").
 
 **Response**: `Schedule`
 

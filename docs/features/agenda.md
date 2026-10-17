@@ -53,6 +53,8 @@ Sistema de configuração de agendas (schedules), permitindo definir horários d
   endTime: string            // "18:00"
   slotDuration: number       // 30 minutos
   bufferTime: number         // 0 minutos entre agendamentos
+  startInterval: number      // 0 | 15 | 30 | 60 — de quanto em quanto tempo oferecer inícios (0 = igual à duração do serviço)
+  smartScheduling: boolean   // esconde inícios que deixam vãos curtos demais (padrão: true)
   lunchStart?: string        // "12:00"
   lunchEnd?: string          // "13:00"
 }
@@ -118,6 +120,8 @@ model Schedule {
   endTime           String   @default("18:00")
   slotDuration      Int      @default(30)
   bufferTime        Int      @default(0)
+  startInterval     Int      @default(30)
+  smartScheduling   Boolean  @default(true)
   lunchStart        String?
   lunchEnd          String?
   
@@ -395,7 +399,16 @@ async function setCustomDayConfig(scheduleId: string, config: DayConfig) {
 6. Agendamentos existentes
 7. slotDuration e bufferTime
 8. advanceBookingDays e minNoticeHours
+9. startInterval (passo entre inícios) e smartScheduling
 ```
+
+### Horários oferecidos (`startInterval` e `smartScheduling`)
+Só mudam o que é **oferecido** para novos agendamentos; agendamentos já marcados nunca são afetados. Implementado em `getAvailableSlots` (`lib/availability-service.ts`); validação em `lib/slot-settings.ts`; card na criação/edição da agenda (`components/schedule/slot-settings-card.tsx`).
+
+- **`startInterval`** (padrão 30): inícios a cada 15/30/60 min a partir do início do expediente, mais o início logo após qualquer compromisso, faixa bloqueada ou almoço. `0` = grade antiga (passo = duração do serviço + folga). Com passo fixo, o `bufferTime` é exigido dos dois lados do agendamento vizinho.
+- **`smartScheduling`** (padrão ligado): esconde um início se ele deixa **sobra órfã** (vão livre maior que 0 e menor que o menor serviço da agenda, `slotDuration`) **dos dois lados**. Início que encosta numa borda (compromisso, bloqueio, almoço ou limite do expediente) sempre é mantido — nunca se esconde um vão onde o serviço cabe. Ex.: vão de 180 min, serviço de 120, passo de 30 → mantém +0 e +60, esconde +30. Função pura `isSmartStart`.
+- **Onde vale:** página pública e chat. O **painel** (`GET /api/appointments/available-slots`) mostra todos os inícios válidos (`ignoreSmartScheduling`), pois a equipe pode preencher qualquer vão.
+- **Página pública:** com mais de 8 opções, os horários são agrupados em Manhã / Tarde / Noite. **Chat:** o assistente propõe no máximo 4 horários espalhados pelo dia.
 
 ## 🎯 Casos de Uso
 

@@ -237,6 +237,14 @@ model Schedule {
   slotDuration Int    @default(30) // Duração padrão dos slots em minutos
   bufferTime   Int    @default(0) // Intervalo entre agendamentos em minutos
 
+  // De quanto em quanto tempo oferecer horários de início (15/30/60). 0 = igual à
+  // duração do serviço (grade fixa antiga). Só muda o que é OFERECIDO para novos
+  // agendamentos; os já marcados não são afetados.
+  startInterval Int @default(30)
+  // Agendamento inteligente: esconde inícios que deixariam vãos menores que o menor
+  // serviço da agenda (ninguém consegue preencher). Vale na página pública e no chat.
+  smartScheduling Boolean @default(true)
+
   // Configurações de agendamento
   lunchStart         String?
   lunchEnd           String?

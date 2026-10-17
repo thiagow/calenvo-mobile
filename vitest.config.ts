@@ -14,5 +14,9 @@ export default defineConfig({
     include: ['**/*.test.ts'],
     exclude: ['node_modules/**', '.next/**'],
     setupFiles: ['dotenv/config'],
+    // Vários testes fazem `await import()` de módulos pesados (Prisma, serviços) dentro do
+    // próprio teste; a 1ª importação a frio passa de 5 s (o padrão) em máquina carregada e
+    // derrubava testes que não têm nada de errado.
+    testTimeout: 20000,
   },
 })

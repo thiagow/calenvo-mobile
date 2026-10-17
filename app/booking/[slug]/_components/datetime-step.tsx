@@ -21,6 +21,25 @@ interface DateTimeStepProps {
   onSelectTime: (time: string) => void
 }
 
+/** A partir de quantas opções vale separar a lista em Manhã / Tarde / Noite. */
+const GROUP_THRESHOLD = 8
+
+/**
+ * Agrupa os horários por período do dia (manhã < 12h, tarde 12h–17:59, noite ≥ 18h) quando
+ * há muitas opções — com passo de 30 min a lista cresce e fica difícil de varrer. Com poucas,
+ * devolve um grupo único sem título. Períodos vazios não aparecem.
+ */
+export function groupSlotsByPeriod(slots: BookingTimeSlot[]): { label: string; slots: BookingTimeSlot[] }[] {
+  if (slots.length <= GROUP_THRESHOLD) return [{ label: '', slots }]
+
+  const periods = [
+    { label: 'Manhã', slots: slots.filter((s) => s.time < '12:00') },
+    { label: 'Tarde', slots: slots.filter((s) => s.time >= '12:00' && s.time < '18:00') },
+    { label: 'Noite', slots: slots.filter((s) => s.time >= '18:00') },
+  ]
+  return periods.filter((p) => p.slots.length > 0)
+}
+
 export function DateTimeStep({
   selectedDate,
   onSelectDate,
@@ -64,17 +83,27 @@ export function DateTimeStep({
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : availableSlots.length > 0 ? (
-            <div className="grid grid-cols-4 gap-2">
-              {availableSlots.map((slot) => (
-                <Button
-                  key={slot.time}
-                  type="button"
-                  variant={selectedTime === slot.time ? 'default' : 'outline'}
-                  onClick={() => onSelectTime(slot.time)}
-                  className="w-full"
-                >
-                  {slot.time}
-                </Button>
+            <div className="space-y-4">
+              {groupSlotsByPeriod(availableSlots).map((group) => (
+                <div key={group.label} className="space-y-2">
+                  {/* Com poucas opções, um bloco só e sem título: não polui o caso simples */}
+                  {group.label && (
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                  )}
+                  <div className="grid grid-cols-4 gap-2">
+                    {group.slots.map((slot) => (
+                      <Button
+                        key={slot.time}
+                        type="button"
+                        variant={selectedTime === slot.time ? 'default' : 'outline'}
+                        onClick={() => onSelectTime(slot.time)}
+                        className="w-full"
+                      >
+                        {slot.time}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (

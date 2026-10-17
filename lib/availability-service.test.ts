@@ -302,6 +302,33 @@ describe('início encaixado logo após um compromisso', () => {
     expect(result!.map((s) => `${s.time}${s.available ? '' : '✗'}`)).toEqual(['15:00✗', '15:30', '17:00'])
   })
 
+  it('depois de agendar às 15:30 (até 17:30) não sobra nada: 17:30 + 120min estoura as 19:00', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    alinhamentoSchedule()
+    mockAppointments = [
+      { scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' },
+      { scheduleId: 'schedule-1', date: dateAt(date, 15, 30), duration: 120, professionalId: 'p1' },
+    ]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.filter((s) => s.available)).toEqual([])
+    expect(result!.some((s) => s.time === '17:30')).toBe(false) // nem aparece na grade
+  })
+
+  it('expediente até 18:00: só o 15:30 é oferecido (17:00 e 17:30 estourariam o fim)', async () => {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    const date = futureDateStr(5)
+    alinhamentoSchedule()
+    mockSchedulesById['schedule-1'].dayConfigs.forEach((c: any) => (c.timeSlots = [{ startTime: '15:00', endTime: '18:00' }]))
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    const result = await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a' })
+
+    expect(result!.map((s) => `${s.time}${s.available ? '' : '✗'}`)).toEqual(['15:00✗', '15:30'])
+  })
+
   it('não oferece início que estoura o fim do expediente', async () => {
     const { getAvailableSlots } = await import('@/lib/availability-service')
     const date = futureDateStr(5)
@@ -381,6 +408,153 @@ describe('motivo para o cliente final (página pública e chat)', () => {
     expect(
       await getNoSlotsReasonForService({ userId: 'tenant-a', serviceId: 'service-1', date: futureDateStr(5), slots: [{ time: '09:00', available: true }] })
     ).toBeNull()
+  })
+})
+
+describe('passo entre horários e agendamento inteligente', () => {
+  // Expediente 15:00–19:00, serviço de 120 min (também o menor da agenda), passo de 30 min.
+  function scheduleWith(overrides: Partial<any> = {}) {
+    mockSchedulesById['schedule-1'] = baseSchedule({
+      startInterval: 30,
+      smartScheduling: true,
+      slotDuration: 120,
+      useCustomDayConfig: true,
+      dayConfigs: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        dayOfWeek, isActive: true, timeSlots: [{ startTime: '15:00', endTime: '19:00' }],
+      })),
+      services: [{ service: { id: 'service-1', duration: 120 } }],
+      professionals: [{ professionalId: 'p1' }],
+      ...overrides,
+    })
+  }
+  const free = (slots: { time: string; available: boolean }[]) => slots.filter((s) => s.available).map((s) => s.time)
+  async function slotsFor(date: string, extra: Record<string, unknown> = {}) {
+    const { getAvailableSlots } = await import('@/lib/availability-service')
+    return (await getAvailableSlots({ scheduleId: 'schedule-1', serviceId: 'service-1', date, userId: 'tenant-a', ...extra }))!
+  }
+
+  it('dia vazio: oferece só os inícios que não deixam vãos curtos demais (15:00 e 17:00)', async () => {
+    scheduleWith()
+
+    expect(free(await slotsFor(futureDateStr(5)))).toEqual(['15:00', '17:00'])
+  })
+
+  it('agendamento inteligente desligado: todos os inícios de 30 em 30', async () => {
+    scheduleWith({ smartScheduling: false })
+
+    expect(free(await slotsFor(futureDateStr(5)))).toEqual(['15:00', '15:30', '16:00', '16:30', '17:00'])
+  })
+
+  it('painel (ignoreSmartScheduling) vê todos os inícios, mesmo com a regra ligada na agenda', async () => {
+    scheduleWith()
+
+    expect(free(await slotsFor(futureDateStr(5), { ignoreSmartScheduling: true }))).toEqual([
+      '15:00', '15:30', '16:00', '16:30', '17:00',
+    ])
+  })
+
+  it('caso real (Alinhamento, agendamento 13:30–15:30): 15:30 e 17:00, sem 16:00 e 16:30', async () => {
+    const date = futureDateStr(5)
+    scheduleWith()
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    expect(free(await slotsFor(date))).toEqual(['15:30', '17:00'])
+  })
+
+  it('vão de 180 min para serviço de 120: mantém as pontas e esconde o do meio', async () => {
+    const date = futureDateStr(5)
+    scheduleWith()
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 15), duration: 60, professionalId: 'p1' }]
+
+    expect(free(await slotsFor(date))).toEqual(['16:00', '17:00'])
+  })
+
+  it('passo 0 ("igual à duração") mantém a grade antiga, sem filtro', async () => {
+    scheduleWith({ startInterval: 0 })
+
+    expect(free(await slotsFor(futureDateStr(5)))).toEqual(['15:00', '17:00'])
+    const date = futureDateStr(6)
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+    expect(free(await slotsFor(date))).toEqual(['15:30', '17:00'])
+  })
+
+  it('intervalo entre atendimentos (bufferTime) é exigido dos dois lados com passo fixo', async () => {
+    const date = futureDateStr(5)
+    scheduleWith({ bufferTime: 15 })
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    const result = await slotsFor(date)
+
+    expect(result.find((s) => s.time === '15:30')?.available).toBe(false) // sem os 15 min de folga
+    expect(free(result)).toEqual(['15:45', '17:00'])
+  })
+
+  it('vários profissionais: o início vale se ao menos um profissional livre o aproveita bem', async () => {
+    const date = futureDateStr(5)
+    scheduleWith({ professionals: [{ professionalId: 'p1' }, { professionalId: 'p2' }] })
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: 'p1' }]
+
+    // 15:30 encosta no fim do agendamento do p1 (serve a ele), mesmo que p2 ficasse com vãos curtos
+    expect(free(await slotsFor(date))).toContain('15:30')
+    // 16:00 deixa vãos curtos para os dois → escondido
+    expect(free(await slotsFor(date))).not.toContain('16:00')
+  })
+
+  it('agenda legada sem profissional: a regra usa os agendamentos da agenda inteira', async () => {
+    const date = futureDateStr(5)
+    scheduleWith({ professionals: [] })
+    mockAppointments = [{ scheduleId: 'schedule-1', date: dateAt(date, 13, 30), duration: 120, professionalId: null }]
+
+    expect(free(await slotsFor(date))).toEqual(['15:30', '17:00'])
+  })
+
+  it('serviço mais curto que o menor da agenda nunca é afetado pelo filtro de vãos', async () => {
+    // menor serviço = 30 min: nenhuma sobra de 30 min ou mais é "curta demais"
+    scheduleWith({ slotDuration: 30, services: [{ service: { id: 'service-1', duration: 30 } }] })
+
+    const result = await slotsFor(futureDateStr(5))
+
+    expect(free(result)).toHaveLength(8) // 15:00 … 18:30, de 30 em 30
+  })
+})
+
+describe('isSmartStart (função pura)', () => {
+  const windows = [{ start: 15 * 60, end: 19 * 60 }]
+
+  it('encostar numa borda mantém o início, mesmo deixando sobra curta do outro lado', async () => {
+    const { isSmartStart } = await import('@/lib/availability-service')
+
+    expect(isSmartStart({ start: 15 * 60, end: 17 * 60, windows, busy: [], minServiceMinutes: 120 })).toBe(true)
+  })
+
+  it('sobra curta dos dois lados esconde', async () => {
+    const { isSmartStart } = await import('@/lib/availability-service')
+
+    expect(isSmartStart({ start: 16 * 60, end: 18 * 60, windows, busy: [], minServiceMinutes: 120 })).toBe(false)
+  })
+
+  it('sobras que comportam o menor serviço não são órfãs', async () => {
+    const { isSmartStart } = await import('@/lib/availability-service')
+    const wide = [{ start: 8 * 60, end: 20 * 60 }]
+
+    // 12:00–14:00 num expediente de 12h: sobras de 4h e 6h
+    expect(isSmartStart({ start: 12 * 60, end: 14 * 60, windows: wide, busy: [], minServiceMinutes: 120 })).toBe(true)
+  })
+
+  it('compromisso vizinho define a borda', async () => {
+    const { isSmartStart } = await import('@/lib/availability-service')
+    const busy = [{ start: 17 * 60 + 30, end: 18 * 60 }] // próximo compromisso às 17:30
+
+    // 15:30–17:30 encosta no compromisso (depois = 0) → mantém
+    expect(isSmartStart({ start: 15 * 60 + 30, end: 17 * 60 + 30, windows, busy, minServiceMinutes: 120 })).toBe(true)
+    // 15:00–17:00 deixa 30 min até o compromisso, e encosta no início do expediente → mantém
+    expect(isSmartStart({ start: 15 * 60, end: 17 * 60, windows, busy, minServiceMinutes: 120 })).toBe(true)
+  })
+
+  it('fora de qualquer expediente conhecido não filtra', async () => {
+    const { isSmartStart } = await import('@/lib/availability-service')
+
+    expect(isSmartStart({ start: 10 * 60, end: 12 * 60, windows, busy: [], minServiceMinutes: 120 })).toBe(true)
   })
 })
 

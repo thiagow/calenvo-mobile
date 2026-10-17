@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { parseBookingWindow } from '@/lib/booking-window'
+import { parseSlotSettings } from '@/lib/slot-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,8 @@ export async function PUT(
       startTime,
       endTime,
       bufferTime,
+      startInterval,
+      smartScheduling,
       lunchStart,
       lunchEnd,
       advanceBookingDays,
@@ -98,6 +101,11 @@ export async function PUT(
     const bookingWindow = parseBookingWindow({ advanceBookingDays, minNoticeHours })
     if (!bookingWindow.ok) {
       return NextResponse.json({ error: bookingWindow.error }, { status: 400 })
+    }
+
+    const slotSettings = parseSlotSettings({ startInterval, smartScheduling })
+    if (!slotSettings.ok) {
+      return NextResponse.json({ error: slotSettings.error }, { status: 400 })
     }
 
     // Verificar se a agenda pertence ao usuário
@@ -149,6 +157,9 @@ export async function PUT(
         endTime,
         ...(derivedSlotDuration !== undefined && { slotDuration: derivedSlotDuration }),
         bufferTime,
+        // Ausentes = não mexer (PUT parcial); presentes já foram validados.
+        ...(slotSettings.startInterval !== undefined && { startInterval: slotSettings.startInterval }),
+        ...(slotSettings.smartScheduling !== undefined && { smartScheduling: slotSettings.smartScheduling }),
         lunchStart,
         lunchEnd,
         advanceBookingDays: bookingWindow.advanceBookingDays,

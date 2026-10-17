@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { DEFAULT_ADVANCE_BOOKING_DAYS, DEFAULT_MIN_NOTICE_HOURS, parseBookingWindow } from '@/lib/booking-window'
+import { DEFAULT_SMART_SCHEDULING, DEFAULT_START_INTERVAL, parseSlotSettings } from '@/lib/slot-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,6 +141,8 @@ export async function POST(request: NextRequest) {
       color,
       workingDays,
       bufferTime,
+      startInterval,
+      smartScheduling,
       advanceBookingDays,
       minNoticeHours,
       serviceIds, // Array de IDs de serviços para vincular
@@ -157,6 +160,11 @@ export async function POST(request: NextRequest) {
     const bookingWindow = parseBookingWindow({ advanceBookingDays, minNoticeHours })
     if (!bookingWindow.ok) {
       return NextResponse.json({ error: bookingWindow.error }, { status: 400 })
+    }
+
+    const slotSettings = parseSlotSettings({ startInterval, smartScheduling })
+    if (!slotSettings.ok) {
+      return NextResponse.json({ error: slotSettings.error }, { status: 400 })
     }
 
     if (!professionalIds || professionalIds.length === 0) {
@@ -218,6 +226,8 @@ export async function POST(request: NextRequest) {
         workingDays,
         slotDuration: derivedSlotDuration,
         bufferTime: bufferTime || 0,
+        startInterval: slotSettings.startInterval ?? DEFAULT_START_INTERVAL,
+        smartScheduling: slotSettings.smartScheduling ?? DEFAULT_SMART_SCHEDULING,
         advanceBookingDays: bookingWindow.advanceBookingDays ?? DEFAULT_ADVANCE_BOOKING_DAYS,
         minNoticeHours: bookingWindow.minNoticeHours ?? DEFAULT_MIN_NOTICE_HOURS
       }
