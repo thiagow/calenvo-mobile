@@ -6,8 +6,9 @@ import {
   addSchedulesToGroup,
   blocksOverlap,
   findOverlappingBlocks,
+  countActiveBlocksBySchedule,
   isBlockPast,
-  listGeneralBlocks,
+  listBlocks,
 } from '@/lib/schedule-blocks'
 
 const SP = 'America/Sao_Paulo'
@@ -92,48 +93,91 @@ describe('findOverlappingBlocks', () => {
   })
 })
 
-describe('listGeneralBlocks', () => {
+describe('listBlocks', () => {
   const sched = (id: string, name: string) => ({ id, name })
-  const row = (groupId: string, schedule: { id: string; name: string }, start: string, end: string) => ({
+  const row = (
+    id: string,
+    groupId: string | null,
+    schedule: { id: string; name: string },
+    start: string,
+    end: string
+  ) => ({
+    id,
     groupId,
     reason: 'x',
     ...allDay(start, end),
     schedule,
   })
 
-  it('um item por grupo com 2+ agendas, mostra as que ficaram de fora e ignora grupo de 1', async () => {
+  it('um item por grupo, mostra as agendas que ficaram de fora e inclui o bloqueio de uma agenda só', async () => {
     const db = {
       scheduleBlock: {
         findMany: vi.fn(async () => [
-          row('g2', sched('s1', 'A'), '2026-12-10', '2026-12-11'),
-          row('g1', sched('s1', 'A'), '2026-11-24', '2026-12-03'),
-          row('g1', sched('s2', 'B '), '2026-11-24', '2026-12-03'),
-          row('solo', sched('s3', 'C'), '2026-12-01', '2026-12-01'),
+          row('b4', 'g2', sched('s1', 'A'), '2026-12-10', '2026-12-11'),
+          row('b1', 'g1', sched('s1', 'A'), '2026-11-24', '2026-12-03'),
+          row('b2', 'g1', sched('s2', 'B '), '2026-11-24', '2026-12-03'),
+          row('b3', null, sched('s3', 'C'), '2026-12-01', '2026-12-01'),
         ]),
       },
       schedule: { findMany: vi.fn(async () => [sched('s1', 'A'), sched('s2', 'B '), sched('s3', 'C')]) },
     }
 
-    const groups = await listGeneralBlocks(db as never, {
+    const items = await listBlocks(db as never, {
       userId: 'u1',
       timeZone: SP,
       now: new Date('2026-12-01T12:00:00.000Z'),
     })
 
-    expect(groups.map((g) => g.groupId)).toEqual(['g1'])
-    expect(groups[0].schedules.map((s) => s.name)).toEqual(['A', 'B'])
-    expect(groups[0].missingSchedules).toEqual([{ id: 's3', name: 'C' }])
-    expect(groups[0].isPast).toBe(false)
+    expect(items.map((g) => g.key)).toEqual(['g1', 'b3', 'g2'])
+    const g1 = items.find((g) => g.key === 'g1')!
+    expect(g1.schedules.map((s) => s.name)).toEqual(['A', 'B'])
+    expect(g1.missingSchedules).toEqual([{ id: 's3', name: 'C' }])
+    expect(g1.isPast).toBe(false)
+    expect(g1.affectedAppointments).toBeNull()
+
+    // Sem grupo: remove-se pelo bloco, e não há "aplicar também".
+    const solo = items.find((g) => g.key === 'b3')!
+    expect(solo).toMatchObject({ groupId: null, blockId: 'b3', missingSchedules: [] })
+  })
+
+  it('conta os agendamentos afetados só dos bloqueios vigentes', async () => {
+    const db = {
+      scheduleBlock: {
+        findMany: vi.fn(async () => [
+          row('b1', null, sched('s1', 'A'), '2026-11-01', '2026-11-02'), // já encerrado
+          row('b2', null, sched('s1', 'A'), '2026-12-10', '2026-12-11'),
+        ]),
+      },
+      schedule: { findMany: vi.fn(async () => [sched('s1', 'A')]) },
+      appointment: {
+        findMany: vi.fn(async () => [
+          { id: 'a1', date: new Date('2026-12-10T13:00:00Z'), duration: 30, client: { name: 'Ana' }, service: { name: 'Corte' }, specialty: null },
+          { id: 'a2', date: new Date('2026-12-11T13:00:00Z'), duration: 30, client: { name: 'Bia' }, service: { name: 'Corte' }, specialty: null },
+        ]),
+      },
+    }
+
+    const items = await listBlocks(db as never, {
+      userId: 'u1',
+      timeZone: SP,
+      countAppointments: true,
+      now: new Date('2026-12-01T12:00:00.000Z'),
+    })
+
+    expect(db.appointment.findMany).toHaveBeenCalledTimes(1)
+    expect(items.find((g) => g.key === 'b1')!.affectedAppointments).toBeNull()
+    expect(items.find((g) => g.key === 'b2')!.affectedAppointments).toBe(2)
   })
 })
 
-describe('listGeneralBlocks — bloqueios pessoais de profissional', () => {
+describe('listBlocks — bloqueios pessoais de profissional', () => {
   const linked = (id: string, name: string, pros: string[]) => ({
     id,
     name,
     professionals: pros.map((professionalId) => ({ professionalId })),
   })
   const row = (groupId: string, schedule: { id: string; name: string }, professionalId: string | null) => ({
+    id: `${groupId}-${schedule.id}`,
     groupId,
     reason: null,
     ...allDay('2026-12-10', '2026-12-11'),
@@ -159,7 +203,7 @@ describe('listGeneralBlocks — bloqueios pessoais de profissional', () => {
   it('bloqueio pessoal aparece mesmo com 1 agenda só, com o nome do profissional', async () => {
     const db = dbWith([row('p1', { id: 's1', name: 'A' }, 'ana')])
 
-    const [group] = await listGeneralBlocks(db as never, { ...params, viewerProfessionalId: null })
+    const [group] = await listBlocks(db as never, { ...params, viewerProfessionalId: null })
 
     expect(group.professional).toEqual({ id: 'ana', name: 'Ana' })
     expect(group.canManage).toBe(true)
@@ -168,7 +212,7 @@ describe('listGeneralBlocks — bloqueios pessoais de profissional', () => {
   it('"não inclui" considera só as agendas em que o profissional está vinculado', async () => {
     const db = dbWith([row('p1', { id: 's1', name: 'A' }, 'ana')])
 
-    const [group] = await listGeneralBlocks(db as never, { ...params, viewerProfessionalId: null })
+    const [group] = await listBlocks(db as never, { ...params, viewerProfessionalId: null })
 
     expect(group.missingSchedules).toEqual([{ id: 's2', name: 'B' }]) // s3 é do Beto: fora
   })
@@ -180,7 +224,7 @@ describe('listGeneralBlocks — bloqueios pessoais de profissional', () => {
       row('mine', { id: 's1', name: 'A' }, 'ana'),
     ])
 
-    const groups = await listGeneralBlocks(db as never, { ...params, viewerProfessionalId: 'ana' })
+    const groups = await listBlocks(db as never, { ...params, viewerProfessionalId: 'ana' })
 
     expect(db.scheduleBlock.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,5 +267,42 @@ describe('addSchedulesToGroup', () => {
     expect(db.scheduleBlock.createMany).toHaveBeenCalledWith({
       data: [{ scheduleId: 's2', groupId: 'g', ...template }],
     })
+  })
+})
+
+describe('countActiveBlocksBySchedule', () => {
+  const now = new Date('2026-12-04T15:00:00.000Z')
+  const block = (scheduleId: string, start: string, end: string) => ({ scheduleId, ...allDay(start, end) })
+
+  it('conta por agenda só os bloqueios ainda vigentes', async () => {
+    const db = {
+      scheduleBlock: {
+        findMany: vi.fn(async () => [
+          block('s1', '2026-12-01', '2026-12-03'), // encerrado
+          block('s1', '2026-12-04', '2026-12-04'), // vigente (hoje)
+          block('s1', '2026-12-20', '2026-12-22'),
+          block('s2', '2026-12-10', '2026-12-10'),
+        ]),
+      },
+    }
+
+    expect(await countActiveBlocksBySchedule(db as never, { scheduleIds: ['s1', 's2', 's3'], timeZone: SP, now })).toEqual({
+      s1: 2,
+      s2: 1,
+    })
+  })
+
+  it('profissional: só agenda inteira + os próprios', async () => {
+    const db = { scheduleBlock: { findMany: vi.fn(async () => []) } }
+    await countActiveBlocksBySchedule(db as never, { scheduleIds: ['s1'], timeZone: SP, viewerProfessionalId: 'ana', now })
+    expect(db.scheduleBlock.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ OR: [{ professionalId: null }, { professionalId: 'ana' }] }) })
+    )
+  })
+
+  it('sem agendas não consulta o banco', async () => {
+    const db = { scheduleBlock: { findMany: vi.fn() } }
+    expect(await countActiveBlocksBySchedule(db as never, { scheduleIds: [], timeZone: SP })).toEqual({})
+    expect(db.scheduleBlock.findMany).not.toHaveBeenCalled()
   })
 })

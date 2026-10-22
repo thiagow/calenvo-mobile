@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getSessionScope } from '@/lib/session-scope'
 import { DEFAULT_TIMEZONE } from '@/lib/timezone'
-import { createBlocksFromRequest, listGeneralBlocks } from '@/lib/schedule-blocks'
+import { createBlocksFromRequest, listBlocks } from '@/lib/schedule-blocks'
 
 export const dynamic = 'force-dynamic'
 
-// GET - Bloqueios gerais (2+ agendas) e pessoais de profissionais, um item por grupo.
-// Administrador vê e gerencia tudo; profissional vê os da agenda inteira e os próprios,
-// e só gerencia os próprios (`canManage`).
+// GET - Todos os bloqueios do tenant (de uma agenda, de várias e pessoais de profissionais),
+// um item por bloqueio. Administrador vê e gerencia tudo; profissional vê os da agenda
+// inteira e os próprios, e só gerencia os próprios (`canManage`).
 export async function GET() {
   try {
     const { scope, error } = await getSessionScope()
@@ -18,14 +18,15 @@ export async function GET() {
       where: { userId: scope.tenantId },
       select: { timezone: true }
     })
-    const groups = await listGeneralBlocks(prisma, {
+    const blocks = await listBlocks(prisma, {
       userId: scope.tenantId,
       timeZone: businessConfig?.timezone || DEFAULT_TIMEZONE,
-      viewerProfessionalId: scope.professionalId
+      viewerProfessionalId: scope.professionalId,
+      countAppointments: true
     })
-    return NextResponse.json({ groups })
+    return NextResponse.json({ blocks })
   } catch (error) {
-    console.error('Error listing general schedule blocks:', error)
+    console.error('Error listing schedule blocks:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

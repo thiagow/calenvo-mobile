@@ -12,10 +12,12 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle, ArrowLeft, Palette } from 'lucide-react'
+import { Store, Clock, Globe, Upload, Copy, ExternalLink, Loader2, Save, Info, ChevronDown, ChevronRight, Pencil, Check, X, AlertTriangle, ArrowLeft, Palette, Key } from 'lucide-react'
 import { generateSlug } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useUserRole } from '@/hooks/use-user-role'
+import { useUserPermissions } from '@/hooks/use-user-permissions'
+import { ApiKeysSection } from '@/components/settings/api-keys-section'
 
 interface BusinessConfig {
   autoConfirm: boolean
@@ -38,10 +40,19 @@ const DIAS_SEMANA = [
   { id: 3, label: 'Qua' }, { id: 4, label: 'Qui' }, { id: 5, label: 'Sex' }, { id: 6, label: 'Sáb' },
 ]
 
-function Section({ title, icon: Icon, iconColor, children, defaultOpen = false }: { title: string; icon: any; iconColor: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function Section({ id, title, icon: Icon, iconColor, children, defaultOpen = false }: { id?: string; title: string; icon: any; iconColor: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
+
+  // Link direto para a seção (ex.: /dashboard/settings#api) abre e rola até ela.
+  useEffect(() => {
+    if (id && window.location.hash === `#${id}`) {
+      setOpen(true)
+      document.getElementById(id)?.scrollIntoView({ block: 'start' })
+    }
+  }, [id])
+
   return (
-    <Card className="border border-border">
+    <Card id={id} className="border border-border scroll-mt-4">
       <button
         className="w-full flex items-center justify-between px-4 py-3.5 text-left"
         onClick={() => setOpen(!open)}
@@ -69,6 +80,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const { data: session } = useSession()
   const { isProfessional } = useUserRole()
+  const { canManageSettings } = useUserPermissions()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
@@ -440,6 +452,13 @@ export default function SettingsPage() {
           {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</> : <><Save className="mr-2 h-4 w-4" />Salvar Preferências</>}
         </Button>
       </Section>
+
+      {/* Integrações (API) */}
+      {canManageSettings && (
+        <Section id="api" title="Integrações (API)" icon={Key} iconColor="bg-slate-500/10 text-slate-600">
+          <ApiKeysSection />
+        </Section>
+      )}
     </div>
   )
 }

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { countActiveBlocksBySchedule } from '@/lib/schedule-blocks'
+import { DEFAULT_TIMEZONE } from '@/lib/timezone'
 import { DEFAULT_ADVANCE_BOOKING_DAYS, DEFAULT_MIN_NOTICE_HOURS, parseBookingWindow } from '@/lib/booking-window'
 import { DEFAULT_SMART_SCHEDULING, DEFAULT_START_INTERVAL, parseSlotSettings } from '@/lib/slot-settings'
 
@@ -75,7 +77,17 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(schedules)
+    // Selo "N bloqueios" nos cartões: vem junto para a lista não fazer uma chamada por agenda.
+    const businessConfig = schedules[0]
+      ? await prisma.businessConfig.findUnique({ where: { userId: schedules[0].userId }, select: { timezone: true } })
+      : null
+    const activeBlocks = await countActiveBlocksBySchedule(prisma, {
+      scheduleIds: schedules.map((s) => s.id),
+      timeZone: businessConfig?.timezone || DEFAULT_TIMEZONE,
+      viewerProfessionalId: userRole === 'PROFESSIONAL' ? userId : null
+    })
+
+    return NextResponse.json(schedules.map((s) => ({ ...s, activeBlocksCount: activeBlocks[s.id] ?? 0 })))
   } catch (error) {
     console.error('Error fetching schedules:', error)
     return NextResponse.json(

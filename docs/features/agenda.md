@@ -256,7 +256,7 @@ async function getAvailability(scheduleId: string, date: Date) {
 ```
 
 ### Criar Bloqueio
-Criado pelo botão **Bloqueio de Períodos** na página de Agendas (combobox com "Todas as agendas" ou uma seleção de agendas). A aba "Bloqueios" da agenda mostra e remove apenas os bloqueios **daquela** agenda; os criados para várias agendas ficam no botão **Bloqueios gerais** (mesma página), onde a remoção vale para todas as agendas do grupo e dá para "Aplicar também" às agendas que ficaram de fora. A aba exibe um aviso com a contagem de bloqueios gerais que também a fecham. O **profissional** não acessa Agendas: ele usa **Mais → Meus bloqueios** (`/dashboard/bloqueios`), cria bloqueios pessoais (por padrão em todas as agendas dele) que fecham só ele — a grade (`getAvailableSlots`), o agendamento (`resolveProfessionalForBooking`) e o reagendamento respeitam isso por profissional, igual à ocupação. Criar por cima de um bloqueio existente exige confirmação (`BLOCK_OVERLAPS_EXISTING`), e blocos encerrados ficam ocultos por padrão.
+Toda a gestão de bloqueios fica numa tela só: **Mais → Bloqueios** (`/dashboard/bloqueios`, `app/dashboard/bloqueios/page.tsx`), para administrador e profissional. O botão **Novo bloqueio** abre o diálogo (combobox com "Todas as agendas" ou uma seleção). A lista (`components/schedule/blocks-list.tsx`, `GET /api/schedule-blocks` → `listBlocks`) traz **todos** os bloqueios — de uma agenda, de várias e pessoais de profissional — com filtros por situação (Ativos/Encerrados), agenda e, para o administrador, profissional. Cada cartão mostra o escopo ("Agenda inteira" ou "Só {profissional}"), as agendas cobertas e, nos vigentes, quantos agendamentos já marcados caem no período (com link "Ver na agenda"). Remover um bloqueio de várias agendas vale para todas do grupo e dá para "Aplicar também" às que ficaram de fora. O cartão de cada agenda em `/dashboard/schedules` mostra o selo "N bloqueios ativos" e a edição da agenda tem o link "Ver bloqueios desta agenda" (ambos abrem `/dashboard/bloqueios?agenda=<id>`). O **profissional** cria bloqueios pessoais (por padrão em todas as agendas dele) que fecham só ele — a grade (`getAvailableSlots`), o agendamento (`resolveProfessionalForBooking`) e o reagendamento respeitam isso por profissional, igual à ocupação. Criar por cima de um bloqueio existente exige confirmação (`BLOCK_OVERLAPS_EXISTING`).
 
 ```typescript
 // Dia inteiro (sem endDate = um dia só) ou período
@@ -425,9 +425,9 @@ Só mudam o que é **oferecido** para novos agendamentos; agendamentos já marca
 
 ### 2. Bloquear Período para Férias
 **Fluxo**:
-1. Acessa configuração da agenda
-2. Clica em "Adicionar Bloqueio"
-3. Seleciona período: 20/12 a 05/01
+1. Acessa Mais → Bloqueios
+2. Clica em "Novo bloqueio"
+3. Escolhe a(s) agenda(s) e o período: 20/12 a 05/01
 4. Define motivo: "Férias de Fim de Ano"
 5. Marca como dia inteiro
 6. Salva bloqueio

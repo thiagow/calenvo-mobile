@@ -98,7 +98,7 @@ export async function PUT(
     }
 
     // Bloco de um grupo editado sozinho se desalinha dos irmãos: bloqueio de várias
-    // agendas só se remove e recria (Agendas → Bloqueios gerais).
+    // agendas só se remove e recria (Mais → Bloqueios).
     if (existingBlock.groupId) {
       const siblings = await prisma.scheduleBlock.count({
         where: { groupId: existingBlock.groupId, schedule: { userId: scope.tenantId } }

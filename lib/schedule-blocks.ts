@@ -283,11 +283,17 @@ export async function findOverlappingBlocks(
 }
 
 /**
- * Bloqueio criado para várias agendas ("geral") ou pessoal de um profissional,
- * com o que ele cobre e o que ficou de fora. Um item por `groupId`.
+ * Um bloqueio como a tela de Bloqueios o mostra: um item por `groupId` (bloqueio
+ * criado para várias agendas ou pessoal de profissional) ou por bloco, quando ele
+ * é de uma agenda só e não tem grupo.
  */
-export interface GeneralBlock extends BlockDisplay {
-  groupId: string
+export interface ListedBlock extends BlockDisplay {
+  /** Chave estável do item: o `groupId`, ou o id do bloco quando não há grupo. */
+  key: string
+  /** Null = bloqueio de uma agenda só, criado fora de grupo (remove-se pelo bloco). */
+  groupId: string | null
+  /** Id de um bloco do item — é o que remove um bloqueio sem grupo. */
+  blockId: string
   isAllDay: boolean
   reason: string | null
   isPast: boolean
@@ -296,32 +302,40 @@ export interface GeneralBlock extends BlockDisplay {
   /** Quem está vendo pode removê-lo/estendê-lo? (profissional só mexe nos próprios) */
   canManage: boolean
   schedules: { id: string; name: string }[]
-  /** Agendas que o bloqueio não cobre (só quando `canManage`): fora do grupo ou criadas depois. */
+  /** Agendas que o bloqueio não cobre (só quando `canManage` e há grupo): fora do grupo ou criadas depois. */
   missingSchedules: { id: string; name: string }[]
+  /** Agendamentos abertos dentro do período (só bloqueios ainda vigentes); null = não calculado. */
+  affectedAppointments: number | null
 }
 
 /**
- * Bloqueios do tenant agrupados por `groupId`. Aparecem: os de 2+ agendas e todo
- * bloqueio pessoal de profissional (mesmo com 1 agenda só). Grupo comum que
- * ficou com 1 bloco (as outras agendas foram excluídas) volta a ser um bloqueio
- * da agenda — ver `GET /api/schedules/[id]/blocks`.
+ * Todos os bloqueios do tenant, um item por bloqueio (ver `ListedBlock`): os de uma
+ * agenda só, os de várias agendas e os pessoais de profissionais.
  *
  * `viewerProfessionalId`: null = administrador (vê e gerencia tudo); id = profissional
  * (vê os da agenda inteira e os próprios, mas só gerencia os próprios).
+ * `countAppointments`: calcula `affectedAppointments` dos bloqueios vigentes — para
+ * o profissional, só os agendamentos dele.
  */
-export async function listGeneralBlocks(
+export async function listBlocks(
   db: DbClient,
-  params: { userId: string; timeZone: string; viewerProfessionalId?: string | null; now?: Date }
-): Promise<GeneralBlock[]> {
-  const { userId, timeZone, viewerProfessionalId = null, now = new Date() } = params
+  params: {
+    userId: string
+    timeZone: string
+    viewerProfessionalId?: string | null
+    countAppointments?: boolean
+    now?: Date
+  }
+): Promise<ListedBlock[]> {
+  const { userId, timeZone, viewerProfessionalId = null, countAppointments = false, now = new Date() } = params
   const [blocks, schedules] = await Promise.all([
     db.scheduleBlock.findMany({
       where: {
-        groupId: { not: null },
         schedule: { userId },
         ...(viewerProfessionalId && { OR: [{ professionalId: null }, { professionalId: viewerProfessionalId }] }),
       },
       select: {
+        id: true,
         groupId: true,
         reason: true,
         startDate: true,
@@ -340,39 +354,90 @@ export async function listGeneralBlocks(
     }),
   ])
 
-  const groups = new Map<string, typeof blocks>()
+  const items = new Map<string, typeof blocks>()
   for (const block of blocks) {
-    const list = groups.get(block.groupId!) ?? []
+    const key = block.groupId ?? block.id
+    const list = items.get(key) ?? []
     list.push(block)
-    groups.set(block.groupId!, list)
+    items.set(key, list)
   }
 
-  const result: GeneralBlock[] = []
-  for (const [groupId, members] of Array.from(groups.entries())) {
-    const first = members[0]
-    if (members.length < 2 && !first.professionalId) continue
-    const canManage = viewerProfessionalId === null || first.professionalId === viewerProfessionalId
-    const covered = new Set(members.map((m) => m.schedule.id))
-    const eligible = first.professionalId
-      ? schedules.filter((s) => s.professionals.some((p) => p.professionalId === first.professionalId))
-      : schedules
-    result.push({
-      groupId,
-      ...describeBlock(first, timeZone),
-      isAllDay: first.isAllDay,
-      reason: first.reason,
-      isPast: isBlockPast(first, timeZone, now),
-      professional: first.professionalId
-        ? { id: first.professionalId, name: first.professional?.name?.trim() || 'Profissional' }
-        : null,
-      canManage,
-      schedules: members.map((m) => ({ id: m.schedule.id, name: m.schedule.name.trim() })),
-      missingSchedules: canManage
-        ? eligible.filter((s) => !covered.has(s.id)).map((s) => ({ id: s.id, name: s.name.trim() }))
-        : [],
+  const result: ListedBlock[] = await Promise.all(
+    Array.from(items.entries()).map(async ([key, members]) => {
+      const first = members[0]
+      const canManage = viewerProfessionalId === null || first.professionalId === viewerProfessionalId
+      const covered = new Set(members.map((m) => m.schedule.id))
+      const eligible = first.professionalId
+        ? schedules.filter((s) => s.professionals.some((p) => p.professionalId === first.professionalId))
+        : schedules
+      const isPast = isBlockPast(first, timeZone, now)
+
+      let affectedAppointments: number | null = null
+      if (countAppointments && !isPast) {
+        const affected = await findAppointmentsInBlockRange(db, {
+          userId,
+          scheduleIds: members.map((m) => m.schedule.id),
+          startDate: first.startDate,
+          endDate: first.endDate,
+          timeZone,
+          isAllDay: first.isAllDay,
+          professionalId: first.professionalId ?? viewerProfessionalId,
+        })
+        affectedAppointments = affected.length
+      }
+
+      return {
+        key,
+        groupId: first.groupId,
+        blockId: first.id,
+        ...describeBlock(first, timeZone),
+        isAllDay: first.isAllDay,
+        reason: first.reason,
+        isPast,
+        professional: first.professionalId
+          ? { id: first.professionalId, name: first.professional?.name?.trim() || 'Profissional' }
+          : null,
+        canManage,
+        schedules: members.map((m) => ({ id: m.schedule.id, name: m.schedule.name.trim() })),
+        // Sem grupo não há a que "aplicar também": é um bloqueio de uma agenda só, por escolha.
+        missingSchedules:
+          canManage && first.groupId
+            ? eligible.filter((s) => !covered.has(s.id)).map((s) => ({ id: s.id, name: s.name.trim() }))
+            : [],
+        affectedAppointments,
+      }
     })
-  }
+  )
   return result.sort((a, b) => a.firstDay.localeCompare(b.firstDay) || (a.startTime ?? '').localeCompare(b.startTime ?? ''))
+}
+
+/**
+ * Quantos bloqueios ainda vigentes fecham cada agenda (para o selo nos cartões de
+ * Agendas). Profissional conta só o que o afeta: agenda inteira + os próprios.
+ */
+export async function countActiveBlocksBySchedule(
+  db: DbClient,
+  params: { scheduleIds: string[]; timeZone: string; viewerProfessionalId?: string | null; now?: Date }
+): Promise<Record<string, number>> {
+  const { scheduleIds, timeZone, viewerProfessionalId = null, now = new Date() } = params
+  if (scheduleIds.length === 0) return {}
+
+  // Margem de 2 dias: dia inteiro é gravado em 00:00Z e o fim "de hoje" no fuso do negócio pode cair no dia UTC anterior.
+  const blocks = await db.scheduleBlock.findMany({
+    where: {
+      scheduleId: { in: scheduleIds },
+      endDate: { gte: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000) },
+      ...(viewerProfessionalId && { OR: [{ professionalId: null }, { professionalId: viewerProfessionalId }] }),
+    },
+    select: { scheduleId: true, startDate: true, endDate: true, isAllDay: true },
+  })
+
+  const counts: Record<string, number> = {}
+  for (const block of blocks) {
+    if (isBlockPast(block, timeZone, now)) continue
+    counts[block.scheduleId] = (counts[block.scheduleId] ?? 0) + 1
+  }
+  return counts
 }
 
 /**

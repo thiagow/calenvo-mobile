@@ -1,14 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BackButton } from '@/components/dashboard/back-button'
+import { BlocksList } from '@/components/schedule/blocks-list'
 import { CreateBlockDialog } from '@/components/schedule/create-block-dialog'
-import { GeneralBlocksList } from '@/components/schedule/general-blocks-list'
+import { useUserRole } from '@/hooks/use-user-role'
 
-// Meus bloqueios: o profissional bloqueia o próprio tempo (férias, curso, consulta pessoal)
-// sem afetar os colegas nem a agenda inteira. Administrador usa Agendas → Bloqueios.
-export default function MyBlocksPage() {
+// Bloqueios: tudo o que está fechado para novos agendamentos, num lugar só.
+// Administrador gerencia todos; profissional bloqueia o próprio tempo (férias, curso,
+// consulta pessoal) sem afetar os colegas nem a agenda inteira.
+export default function BlocksPage() {
+  const { isProfessional } = useUserRole()
   const [refreshKey, setRefreshKey] = useState(0)
+  const [initialScheduleId, setInitialScheduleId] = useState<string>()
+
+  // "Ver bloqueios desta agenda" (/dashboard/bloqueios?agenda=<id>) abre a lista já filtrada.
+  useEffect(() => {
+    const agenda = new URLSearchParams(window.location.search).get('agenda')
+    if (agenda) setInitialScheduleId(agenda)
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -18,14 +28,19 @@ export default function MyBlocksPage() {
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold">Meus bloqueios</h1>
+        <h1 className="text-lg font-semibold">Bloqueios</h1>
         <p className="text-sm text-muted-foreground">
-          Dias e horários em que você não atende. Valem só para você, em todas as suas agendas; seus colegas continuam
-          disponíveis. Agendamentos já marcados são mantidos.
+          {isProfessional
+            ? 'Dias e horários em que você não atende. Valem só para você, em todas as suas agendas; seus colegas continuam disponíveis. Agendamentos já marcados são mantidos.'
+            : 'Dias e horários em que não haverá atendimento (férias, feriados, eventos). Agendamentos já marcados são mantidos; o bloqueio vale só para novos agendamentos.'}
         </p>
       </div>
 
-      <GeneralBlocksList refreshKey={refreshKey} emptyText="Você não tem bloqueios ativos" />
+      <BlocksList
+        refreshKey={refreshKey}
+        initialScheduleId={initialScheduleId}
+        showProfessionalFilter={!isProfessional}
+      />
     </div>
   )
 }

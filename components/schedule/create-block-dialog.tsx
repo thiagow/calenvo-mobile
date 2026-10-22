@@ -186,7 +186,7 @@ export function CreateBlockDialog({ onCreated }: CreateBlockDialogProps) {
     <>
       <Button size="sm" variant="outline" onClick={() => handleOpenChange(true)}>
         <CalendarOff className="h-4 w-4 mr-1.5" />
-        Bloqueio de Períodos
+        Novo bloqueio
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>

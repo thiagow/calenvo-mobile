@@ -7,18 +7,18 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Calendar, Plus, Edit, Trash2, Clock, Layers } from 'lucide-react'
+import Link from 'next/link'
+import { Calendar, CalendarOff, Plus, Edit, Trash2, Clock, Layers } from 'lucide-react'
 import { toast } from 'sonner'
 import { useDialog } from '@/components/providers/dialog-provider'
 import { BackButton } from '@/components/dashboard/back-button'
-import { CreateBlockDialog } from '@/components/schedule/create-block-dialog'
-import { GeneralBlocksDialog } from '@/components/schedule/general-blocks-dialog'
 
 interface Schedule {
   id: string; name: string; description: string | null; color: string
   isActive: boolean; workingDays: number[]; startTime: string; endTime: string
   slotDuration: number; bufferTime: number; services: any[]
   _count: { appointments: number }
+  activeBlocksCount: number
 }
 
 const DAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -29,13 +29,6 @@ export default function SchedulesPage() {
   const { confirm } = useDialog()
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
-  const [generalBlocksOpen, setGeneralBlocksOpen] = useState(false)
-
-  // Link da aba de bloqueios de uma agenda ("Ver bloqueios gerais") abre o diálogo direto.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('bloqueios') === 'gerais') setGeneralBlocksOpen(true)
-  }, [])
-
   useEffect(() => {
     if (status !== 'authenticated') return
     fetch('/api/schedules')
@@ -65,13 +58,12 @@ export default function SchedulesPage() {
       <div className="flex items-center justify-between gap-2">
         <BackButton />
         {schedules.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setGeneralBlocksOpen(true)}>
-              <Layers className="h-4 w-4 mr-1.5" />
-              Bloqueios gerais
-            </Button>
-            <CreateBlockDialog />
-          </div>
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/dashboard/bloqueios">
+              <CalendarOff className="h-4 w-4 mr-1.5" />
+              Bloqueios
+            </Link>
+          </Button>
         )}
       </div>
       {schedules.length === 0 ? (
@@ -132,6 +124,16 @@ export default function SchedulesPage() {
                   </div>
                 </div>
 
+                {schedule.activeBlocksCount > 0 && (
+                  <Link
+                    href={`/dashboard/bloqueios?agenda=${schedule.id}`}
+                    className="mt-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700 hover:bg-red-200"
+                  >
+                    <CalendarOff className="h-3 w-3" />
+                    {schedule.activeBlocksCount} {schedule.activeBlocksCount === 1 ? 'bloqueio ativo' : 'bloqueios ativos'}
+                  </Link>
+                )}
+
                 {schedule.description && (
                   <p className="text-xs text-muted-foreground mt-2 truncate">{schedule.description}</p>
                 )}
@@ -140,8 +142,6 @@ export default function SchedulesPage() {
           ))}
         </div>
       )}
-
-      <GeneralBlocksDialog open={generalBlocksOpen} onOpenChange={setGeneralBlocksOpen} />
 
       {/* FAB */}
       <button

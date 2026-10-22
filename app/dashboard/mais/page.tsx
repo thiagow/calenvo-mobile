@@ -13,12 +13,8 @@ import {
   MessageSquare,
   Settings,
   User,
-  CreditCard,
   LogOut,
   ChevronRight,
-  Sliders,
-  Star,
-  Key,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +27,7 @@ const menuGroups = [
     label: 'Gestão',
     items: [
       { name: 'Agendas', href: '/dashboard/schedules', icon: Calendar, permission: 'canManageSchedules' as const },
-      { name: 'Meus bloqueios', href: '/dashboard/bloqueios', icon: CalendarOff, permission: 'canManageOwnBlocks' as const },
+      { name: 'Bloqueios', href: '/dashboard/bloqueios', icon: CalendarOff },
       { name: 'Serviços', href: '/dashboard/services', icon: Briefcase, permission: 'canManageServices' as const },
       { name: 'Profissionais', href: '/dashboard/professionals', icon: UserCog, permission: 'canManageProfessionals' as const },
       { name: 'Pacotes', href: '/dashboard/packages', icon: Package, permission: 'canManageServices' as const },
@@ -50,9 +46,6 @@ const menuGroups = [
     items: [
       { name: 'Perfil', href: '/dashboard/profile', icon: User },
       { name: 'Configurações', href: '/dashboard/settings', icon: Settings },
-      { name: 'Segmento', href: '/dashboard/segment-settings', icon: Sliders },
-      { name: 'Planos', href: '/dashboard/plans', icon: CreditCard },
-      { name: 'Chaves de API', href: '/dashboard/api-keys', icon: Key, permission: 'canManageSettings' as const },
     ],
   },
 ]
@@ -98,9 +91,11 @@ export default function MaisPage() {
           <p className="font-semibold truncate">{session?.user?.name}</p>
           <p className="text-xs text-muted-foreground truncate">{session?.user?.email}</p>
         </div>
-        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs flex-shrink-0">
-          {planConfig?.name}
-        </Badge>
+        <Link href="/dashboard/profile" aria-label="Ver plano no perfil" className="flex-shrink-0">
+          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
+            {planConfig?.name}
+          </Badge>
+        </Link>
       </div>
 
       <Separator />

@@ -61,7 +61,7 @@ export async function GET(
     const now = new Date()
 
     // Bloqueio "geral" (2+ agendas) e o pessoal de profissional são gerenciados no diálogo de
-    // bloqueios (Agendas → Bloqueios gerais; para o profissional, Meus bloqueios). Aqui entram só
+    // bloqueios (Mais → Bloqueios, `GET /api/schedule-blocks`). Aqui entram só
     // os desta agenda. Grupo comum que sobrou com 1 bloco volta a ser da agenda.
     const isGeneral = (b: (typeof blocks)[number]) =>
       Boolean(b.professionalId) || (Boolean(b.groupId) && (groupSizes.get(b.groupId!) ?? 1) > 1)

@@ -11,8 +11,6 @@ export interface UserPermissions {
   // Gestão de serviços e agendas
   canManageServices: boolean
   canManageSchedules: boolean
-  /** Profissional bloqueia o próprio tempo (administrador usa Agendas → Bloqueios). */
-  canManageOwnBlocks: boolean
 
   // Gestão de planos
   canManagePlans: boolean
@@ -63,7 +61,6 @@ export function useUserPermissions(): UserPermissions {
     
     canManageServices: isMaster,
     canManageSchedules: isMaster,
-    canManageOwnBlocks: isProfessional,
 
     canManagePlans: isMaster,
     canViewPlans: isMaster,

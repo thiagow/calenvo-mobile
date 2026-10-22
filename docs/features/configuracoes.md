@@ -8,7 +8,8 @@ Sistema de configurações gerais do negócio, incluindo horários de funcioname
 
 ### Páginas
 - **Configurações Gerais**: `/dashboard/settings` → `app/dashboard/settings/page.tsx`
-- **Configurações de Segmento**: `/dashboard/segment-settings` → `app/dashboard/segment-settings/page.tsx`
+- **Chaves de API**: seção "Integrações (API)" de `/dashboard/settings#api` → `components/settings/api-keys-section.tsx` (só MASTER; `/dashboard/api-keys` redireciona para lá)
+- **Segmento**: não é mais alterado pelo painel do negócio — só pelo SaaS Admin (`app/saas-admin/tenants/[id]`)
 - **Perfil**: `/dashboard/profile` → `app/dashboard/profile/page.tsx`
 
 ### Componentes
