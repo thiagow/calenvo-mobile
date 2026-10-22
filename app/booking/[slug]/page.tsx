@@ -31,6 +31,13 @@ interface BusinessInfo {
   businessName: string
   businessLogo: string | null
   address: string | null
+  timezone: string | null
+}
+
+interface ConfirmedAppointment {
+  id: string
+  startIso: string
+  status: string
 }
 
 export default function PublicBookingPage() {
@@ -65,6 +72,7 @@ export default function PublicBookingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [confirmedProfessionalName, setConfirmedProfessionalName] = useState<string | null>(null)
+  const [confirmedAppointment, setConfirmedAppointment] = useState<ConfirmedAppointment | null>(null)
 
   useEffect(() => {
     fetchBusinessInfo()
@@ -212,6 +220,13 @@ export default function PublicBookingPage() {
       if (response.ok) {
         const data = await response.json()
         setConfirmedProfessionalName(data.appointment?.professionalName || null)
+        if (data.appointment?.id && data.appointment?.date) {
+          setConfirmedAppointment({
+            id: data.appointment.id,
+            startIso: data.appointment.date,
+            status: data.appointment.status,
+          })
+        }
         setSuccess(true)
         toast.success('Agendamento realizado com sucesso!')
       } else {
@@ -241,6 +256,7 @@ export default function PublicBookingPage() {
     setClientEmail('')
     setClientPhone('')
     setConfirmedProfessionalName(null)
+    setConfirmedAppointment(null)
   }
 
   if (loading) {
@@ -259,6 +275,19 @@ export default function PublicBookingPage() {
         professionalName={confirmedProfessionalName}
         dateLabel={dateLabel}
         time={selectedTime}
+        calendarEvent={
+          confirmedAppointment
+            ? {
+                appointmentId: confirmedAppointment.id,
+                startIso: confirmedAppointment.startIso,
+                durationMin: selectedService.duration,
+                businessName: businessInfo?.businessName ?? null,
+                address: businessInfo?.address ?? null,
+                timezone: businessInfo?.timezone ?? null,
+                pendingConfirmation: confirmedAppointment.status === 'SCHEDULED',
+              }
+            : null
+        }
         onNewBooking={handleNewBooking}
       />
     )

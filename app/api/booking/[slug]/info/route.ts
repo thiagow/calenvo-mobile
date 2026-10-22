@@ -58,7 +58,8 @@ export async function GET(
     return NextResponse.json({
       businessName: user.businessName || user.name || 'Agendamento Online',
       businessLogo: user.businessConfig.businessLogo,
-      address: user.businessConfig.address || null
+      address: user.businessConfig.address || null,
+      timezone: user.businessConfig.timezone
     })
   } catch (error) {
     console.error('Erro ao buscar informações:', error)
