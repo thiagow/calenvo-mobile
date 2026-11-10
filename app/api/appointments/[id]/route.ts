@@ -1,7 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { AppointmentStatus, ModalityType } from '@prisma/client'
 import { NotificationService } from '@/lib/notification-service'
@@ -12,27 +10,38 @@ import { checkBookingConflict, withBookingLock } from '@/lib/appointment-service
 import { BLOCKED_DATE_ERROR, isScheduleDateBlocked } from '@/lib/schedule-blocks'
 import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { logError } from '@/lib/error-logger'
+import { getSessionScope } from '@/lib/session-scope'
+import type { TenantScope } from '@/lib/reactivation-service'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Agendamentos pertencem ao MASTER (`userId` = tenant). PROFESSIONAL acessa só os
+ * atendimentos em que é o responsável — mesma regra da listagem (GET /api/appointments).
+ * Antes cada handler filtrava por `userId: session.user.id`, o que devolvia 404 para
+ * todo profissional (e impedia, por exemplo, que concluísse o próprio atendimento).
+ */
+function appointmentScopeWhere(scope: TenantScope, id: string) {
+  return {
+    id,
+    userId: scope.tenantId,
+    deletedAt: null,
+    ...(scope.professionalId && { professionalId: scope.professionalId })
+  }
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const { scope, error } = await getSessionScope()
+    if (error) return error
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const userId = (session.user as any).id
+    // Daqui pra baixo `userId` é sempre o tenant (dono dos dados), também para PROFESSIONAL.
+    const userId = scope.tenantId
     const appointment = await prisma.appointment.findFirst({
-      where: {
-        id: params.id,
-        userId: userId,
-        deletedAt: null
-      },
+      where: appointmentScopeWhere(scope, params.id),
       include: {
         client: {
           select: {
@@ -84,13 +93,11 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const { scope, error } = await getSessionScope()
+    if (error) return error
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const userId = (session.user as any).id
+    // Daqui pra baixo `userId` é sempre o tenant (dono dos dados), também para PROFESSIONAL.
+    const userId = scope.tenantId
     const body = await request.json()
     const {
       date,
@@ -109,29 +116,24 @@ export async function PUT(
 
     // Verify appointment exists and belongs to user
     const existingAppointment = await prisma.appointment.findFirst({
-      where: {
-        id: params.id,
-        userId: userId,
-        deletedAt: null
-      }
+      where: appointmentScopeWhere(scope, params.id)
     })
 
     if (!existingAppointment) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        role: true,
-        canForceOverbook: true,
-        businessConfig: { select: { timezone: true } }
-      }
-    })
+    // Permissão de encaixe é do usuário logado; o fuso é do negócio (tenant).
+    const [actor, businessConfig] = await Promise.all([
+      scope.professionalId
+        ? prisma.user.findUnique({ where: { id: scope.professionalId }, select: { canForceOverbook: true } })
+        : null,
+      prisma.businessConfig.findUnique({ where: { userId: scope.tenantId }, select: { timezone: true } })
+    ])
 
     // Mesma conversão de hora de parede -> instante usada na criação e no motor
     // de slots: no fuso do negócio, resolvida no servidor.
-    const timezone = user?.businessConfig?.timezone || DEFAULT_TIMEZONE
+    const timezone = businessConfig?.timezone || DEFAULT_TIMEZONE
     let newDate: Date | undefined
     if (date) {
       newDate = time ? wallTimeToInstant(date, time, timezone) : new Date(date)
@@ -148,7 +150,7 @@ export async function PUT(
     const durationChanged = Boolean(duration) && Number(duration) !== existingAppointment.duration
     const isReschedule = (dateChanged || durationChanged) && Boolean(existingAppointment.scheduleId)
 
-    const canOverbook = user?.role === 'MASTER' || user?.canForceOverbook === true
+    const canOverbook = scope.isMaster || actor?.canForceOverbook === true
     if (forceOverbook && !canOverbook) {
       return NextResponse.json(
         { error: 'Você não tem permissão para criar encaixes' },
@@ -448,21 +450,15 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const { scope, error } = await getSessionScope()
+    if (error) return error
 
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const userId = (session.user as any).id
+    // Daqui pra baixo `userId` é sempre o tenant (dono dos dados), também para PROFESSIONAL.
+    const userId = scope.tenantId
 
     // Verify appointment exists, belongs to user, and isn't already deleted
     const existingAppointment = await prisma.appointment.findFirst({
-      where: {
-        id: params.id,
-        userId: userId,
-        deletedAt: null
-      }
+      where: appointmentScopeWhere(scope, params.id)
     })
 
     if (!existingAppointment) {
