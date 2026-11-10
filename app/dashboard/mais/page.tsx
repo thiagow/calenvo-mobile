@@ -15,14 +15,25 @@ import {
   User,
   LogOut,
   ChevronRight,
+  Wallet,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { PLAN_CONFIGS } from '@/lib/types'
 import { useUserPermissions } from '@/hooks/use-user-permissions'
+import { useFeatures, type FeaturesState } from '@/hooks/use-features'
 
-const menuGroups = [
+type MenuEntry = {
+  name: string
+  href: string
+  icon: React.ElementType
+  permission?: keyof ReturnType<typeof useUserPermissions>
+  /** Módulo opcional: o item só aparece com o direito de uso liberado. */
+  feature?: keyof FeaturesState
+}
+
+const menuGroups: { label: string; items: MenuEntry[] }[] = [
   {
     label: 'Gestão',
     items: [
@@ -32,6 +43,7 @@ const menuGroups = [
       { name: 'Profissionais', href: '/dashboard/professionals', icon: UserCog, permission: 'canManageProfessionals' as const },
       { name: 'Pacotes', href: '/dashboard/packages', icon: Package, permission: 'canManageServices' as const },
       { name: 'Fidelidade', href: '/dashboard/loyalty', icon: Gift, permission: 'canManageServices' as const },
+      { name: 'Financeiro', href: '/dashboard/financeiro', icon: Wallet, permission: 'canManageSettings' as const, feature: 'finance' as const },
     ],
   },
   {
@@ -70,6 +82,7 @@ function MenuItem({ name, href, icon: Icon }: { name: string; href: string; icon
 export default function MaisPage() {
   const { data: session } = useSession()
   const permissions = useUserPermissions()
+  const { features } = useFeatures()
   const userPlan = (session?.user as any)?.planType || 'BASICO'
   const planConfig = PLAN_CONFIGS[userPlan as keyof typeof PLAN_CONFIGS]
 
@@ -103,7 +116,9 @@ export default function MaisPage() {
       {/* Menu groups */}
       {menuGroups.map((group) => {
         const visibleItems = group.items.filter(item =>
-          !item.permission || permissions[item.permission]
+          (!item.permission || permissions[item.permission]) &&
+          // Com direito de uso o item aparece mesmo desligado: é lá que o dono liga o módulo.
+          (!item.feature || features?.[item.feature].entitled === true)
         )
         if (visibleItems.length === 0) return null
         return (

@@ -150,6 +150,12 @@ model User {
   messageTemplates     MessageTemplate[]
   reactivationMessages ReactivationMessage[]
 
+  // Módulos opcionais (direito de uso) e Módulo Financeiro
+  tenantFeatures    TenantFeature[]
+  financeConfig     FinanceConfig?
+  paymentMethods    PaymentMethod[]
+  financeCategories FinanceCategory[]
+
   @@unique([email, role])
 }
 
@@ -883,4 +889,116 @@ model ReactivationMessage {
 
   @@index([userId, clientId, serviceId, createdAt])
   @@index([userId, status, sentAt])
+}
+
+// ====== MÓDULOS OPCIONAIS ======
+
+enum FeatureKey {
+  FINANCE // Módulo Financeiro (caixa, contas a pagar/receber, comissões)
+}
+
+enum FeatureSource {
+  ADDON // Add-on pago na assinatura (Stripe)
+  GRANT // Liberado manualmente pelo SaaS Admin
+  PLAN  // Incluído no plano
+}
+
+enum FeatureStatus {
+  ACTIVE
+  CANCELED
+}
+
+/// Direito de uso de um módulo opcional por tenant. Ter o direito não liga o
+/// módulo: cada módulo tem sua própria chave liga/desliga (ex.: FinanceConfig.isActive).
+model TenantFeature {
+  id                       String        @id @default(cuid())
+  userId                   String
+  user                     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feature                  FeatureKey
+  source                   FeatureSource
+  status                   FeatureStatus @default(ACTIVE)
+  stripeSubscriptionItemId String?
+  expiresAt                DateTime?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  @@unique([userId, feature])
+}
+
+// ====== MÓDULO FINANCEIRO ======
+// Convenção: todo valor em dinheiro é Int em centavos (*Cents) e todo
+// percentual é Int em basis points (*Bps, 10000 = 100%). Nunca Float.
+
+enum CommissionBase {
+  AFTER_DISCOUNT // Sobre o valor cobrado, depois dos descontos
+  AFTER_FEES     // Também descontando a taxa da forma de pagamento
+}
+
+enum PaymentMethodType {
+  CASH
+  PIX
+  DEBIT
+  CREDIT
+  TRANSFER
+  OTHER
+}
+
+enum FinanceCategoryKind {
+  INCOME
+  EXPENSE
+}
+
+/// Configuração do Módulo Financeiro (1 por tenant). Só tem efeito com
+/// TenantFeature FINANCE ativo.
+model FinanceConfig {
+  id                        String         @id @default(cuid())
+  userId                    String         @unique
+  user                      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isActive                  Boolean        @default(false)
+  /// Quando o módulo foi ligado pela primeira vez: corte da tela de pendências.
+  activatedAt               DateTime?
+  commissionBase            CommissionBase @default(AFTER_DISCOUNT)
+  requireOpenCashSession    Boolean        @default(true)
+  settleOnlyPaidCommissions Boolean        @default(true)
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+}
+
+/// Formas de pagamento do tenant, com a taxa cobrada pela operadora.
+/// Não são apagadas (o histórico aponta para elas): desativar com isActive.
+model PaymentMethod {
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  type          PaymentMethodType
+  feeBps        Int               @default(0)
+  feeFixedCents Int               @default(0)
+  isActive      Boolean           @default(true)
+  sortOrder     Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId, isActive])
+}
+
+/// Plano de contas simples. Categorias de sistema (isSystem) são usadas pelos
+/// lançamentos automáticos e não podem ser renomeadas nem desativadas.
+model FinanceCategory {
+  id        String              @id @default(cuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      FinanceCategoryKind
+  name      String
+  /// Identificador estável das categorias de sistema (ex.: "services").
+  systemKey String?
+  isSystem  Boolean             @default(false)
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, kind, name])
+  @@unique([userId, systemKey])
+  @@index([userId, kind, isActive])
 }

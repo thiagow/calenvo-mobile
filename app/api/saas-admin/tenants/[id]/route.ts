@@ -23,6 +23,9 @@ export async function GET(
             where: { id },
             include: {
                 businessConfig: true,
+                tenantFeatures: {
+                    select: { feature: true, status: true, source: true, expiresAt: true }
+                },
                 professionals: {
                     select: {
                         id: true,

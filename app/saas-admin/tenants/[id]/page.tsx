@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { ArrowLeft, Lock, Unlock, Zap, Gift, Users, CalendarDays, UserRound, Briefcase, CalendarRange, Trash2, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Lock, Unlock, Zap, Gift, Users, CalendarDays, UserRound, Briefcase, CalendarRange, Trash2, AlertTriangle, Wallet } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import {
     Select,
     SelectContent,
@@ -53,6 +54,7 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
     const [deletePassword, setDeletePassword] = useState('')
     const [deleteError, setDeleteError] = useState('')
     const [isDeleting, setIsDeleting] = useState(false)
+    const [updatingFeature, setUpdatingFeature] = useState(false)
 
     useEffect(() => {
         fetchTenantDetails()
@@ -193,6 +195,43 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                 description: 'Erro ao atualizar isenção de pagamento',
                 variant: 'error'
             })
+        }
+    }
+
+    const financeFeature = tenant?.tenantFeatures?.find((f: { feature: string }) => f.feature === 'FINANCE')
+    const financeEnabled = financeFeature?.status === 'ACTIVE'
+    const handleToggleFinance = async () => {
+        if (!tenant) return
+        const enabled = !financeEnabled
+
+        const confirmed = await confirm({
+            title: enabled ? 'Liberar Módulo Financeiro' : 'Revogar Módulo Financeiro',
+            description: enabled
+                ? 'O cliente passa a ver o Financeiro no menu e pode ativá-lo nas configurações.'
+                : 'O Financeiro some do menu e para de lançar. Os dados já lançados são mantidos e voltam se o módulo for liberado de novo.',
+            variant: enabled ? 'default' : 'destructive',
+            confirmText: enabled ? 'Liberar' : 'Revogar'
+        })
+        if (!confirmed) return
+
+        setUpdatingFeature(true)
+        try {
+            const res = await fetch(`/api/saas-admin/tenants/${params.id}/features`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    feature: 'FINANCE',
+                    enabled,
+                    reason: enabled ? 'Módulo Financeiro liberado pelo admin' : 'Módulo Financeiro revogado pelo admin'
+                })
+            })
+            if (!res.ok) throw new Error()
+            toast.success(enabled ? 'Módulo Financeiro liberado' : 'Módulo Financeiro revogado')
+            fetchTenantDetails()
+        } catch {
+            toast.error('Erro ao atualizar o Módulo Financeiro')
+        } finally {
+            setUpdatingFeature(false)
         }
     }
 
@@ -394,6 +433,37 @@ export default function TenantDetailsPage({ params }: { params: { id: string } }
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Módulos opcionais</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Wallet className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="font-medium">Financeiro</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {financeEnabled
+                                        ? financeFeature?.source === 'ADDON'
+                                            ? 'Liberado pelo add-on da assinatura'
+                                            : 'Liberado pelo admin'
+                                        : 'Caixa, contas a pagar e receber, comissões'}
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={financeEnabled}
+                            disabled={updatingFeature}
+                            onCheckedChange={handleToggleFinance}
+                            aria-label="Liberar Módulo Financeiro"
+                        />
+                    </div>
+                </CardContent>
+            </Card>
 
             {tenant.professionals && tenant.professionals.length > 0 && (
                 <Card>
