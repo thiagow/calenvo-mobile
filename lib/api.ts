@@ -1,5 +1,7 @@
 
 // API client utilities
+import { announceSaleFromAppointmentResponse } from '@/lib/finance/client'
+
 const API_BASE = '/api'
 
 export interface ApiResponse<T> {
@@ -123,6 +125,10 @@ export const appointmentsApi = {
     return apiRequest<any>(`/appointments/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    }).then((response) => {
+      // Módulo Financeiro: concluir pode gerar uma comanda — abre "Fechar comanda".
+      announceSaleFromAppointmentResponse(response)
+      return response
     })
   },
 

@@ -1,195 +1,259 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, HandCoins, Landmark, Receipt, Wallet } from 'lucide-react'
 import { toast } from 'sonner'
 import { BackButton } from '@/components/dashboard/back-button'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
+import { Money } from '@/components/finance/money'
+import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
 import { useFeatures } from '@/hooks/use-features'
-import { useUserRole } from '@/hooks/use-user-role'
-import { CategoriesCard } from './_components/categories-card'
+import { financeFetch } from '@/lib/finance/client'
+import type { CurrencyCode } from '@/lib/finance/money'
+import { cn } from '@/lib/utils'
 import { FinanceIntro } from './_components/finance-intro'
-import { FinanceRulesCard } from './_components/finance-rules-card'
-import { PaymentMethodsCard } from './_components/payment-methods-card'
-import {
-  financeFetch,
-  type CurrencyCode,
-  type FinanceCategoryDto,
-  type FinanceConfigDto,
-  type PaymentMethodDto
-} from './_components/types'
+import { FinanceShell } from './_components/finance-shell'
 
-interface Settings {
-  config: FinanceConfigDto
-  currency: CurrencyCode
-  paymentMethods: PaymentMethodDto[]
-  categories: FinanceCategoryDto[]
+interface Overview {
+  today: string
+  cashSession: { id: string; openedAt: string; openedBy: string | null; openingCents: number; expectedCashCents: number | null } | null
+  cashSessionSummary: { totalInCents: number; totalOutCents: number; expectedCashCents: number } | null
+  todayInCents: number
+  todayOutCents: number
+  receivablesNext7Cents: number
+  receivablesOverdueCents: number
+  payablesNext7Cents: number
+  payablesOverdueCents: number
+  pendingCommissionsCents: number
+  pendingAppointments: number
 }
 
-const dateFormatter = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+const timeFormatter = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
-export default function FinancePage() {
-  const { isMaster, isLoading: roleLoading } = useUserRole()
-  const { features, isLoading: featuresLoading, refresh: refreshFeatures } = useFeatures()
-  const entitled = features?.finance.entitled === true
+export default function FinanceHomePage() {
+  const router = useRouter()
+  const { features, isLoading, refresh } = useFeatures()
+  const finance = features?.finance
+  const [activating, setActivating] = useState(false)
+  const [subscribing, setSubscribing] = useState(false)
 
-  const [settings, setSettings] = useState<Settings | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [confirmOff, setConfirmOff] = useState(false)
+  // Quem não é dono vai direto para a tela que pode usar.
+  useEffect(() => {
+    if (!finance?.active || finance.isMaster) return
+    router.replace(finance.canOperateCash ? '/dashboard/financeiro/caixa' : '/dashboard/financeiro/meus-ganhos')
+  }, [finance, router])
+
+  if (isLoading || !finance) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-2">
+          <Skeleton className="h-24 rounded-xl" />
+          <Skeleton className="h-24 rounded-xl" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!finance.active) {
+    const activate = async () => {
+      setActivating(true)
+      try {
+        await financeFetch('/api/finance/config', { method: 'PUT', body: JSON.stringify({ isActive: true }) })
+        await refresh()
+        toast.success('Financeiro ativado')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível ativar')
+      } finally {
+        setActivating(false)
+      }
+    }
+    const subscribe = async () => {
+      setSubscribing(true)
+      try {
+        await financeFetch('/api/finance/addon', { method: 'POST' })
+        await refresh()
+        toast.success('Financeiro adicionado à assinatura. Agora é só ativar.')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Não foi possível contratar')
+      } finally {
+        setSubscribing(false)
+      }
+    }
+    return (
+      <div className="space-y-4">
+        <BackButton />
+        <FinanceIntro
+          entitled={finance.entitled && finance.isMaster}
+          activating={activating}
+          onActivate={activate}
+          onSubscribe={finance.addonAvailable ? subscribe : undefined}
+          subscribing={subscribing}
+        />
+      </div>
+    )
+  }
+
+  if (!finance.isMaster) return null
+
+  return (
+    <FinanceShell title="Visão geral" access="master">
+      {(f) => <OverviewContent currency={f.currency} />}
+    </FinanceShell>
+  )
+}
+
+function OverviewContent({ currency }: { currency: CurrencyCode }) {
+  const [data, setData] = useState<Overview | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const { config, currency } = await financeFetch<{ config: FinanceConfigDto; currency: CurrencyCode }>(
-        '/api/finance/config'
-      )
-      if (!config.isActive) {
-        setSettings({ config, currency, paymentMethods: [], categories: [] })
-        return
-      }
-      const [{ paymentMethods }, { categories }] = await Promise.all([
-        financeFetch<{ paymentMethods: PaymentMethodDto[] }>('/api/finance/payment-methods?all=1'),
-        financeFetch<{ categories: FinanceCategoryDto[] }>('/api/finance/categories?all=1')
-      ])
-      setSettings({ config, currency, paymentMethods, categories })
+      setData(await financeFetch<Overview>('/api/finance/overview'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar o Financeiro')
-    } finally {
-      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (featuresLoading || roleLoading) return
-    if (entitled && isMaster) {
-      void load()
-    } else {
-      setLoading(false)
-    }
-  }, [entitled, featuresLoading, roleLoading, isMaster, load])
+    void load()
+    window.addEventListener(FINANCE_CHANGED_EVENT, load)
+    return () => window.removeEventListener(FINANCE_CHANGED_EVENT, load)
+  }, [load])
 
-  const updateConfig = async (changes: Partial<FinanceConfigDto>) => {
-    if (!settings) return
-    const previous = settings.config
-    setSettings({ ...settings, config: { ...previous, ...changes } }) // otimista
-    setSaving(true)
-    try {
-      const { config } = await financeFetch<{ config: FinanceConfigDto }>('/api/finance/config', {
-        method: 'PUT',
-        body: JSON.stringify(changes)
-      })
-      const switchedState = changes.isActive !== undefined
-      if (switchedState) {
-        await Promise.all([load(), refreshFeatures()])
-        toast.success(config.isActive ? 'Financeiro ativado' : 'Financeiro desativado')
-      } else {
-        setSettings((current) => (current ? { ...current, config } : current))
-      }
-    } catch (err) {
-      setSettings((current) => (current ? { ...current, config: previous } : current))
-      toast.error(err instanceof Error ? err.message : 'Não foi possível salvar')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (featuresLoading || roleLoading || loading) {
+  if (!data) {
     return (
       <div className="space-y-3">
-        <Skeleton className="h-5 w-16" />
-        <Skeleton className="h-48 w-full rounded-2xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-44 w-full rounded-2xl" />
+        <div className="grid grid-cols-2 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
 
-  if (!isMaster) {
-    return (
-      <div className="space-y-4">
-        <BackButton />
-        <p className="text-sm text-muted-foreground">Apenas o administrador da conta acessa as configurações do Financeiro.</p>
-      </div>
-    )
-  }
-
-  if (!entitled || !settings) {
-    return (
-      <div className="space-y-4">
-        <BackButton />
-        <FinanceIntro entitled={false} />
-      </div>
-    )
-  }
-
-  if (!settings.config.isActive) {
-    return (
-      <div className="space-y-4">
-        <BackButton />
-        <FinanceIntro entitled activating={saving} onActivate={() => updateConfig({ isActive: true })} />
-      </div>
-    )
-  }
-
-  const { config, currency, paymentMethods, categories } = settings
+  const net = data.todayInCents - data.todayOutCents
 
   return (
-    <div className="space-y-6 pb-4">
-      <BackButton />
-
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold tracking-tight">Financeiro</h1>
-          <p className="text-sm text-muted-foreground">
-            {config.activatedAt
-              ? `Ativo desde ${dateFormatter.format(new Date(config.activatedAt))}`
-              : 'Ativo'}
+    <div className="space-y-4">
+      {data.pendingAppointments > 0 && (
+        <Link
+          href="/dashboard/financeiro/pendencias"
+          className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 transition-colors hover:bg-amber-500/10"
+        >
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+          <p className="flex-1 text-sm">
+            <span className="font-medium">{data.pendingAppointments}</span>{' '}
+            {data.pendingAppointments === 1 ? 'atendimento concluído sem comanda' : 'atendimentos concluídos sem comanda'}
           </p>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+        </Link>
+      )}
+
+      {/* Hoje */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative space-y-5">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Saldo de hoje</p>
+            <Money cents={net} currency={currency} signed className={cn('block text-4xl font-semibold tracking-tight', net < 0 && 'text-destructive')} />
+          </div>
+          <div className="flex gap-6 text-sm">
+            <div className="flex items-center gap-1.5">
+              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              <Money cents={data.todayInCents} currency={currency} />
+              <span className="text-muted-foreground">entradas</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <ArrowDownRight className="h-4 w-4 text-rose-500" />
+              <Money cents={data.todayOutCents} currency={currency} />
+              <span className="text-muted-foreground">saídas</span>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/financeiro/caixa"
+            className="flex items-center justify-between rounded-xl bg-muted/60 px-3.5 py-3 transition-colors hover:bg-muted"
+          >
+            <span className="flex items-center gap-2.5">
+              <span className={cn('h-2 w-2 rounded-full', data.cashSession ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+              <span className="text-sm">
+                {data.cashSession ? (
+                  <>
+                    Caixa aberto desde {timeFormatter.format(new Date(data.cashSession.openedAt))}
+                    <span className="text-muted-foreground"> · gaveta </span>
+                    <Money cents={data.cashSessionSummary?.expectedCashCents ?? 0} currency={currency} />
+                  </>
+                ) : (
+                  'Caixa fechado'
+                )}
+              </span>
+            </span>
+            <span className="text-xs font-medium text-primary">{data.cashSession ? 'Ver caixa' : 'Abrir caixa'}</span>
+          </Link>
         </div>
-        <label className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Ligado
-          <Switch checked disabled={saving} onCheckedChange={() => setConfirmOff(true)} aria-label="Desativar Financeiro" />
-        </label>
-      </header>
+      </section>
 
-      <Section title="Regras" description="Como as comissões e os recebimentos se comportam.">
-        <FinanceRulesCard config={config} saving={saving} onChange={updateConfig} />
-      </Section>
-
-      <Section title="Formas de pagamento" description="Cadastre a taxa de cada maquininha para ver o valor líquido real.">
-        <PaymentMethodsCard methods={paymentMethods} currency={currency} onChanged={load} />
-      </Section>
-
-      <Section title="Categorias" description="Organizam receitas e despesas nos relatórios.">
-        <CategoriesCard categories={categories} onChanged={load} />
-      </Section>
-
-      <ConfirmDialog
-        open={confirmOff}
-        onOpenChange={setConfirmOff}
-        title="Desativar o Financeiro?"
-        description="Atendimentos concluídos deixam de entrar no caixa e nas comissões enquanto estiver desligado. Nada do que já foi lançado é apagado, e você pode ligar de novo quando quiser."
-        confirmText="Desativar"
-        variant="destructive"
-        onConfirm={() => updateConfig({ isActive: false })}
-      />
+      {/* Próximos 7 dias */}
+      <div className="grid grid-cols-2 gap-2">
+        <Tile
+          href="/dashboard/financeiro/receber"
+          icon={Receipt}
+          label="A receber · 7 dias"
+          cents={data.receivablesNext7Cents}
+          currency={currency}
+          note={data.receivablesOverdueCents > 0 ? { cents: data.receivablesOverdueCents, text: 'vencido' } : null}
+        />
+        <Tile
+          href="/dashboard/financeiro/pagar"
+          icon={Landmark}
+          label="A pagar · 7 dias"
+          cents={data.payablesNext7Cents}
+          currency={currency}
+          note={data.payablesOverdueCents > 0 ? { cents: data.payablesOverdueCents, text: 'vencido' } : null}
+        />
+        <Tile href="/dashboard/financeiro/comissoes" icon={HandCoins} label="Comissões a acertar" cents={data.pendingCommissionsCents} currency={currency} />
+        <Tile href="/dashboard/financeiro/caixa" icon={Wallet} label="Na gaveta agora" cents={data.cashSessionSummary?.expectedCashCents ?? 0} currency={currency} muted={!data.cashSession} />
+      </div>
     </div>
   )
 }
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Tile({
+  href,
+  icon: Icon,
+  label,
+  cents,
+  currency,
+  note,
+  muted
+}: {
+  href: string
+  icon: React.ElementType
+  label: string
+  cents: number
+  currency: CurrencyCode
+  note?: { cents: number; text: string } | null
+  muted?: boolean
+}) {
   return (
-    <section className="space-y-2.5">
-      <div className="px-0.5">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
-        <p className="text-xs text-muted-foreground/80">{description}</p>
+    <Link href={href} className="group space-y-2 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-foreground/20">
+      <div className="flex items-center justify-between">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
-      {children}
-    </section>
+      <div>
+        <Money cents={cents} currency={currency} className={cn('block text-lg font-semibold tracking-tight', muted && 'text-muted-foreground')} />
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        {note && (
+          <p className="mt-1 text-[11px] font-medium text-rose-500">
+            <Money cents={note.cents} currency={currency} /> {note.text}
+          </p>
+        )}
+      </div>
+    </Link>
   )
 }

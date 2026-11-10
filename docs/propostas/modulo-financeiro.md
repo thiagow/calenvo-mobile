@@ -6,6 +6,15 @@ Módulo **opcional**, com direito de uso por tenant. Ele cobre contas a receber 
 
 | Etapa | Situação |
 |---|---|
+| Correção do `PUT/GET/DELETE /api/appointments/[id]` para PROFESSIONAL | ✅ Feito e em produção |
+| Fase 1: Fundação | ✅ Feito e em produção (migration `20261110120000_add_finance_foundation`) |
+| Fases 2 a 6: comanda, contas a receber, caixa, comissões e acertos, contas a pagar, pacotes, relatórios, add-on Stripe | ✅ Código pronto. Migration `20261110180000_add_finance_operations` |
+
+Verificação ponta a ponta contra o banco, sempre desfeita no fim: `npx tsx scripts/finance-flow-check.ts <tenantId>`.
+
+Para cobrar o add-on, configure `STRIPE_FINANCE_ADDON_PRICE_ID` (e `_USD`). Sem essas variáveis, o módulo só é liberado pelo SaaS Admin.
+
+---|---|
 | Correção do `PUT/GET/DELETE /api/appointments/[id]` para PROFESSIONAL | ✅ Feito, com testes em `app/api/appointments/[id]/route.test.ts` |
 | Fase 1: Fundação | ✅ Código pronto. Migration `20261110120000_add_finance_foundation` ainda não aplicada no banco |
 | Fases 2 a 6 | Pendentes |

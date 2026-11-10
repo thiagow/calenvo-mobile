@@ -10,6 +10,7 @@ import { SegmentType, PlanType } from '@prisma/client'
 import { PLAN_CONFIGS, getPlanPrice } from '@/lib/types'
 import { formatCurrencyByCurrency, normalizeEmail } from '@/lib/utils'
 import Stripe from 'stripe'
+import { pickPlanPriceId, syncFinanceAddon } from '@/lib/finance/addon'
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -264,8 +265,13 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   // O plano é derivado do price ID atual da assinatura, cobrindo tanto o
   // checkout inicial quanto trocas de plano feitas via Stripe Billing Portal
   // (upgrade/downgrade de self-service), que não passam pelo nosso checkout.
-  const currentPriceId = subscription.items.data[0]?.price?.id
+  // Com o add-on do Financeiro a assinatura tem mais de um item: o plano é o
+  // primeiro item cujo price mapeia para um plano, não necessariamente items[0].
+  const currentPriceId = pickPlanPriceId(subscription.items.data, (priceId) => getPlanFromPriceId(priceId) !== null)
   const planInfo = currentPriceId ? getPlanFromPriceId(currentPriceId) : null
+
+  // Add-on do Módulo Financeiro (opcional): liga/desliga o direito de uso.
+  await syncFinanceAddon(prisma, { tenantId: user.id, subscriptionStatus: subscription.status, items: subscription.items.data })
 
   await prisma.user.update({
     where: { id: user.id },
@@ -320,6 +326,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     where: { id: user.id },
     data: { subscriptionStatus: 'canceled' }
   })
+
+  // Sem assinatura, o add-on do Financeiro também deixa de valer (dados são mantidos).
+  await syncFinanceAddon(prisma, { tenantId: user.id, subscriptionStatus: 'canceled', items: [] })
 
   console.log('⚠️ Assinatura do usuário marcada como cancelada (conta suspensa)')
 }

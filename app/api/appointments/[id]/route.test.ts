@@ -60,9 +60,14 @@ vi.mock('@/app/actions/loyalty', () => ({ processLoyaltyEarn: vi.fn(async () => 
 vi.mock('@/lib/appointment-service', () => ({ checkBookingConflict: vi.fn(), withBookingLock: vi.fn() }))
 vi.mock('@/lib/schedule-blocks', () => ({ BLOCKED_DATE_ERROR: 'blocked', isScheduleDateBlocked: vi.fn() }))
 vi.mock('@/lib/error-logger', () => ({ logError: vi.fn() }))
+vi.mock('@/lib/finance/hooks', () => ({
+  onAppointmentCompleted: vi.fn(async () => ({ saleId: 'sale-1' })),
+  onAppointmentUncompleted: vi.fn()
+}))
 
 import { GET, PUT, DELETE } from './route'
 import { processLoyaltyEarn } from '@/app/actions/loyalty'
+import { onAppointmentCompleted, onAppointmentUncompleted } from '@/lib/finance/hooks'
 
 const params = { params: { id: 'appt-1' } }
 
@@ -104,6 +109,9 @@ describe('/api/appointments/[id] — escopo do tenant', () => {
     expect(res.status).toBe(200)
     expect(lastWhere()).toMatchObject({ userId: 'master-1', professionalId: 'pro-1' })
     expect(processLoyaltyEarn).toHaveBeenCalledWith('appt-1', 'master-1')
+    // Comanda do Financeiro: gancho chamado no tenant, com o profissional como autor
+    expect(onAppointmentCompleted).toHaveBeenCalledWith({ tenantId: 'master-1', appointmentId: 'appt-1', actorId: 'pro-1' })
+    expect((await res.json()).financeSaleId).toBe('sale-1')
     // Fuso vem do negócio, não do profissional (que não tem BusinessConfig)
     expect(db.businessConfig.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: 'master-1' } })
@@ -130,6 +138,14 @@ describe('/api/appointments/[id] — escopo do tenant', () => {
     const res = await DELETE(new NextRequest('http://localhost/api/appointments/appt-1'), params)
     expect(res.status).toBe(403)
     expect(db.appointment.findFirst).not.toHaveBeenCalled()
+  })
+
+  it('tirar de COMPLETED aciona o cancelamento da comanda', async () => {
+    db.appointment.findFirst.mockResolvedValueOnce({ ...db.updated, status: 'COMPLETED' })
+    const res = await put({ status: 'CONFIRMED' })
+    expect(res.status).toBe(200)
+    expect(onAppointmentUncompleted).toHaveBeenCalledWith({ tenantId: 'master-1', appointmentId: 'appt-1', actorId: 'master-1' })
+    expect(onAppointmentCompleted).not.toHaveBeenCalled()
   })
 
   it('DELETE do PROFESSIONAL faz exclusão lógica do próprio atendimento', async () => {

@@ -97,6 +97,9 @@ model User {
   // Permite a um profissional (role PROFESSIONAL) criar agendamentos em horário já ocupado ("encaixe").
   // MASTER sempre pode, independente deste campo.
   canForceOverbook   Boolean     @default(false)
+  // Permite a um profissional (ex.: recepção) operar o caixa e receber pagamentos
+  // no Módulo Financeiro. MASTER sempre pode.
+  canOperateCash     Boolean     @default(false)
   businessName       String? // Nome do negócio
   phone              String?
   segmentTypes       SegmentType[] @default([BEAUTY_SALON])
@@ -155,6 +158,22 @@ model User {
   financeConfig     FinanceConfig?
   paymentMethods    PaymentMethod[]
   financeCategories FinanceCategory[]
+  sales                       Sale[]
+  receivables                 Receivable[]
+  payables                    Payable[]
+  financialTransactions       FinancialTransaction[]   @relation("TenantTransactions")
+  createdTransactions         FinancialTransaction[]   @relation("TransactionCreatedBy")
+  cashSessions                CashSession[]            @relation("TenantCashSessions")
+  openedCashSessions          CashSession[]            @relation("CashOpenedBy")
+  closedCashSessions          CashSession[]            @relation("CashClosedBy")
+  commissionRules             CommissionRule[]         @relation("TenantCommissionRules")
+  professionalCommissionRules CommissionRule[]         @relation("ProfessionalCommissionRules")
+  saleItemsAsProfessional     SaleItem[]               @relation("SaleItemProfessional")
+  commissions                 Commission[]             @relation("ProfessionalCommissions")
+  professionalAdjustments     ProfessionalAdjustment[] @relation("ProfessionalAdjustments")
+  createdAdjustments          ProfessionalAdjustment[] @relation("AdjustmentCreatedBy")
+  settlementsAsProfessional   CommissionSettlement[]   @relation("ProfessionalSettlements")
+  createdSettlements          CommissionSettlement[]   @relation("SettlementCreatedBy")
 
   @@unique([email, role])
 }
@@ -208,6 +227,8 @@ model Client {
   loyaltyBalance      LoyaltyBalance[]      @relation("ClientLoyaltyBalance")
   loyaltyTransactions LoyaltyTransaction[]  @relation("ClientLoyaltyTransactions")
   reactivationMessages ReactivationMessage[]
+  sales                Sale[]
+  receivables          Receivable[]
 
   @@unique([cpf, userId])
   @@unique([userId, phone])
@@ -369,6 +390,8 @@ model Service {
   appointments Appointment[]
   packageItems ClientPackageItem[] // Itens de pacote vinculados a este serviço
   templateItems PackageTemplateItem[] // Itens de template de pacotes
+  saleItems       SaleItem[]
+  commissionRules CommissionRule[]
 }
 
 // Tabela de junção: Agenda <-> Serviços
@@ -446,6 +469,9 @@ model Appointment {
   // Pedido de confirmação de presença enviado por WhatsApp (link)
   confirmationRequest AppointmentConfirmation?
 
+  // Comanda gerada ao concluir (Módulo Financeiro)
+  sale Sale?
+
   @@index([userId, date])
   @@index([userId, status, date])
   @@index([professionalId, date])
@@ -472,6 +498,7 @@ model ClientPackage {
   updatedAt   DateTime            @updatedAt
   
   items       ClientPackageItem[]
+  sale        Sale? // Venda do pacote (Módulo Financeiro)
 
   @@index([clientId])
   @@index([userId])
@@ -486,8 +513,12 @@ model ClientPackageItem {
   service         Service        @relation(fields: [serviceId], references: [id])
   totalSessions   Int
   usedSessions    Int            @default(0)
+  /// Valor proporcional de uma sessão (centavos), gravado na venda do pacote.
+  /// Base da comissão quando a sessão é concluída.
+  sessionValueCents Int?
   
   appointments    Appointment[]
+  saleItems       SaleItem[]
 
   @@index([clientPackageId])
   @@index([serviceId])
@@ -979,6 +1010,9 @@ model PaymentMethod {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
+  transactions FinancialTransaction[]
+  settlements  CommissionSettlement[]
+
   @@unique([userId, name])
   @@index([userId, isActive])
 }
@@ -998,7 +1032,341 @@ model FinanceCategory {
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
 
+  receivables Receivable[]
+  payables    Payable[]
+
   @@unique([userId, kind, name])
   @@unique([userId, systemKey])
   @@index([userId, kind, isActive])
+}
+
+enum SaleOrigin {
+  APPOINTMENT // Gerada ao concluir um agendamento
+  PACKAGE     // Venda de pacote
+  MANUAL      // Venda avulsa
+}
+
+enum SaleStatus {
+  OPEN      // Valor em aberto (total ou parcial)
+  CLOSED    // Quitada
+  CANCELLED
+}
+
+enum SettlementEntryStatus {
+  OPEN
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum TransactionDirection {
+  IN
+  OUT
+}
+
+enum TransactionKind {
+  RECEIPT           // Recebimento de conta a receber
+  PAYMENT           // Pagamento de conta a pagar
+  SUPPLY            // Suprimento (entrada de troco no caixa)
+  WITHDRAWAL        // Sangria (retirada do caixa)
+  COMMISSION_PAYOUT // Pagamento de acerto ao profissional
+  ADVANCE           // Vale/adiantamento pago ao profissional
+  REVERSAL          // Estorno de um lançamento (sentido oposto)
+}
+
+enum CashSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum CommissionRuleType {
+  PERCENT
+  FIXED
+}
+
+enum CommissionStatus {
+  PENDING
+  SETTLED
+  CANCELLED
+}
+
+enum AdjustmentKind {
+  ADVANCE   // Vale/adiantamento (desconta no acerto)
+  BONUS     // Bônus (soma no acerto)
+  DEDUCTION // Desconto (desconta no acerto)
+}
+
+enum SettlementStatus {
+  PAID
+  CANCELLED
+}
+
+/// Comanda: o que foi vendido. Uma por agendamento concluído ou por pacote.
+model Sale {
+  id              String         @id @default(cuid())
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origin          SaleOrigin
+  status          SaleStatus     @default(OPEN)
+  appointmentId   String?        @unique
+  appointment     Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  clientPackageId String?        @unique
+  clientPackage   ClientPackage? @relation(fields: [clientPackageId], references: [id], onDelete: SetNull)
+  clientId        String?
+  client          Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  description     String
+  subtotalCents   Int            @default(0)
+  discountCents   Int            @default(0)
+  totalCents      Int            @default(0)
+  occurredAt      DateTime       @default(now())
+  closedAt        DateTime?
+  cancelledAt     DateTime?
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  items      SaleItem[]
+  receivable Receivable?
+
+  @@index([userId, status, occurredAt])
+  @@index([userId, occurredAt])
+}
+
+/// Serviço executado (ou item vendido) numa comanda.
+model SaleItem {
+  id                  String             @id @default(cuid())
+  saleId              String
+  sale                Sale               @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  serviceId           String?
+  service             Service?           @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  description         String
+  professionalId      String?
+  professional        User?              @relation("SaleItemProfessional", fields: [professionalId], references: [id], onDelete: SetNull)
+  quantity            Int                @default(1)
+  unitPriceCents      Int
+  discountCents       Int                @default(0)
+  totalCents          Int
+  /// Parte das taxas de pagamento rateada para este item (base AFTER_FEES).
+  feeCents            Int                @default(0)
+  clientPackageItemId String?
+  clientPackageItem   ClientPackageItem? @relation(fields: [clientPackageItemId], references: [id], onDelete: SetNull)
+  /// Base da comissão: total do item, ou o valor da sessão em pacote.
+  commissionBaseCents Int
+  sortOrder           Int                @default(0)
+
+  commission Commission?
+
+  @@index([saleId])
+  @@index([professionalId])
+}
+
+model Receivable {
+  id          String                @id @default(cuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  saleId      String?               @unique
+  sale        Sale?                 @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  clientId    String?
+  client      Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  categoryId  String
+  category    FinanceCategory       @relation(fields: [categoryId], references: [id])
+  description String
+  amountCents Int
+  paidCents   Int                   @default(0)
+  dueDate     DateTime
+  status      SettlementEntryStatus @default(OPEN)
+  cancelledAt DateTime?
+  createdById String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  transactions FinancialTransaction[]
+
+  @@index([userId, status, dueDate])
+  @@index([userId, clientId])
+}
+
+model Payable {
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       FinanceCategory       @relation(fields: [categoryId], references: [id])
+  supplier       String?
+  description    String
+  amountCents    Int
+  paidCents      Int                   @default(0)
+  dueDate        DateTime
+  status         SettlementEntryStatus @default(OPEN)
+  /// Parcelas e recorrências geradas juntas compartilham o seriesId.
+  seriesId       String?
+  installment    Int?
+  ofInstallments Int?
+  notes          String?
+  cancelledAt    DateTime?
+  createdById    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  transactions FinancialTransaction[]
+
+  @@index([userId, status, dueDate])
+  @@index([seriesId])
+}
+
+/// Livro-razão imutável: toda entrada e saída de dinheiro. Correção = REVERSAL,
+/// nunca UPDATE/DELETE. amountCents é sempre positivo; o sentido está em direction.
+model FinancialTransaction {
+  id              String                  @id @default(cuid())
+  userId          String
+  user            User                    @relation("TenantTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  direction       TransactionDirection
+  kind            TransactionKind
+  amountCents     Int
+  feeCents        Int                     @default(0)
+  paymentMethodId String?
+  paymentMethod   PaymentMethod?          @relation(fields: [paymentMethodId], references: [id])
+  cashSessionId   String?
+  cashSession     CashSession?            @relation(fields: [cashSessionId], references: [id])
+  receivableId    String?
+  receivable      Receivable?             @relation(fields: [receivableId], references: [id])
+  payableId       String?
+  payable         Payable?                @relation(fields: [payableId], references: [id])
+  settlementId    String?
+  settlement      CommissionSettlement?   @relation(fields: [settlementId], references: [id])
+  adjustmentId    String?                 @unique
+  adjustment      ProfessionalAdjustment? @relation(fields: [adjustmentId], references: [id])
+  reversesId      String?                 @unique
+  reverses        FinancialTransaction?   @relation("Reversal", fields: [reversesId], references: [id])
+  reversedBy      FinancialTransaction?   @relation("Reversal")
+  description     String?
+  occurredAt      DateTime                @default(now())
+  createdById     String?
+  createdBy       User?                   @relation("TransactionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime                @default(now())
+
+  @@index([userId, occurredAt])
+  @@index([cashSessionId])
+  @@index([receivableId])
+  @@index([payableId])
+}
+
+/// Caixa. No máximo um OPEN por tenant (índice único parcial na migration).
+model CashSession {
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation("TenantCashSessions", fields: [userId], references: [id], onDelete: Cascade)
+  status            CashSessionStatus @default(OPEN)
+  openedById        String
+  openedBy          User              @relation("CashOpenedBy", fields: [openedById], references: [id])
+  openedAt          DateTime          @default(now())
+  openingCents      Int               @default(0)
+  closedById        String?
+  closedBy          User?             @relation("CashClosedBy", fields: [closedById], references: [id])
+  closedAt          DateTime?
+  expectedCashCents Int?
+  countedCashCents  Int?
+  differenceCents   Int?
+  notes             String?
+
+  transactions FinancialTransaction[]
+  settlements  CommissionSettlement[]
+
+  @@index([userId, status])
+  @@index([userId, openedAt])
+}
+
+/// Regra de comissão. serviceId null = padrão do profissional. A regra mais
+/// específica vence. Unicidade de (profissional, null) garantida por índice parcial.
+model CommissionRule {
+  id             String             @id @default(cuid())
+  userId         String
+  user           User               @relation("TenantCommissionRules", fields: [userId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   User               @relation("ProfessionalCommissionRules", fields: [professionalId], references: [id], onDelete: Cascade)
+  serviceId      String?
+  service        Service?           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  type           CommissionRuleType
+  valueBps       Int?
+  valueCents     Int?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([professionalId, serviceId])
+  @@index([userId])
+}
+
+/// Comissão gerada por item de comanda. Snapshot da regra: mudar a regra depois
+/// não altera o passado. SETTLED fica congelada.
+model Commission {
+  id             String                @id @default(cuid())
+  userId         String
+  saleItemId     String                @unique
+  saleItem       SaleItem              @relation(fields: [saleItemId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   User                  @relation("ProfessionalCommissions", fields: [professionalId], references: [id], onDelete: Cascade)
+  baseCents      Int
+  ruleType       CommissionRuleType
+  ruleValue      Int
+  amountCents    Int
+  status         CommissionStatus      @default(PENDING)
+  settlementId   String?
+  settlement     CommissionSettlement? @relation(fields: [settlementId], references: [id])
+  earnedAt       DateTime              @default(now())
+  cancelledAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([userId, professionalId, status])
+  @@index([settlementId])
+}
+
+model ProfessionalAdjustment {
+  id             String                @id @default(cuid())
+  userId         String
+  professionalId String
+  professional   User                  @relation("ProfessionalAdjustments", fields: [professionalId], references: [id], onDelete: Cascade)
+  kind           AdjustmentKind
+  amountCents    Int
+  description    String
+  settlementId   String?
+  settlement     CommissionSettlement? @relation(fields: [settlementId], references: [id])
+  cancelledAt    DateTime?
+  createdById    String?
+  createdBy      User?                 @relation("AdjustmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime              @default(now())
+
+  transaction FinancialTransaction?
+
+  @@index([userId, professionalId, settlementId])
+}
+
+/// Acerto com o profissional: comissões + bônus − vales/descontos = líquido pago.
+model CommissionSettlement {
+  id               String           @id @default(cuid())
+  userId           String
+  professionalId   String
+  professional     User             @relation("ProfessionalSettlements", fields: [professionalId], references: [id], onDelete: Cascade)
+  cashSessionId    String?
+  cashSession      CashSession?     @relation(fields: [cashSessionId], references: [id])
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  commissionsCents Int
+  bonusesCents     Int              @default(0)
+  deductionsCents  Int              @default(0)
+  netCents         Int
+  status           SettlementStatus @default(PAID)
+  paymentMethodId  String?
+  paymentMethod    PaymentMethod?   @relation(fields: [paymentMethodId], references: [id])
+  notes            String?
+  paidAt           DateTime         @default(now())
+  createdById      String?
+  createdBy        User?            @relation("SettlementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime         @default(now())
+
+  commissions  Commission[]
+  adjustments  ProfessionalAdjustment[]
+  transactions FinancialTransaction[]
+
+  @@index([userId, professionalId, paidAt])
 }

@@ -145,7 +145,7 @@ describe('GET /api/features', () => {
   it('informa disponibilidade para a sessão, inclusive PROFESSIONAL', async () => {
     mockUser = { id: 'pro-1', role: 'PROFESSIONAL', masterId: 'master-1' }
     const res = await featuresRoute.GET()
-    expect(await res.json()).toEqual({ finance: { entitled: true, active: true } })
+    expect((await res.json()).finance).toMatchObject({ entitled: true, active: true, isMaster: false, canOperateCash: false })
   })
 })
 

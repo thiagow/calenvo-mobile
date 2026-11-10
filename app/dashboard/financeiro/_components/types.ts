@@ -33,13 +33,4 @@ export interface FinanceCategoryDto {
 
 export type { CurrencyCode }
 
-/** fetch JSON com erro legível vindo da API (`{ error }`). */
-export async function financeFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers }
-  })
-  const body = await res.json().catch(() => null)
-  if (!res.ok) throw new Error((body as { error?: string } | null)?.error ?? 'Não foi possível concluir a operação')
-  return body as T
-}
+export { financeFetch } from '@/lib/finance/client'

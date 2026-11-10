@@ -5,6 +5,7 @@ import { SessionProvider } from 'next-auth/react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { BottomNav } from '@/components/layout/bottom-nav'
 import { SegmentProvider } from '@/contexts/segment-context'
+import { SaleSheetHost } from '@/components/finance/sale-sheet-host'
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode
@@ -29,6 +30,8 @@ export function DashboardLayoutClient({ children, sessionData, session }: Dashbo
             {children}
           </main>
           <BottomNav />
+          {/* Módulo Financeiro (opcional): "Fechar comanda" ao concluir atendimentos */}
+          <SaleSheetHost />
         </div>
       </SegmentProvider>
     </SessionProvider>

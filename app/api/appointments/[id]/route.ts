@@ -11,6 +11,7 @@ import { BLOCKED_DATE_ERROR, isScheduleDateBlocked } from '@/lib/schedule-blocks
 import { DEFAULT_TIMEZONE, wallTimeToInstant } from '@/lib/timezone'
 import { logError } from '@/lib/error-logger'
 import { getSessionScope } from '@/lib/session-scope'
+import { onAppointmentCompleted, onAppointmentUncompleted } from '@/lib/finance/hooks'
 import type { TenantScope } from '@/lib/reactivation-service'
 
 export const dynamic = 'force-dynamic'
@@ -263,6 +264,10 @@ export async function PUT(
       })
     }
 
+    // Comanda criada pelo Módulo Financeiro nesta conclusão (null com o módulo desligado)
+    let financeSale: { saleId: string } | null = null
+    const actorId = scope.professionalId ?? scope.tenantId
+
     // Criar notificações baseadas na mudança de status
     try {
       const serviceName = updatedAppointment.service?.name || updatedAppointment.specialty || 'Serviço'
@@ -351,6 +356,14 @@ export async function PUT(
         }
         // --- FIM: Lógica de Fidelização ---
 
+        // --- Módulo Financeiro (opcional): depois da dedução de pacote, para a
+        // comanda já saber se a sessão é de pacote. Os ganchos nunca lançam erro.
+        if (status === 'COMPLETED') {
+          financeSale = await onAppointmentCompleted({ tenantId: userId, appointmentId: params.id, actorId })
+        } else if (existingAppointment.status === 'COMPLETED') {
+          await onAppointmentUncompleted({ tenantId: userId, appointmentId: params.id, actorId })
+        }
+
         switch (status) {
           case 'CONFIRMED':
             // Notificação interna apenas — o WhatsApp de "confirme sua presença" é
@@ -431,7 +444,8 @@ export async function PUT(
       insurance: updatedAppointment.insurance || 'Particular',
       notes: updatedAppointment.notes || '',
       professional: updatedAppointment.professional || 'Não definido',
-      price: updatedAppointment.price
+      price: updatedAppointment.price,
+      ...(financeSale && { financeSaleId: financeSale.saleId })
     }
 
     return NextResponse.json(transformedAppointment)

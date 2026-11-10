@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { onPackageSold } from '@/lib/finance/hooks'
 
 const createPackageSchema = z.object({
     clientId: z.string().min(1, 'Cliente é obrigatório'),
@@ -46,6 +47,9 @@ export async function createClientPackage(data: z.infer<typeof createPackageSche
                 items: true
             }
         })
+
+        // Módulo Financeiro (opcional): a venda do pacote entra no contas a receber.
+        await onPackageSold({ tenantId: userId, clientPackageId: newPackage.id, actorId: userId })
 
         revalidatePath(`/dashboard/clients/${validatedData.clientId}`)
         return { success: true, data: newPackage }

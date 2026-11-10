@@ -3,7 +3,16 @@
 import useSWR from 'swr'
 
 export interface FeaturesState {
-  finance: { entitled: boolean; active: boolean }
+  finance: {
+    entitled: boolean
+    active: boolean
+    /** MASTER, ou profissional com permissão de operar o caixa. */
+    canOperateCash: boolean
+    isMaster: boolean
+    currency: 'BRL' | 'USD'
+    /** Dono pode contratar o add-on pela própria assinatura. */
+    addonAvailable: boolean
+  }
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : null))

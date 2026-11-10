@@ -32,9 +32,12 @@ interface FinanceIntroProps {
   entitled: boolean
   activating?: boolean
   onActivate?: () => void
+  /** Sem direito de uso, mas pode contratar o add-on pela assinatura. */
+  onSubscribe?: () => void
+  subscribing?: boolean
 }
 
-export function FinanceIntro({ entitled, activating = false, onActivate }: FinanceIntroProps) {
+export function FinanceIntro({ entitled, activating = false, onActivate, onSubscribe, subscribing = false }: FinanceIntroProps) {
   return (
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card px-5 pb-6 pt-7">
@@ -69,6 +72,16 @@ export function FinanceIntro({ entitled, activating = false, onActivate }: Finan
               <p className="text-xs text-muted-foreground">
                 Criamos as formas de pagamento e as categorias mais comuns. Tudo pode ser ajustado depois, e
                 desativar não apaga nada.
+              </p>
+            </div>
+          ) : onSubscribe ? (
+            <div className="space-y-2 pt-1">
+              <Button onClick={onSubscribe} disabled={subscribing} className="w-full sm:w-auto">
+                {subscribing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Adicionar o Financeiro à assinatura
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Entra como add-on na sua assinatura atual, com cobrança proporcional. Cancele quando quiser, sem perder dados.
               </p>
             </div>
           ) : (

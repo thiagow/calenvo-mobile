@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
   Wallet,
+  HandCoins,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -29,8 +30,8 @@ type MenuEntry = {
   href: string
   icon: React.ElementType
   permission?: keyof ReturnType<typeof useUserPermissions>
-  /** Módulo opcional: o item só aparece com o direito de uso liberado. */
-  feature?: keyof FeaturesState
+  /** Módulo opcional: decide se o item aparece (direito de uso, módulo ligado, papel). */
+  feature?: (finance: FeaturesState['finance']) => boolean
 }
 
 const menuGroups: { label: string; items: MenuEntry[] }[] = [
@@ -43,7 +44,10 @@ const menuGroups: { label: string; items: MenuEntry[] }[] = [
       { name: 'Profissionais', href: '/dashboard/professionals', icon: UserCog, permission: 'canManageProfessionals' as const },
       { name: 'Pacotes', href: '/dashboard/packages', icon: Package, permission: 'canManageServices' as const },
       { name: 'Fidelidade', href: '/dashboard/loyalty', icon: Gift, permission: 'canManageServices' as const },
-      { name: 'Financeiro', href: '/dashboard/financeiro', icon: Wallet, permission: 'canManageSettings' as const, feature: 'finance' as const },
+      // Com direito de uso o item aparece mesmo desligado: é lá que o dono liga o módulo.
+      { name: 'Financeiro', href: '/dashboard/financeiro', icon: Wallet, permission: 'canManageSettings' as const, feature: (f) => f.entitled },
+      { name: 'Caixa', href: '/dashboard/financeiro/caixa', icon: Wallet, feature: (f) => f.active && !f.isMaster && f.canOperateCash },
+      { name: 'Meus ganhos', href: '/dashboard/financeiro/meus-ganhos', icon: HandCoins, feature: (f) => f.active && !f.isMaster },
     ],
   },
   {
@@ -117,8 +121,7 @@ export default function MaisPage() {
       {menuGroups.map((group) => {
         const visibleItems = group.items.filter(item =>
           (!item.permission || permissions[item.permission]) &&
-          // Com direito de uso o item aparece mesmo desligado: é lá que o dono liga o módulo.
-          (!item.feature || features?.[item.feature].entitled === true)
+          (!item.feature || (features ? item.feature(features.finance) : false))
         )
         if (visibleItems.length === 0) return null
         return (

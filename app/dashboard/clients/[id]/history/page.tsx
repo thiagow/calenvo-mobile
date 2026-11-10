@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { useSegmentConfig } from '@/contexts/segment-context'
 import { PackageDeductionModal } from '@/components/dashboard/package-deduction-modal'
+import { announceSaleFromAppointmentResponse } from '@/lib/finance/client'
 
 interface AppointmentHistory {
     id: string
@@ -116,6 +117,8 @@ export default function ClientHistoryPage() {
             if (!response.ok) {
                 throw new Error('Erro ao atualizar status')
             }
+            // Módulo Financeiro: concluir pode gerar uma comanda — abre "Fechar comanda".
+            announceSaleFromAppointmentResponse(await response.clone().json().catch(() => null))
 
             toast.success(
                 newStatus === 'COMPLETED'
