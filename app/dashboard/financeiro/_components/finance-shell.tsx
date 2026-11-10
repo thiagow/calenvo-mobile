@@ -80,8 +80,8 @@ export function FinanceShell({ title, description, access, actions, children }: 
           {actions && <div className="flex flex-shrink-0 items-center gap-2 pt-5">{actions}</div>}
         </div>
         {links.length > 1 && (
-          <nav aria-label="Financeiro" className="-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <ul className="flex w-max gap-1.5">
+          <nav aria-label="Financeiro">
+            <ul className="flex flex-wrap gap-1.5">
               {links.map((link) => {
                 const active = link.href === '/dashboard/financeiro' ? pathname === link.href : pathname?.startsWith(link.href)
                 return (
