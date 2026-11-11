@@ -11,11 +11,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MoneyInput } from '@/components/finance/money'
 import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
-import type { EntryStatus, SaleDto, SaleOptionsDto } from '@/components/finance/types'
-import { financeFetch, openSaleSheet } from '@/lib/finance/client'
+import type { EntryStatus } from '@/components/finance/types'
+import { financeFetch } from '@/lib/finance/client'
 import { useFeatures } from '@/hooks/use-features'
 import type { CurrencyCode } from '@/lib/finance/money'
 import { FinanceShell } from '../_components/finance-shell'
+import { ClientTabDialog } from '../_components/client-tab-dialog'
+import { NewSaleDialog } from '../_components/new-sale-dialog'
+import type { ClientOption } from '@/components/finance/client-combobox'
 import { EntryList, FilterPills, type EntryFilter } from '../_components/entry-list'
 import { ReceivableDialog } from '../_components/receivable-dialog'
 
@@ -33,7 +36,8 @@ interface ReceivableRow {
 }
 
 export default function ReceivablesPage() {
-  const [creating, setCreating] = useState<'sale' | 'manual' | null>(null)
+  const [creating, setCreating] = useState<'tab' | 'sale' | 'manual' | null>(null)
+  const [saleClient, setSaleClient] = useState<ClientOption | null>(null)
   const isMaster = useFeatures().features?.finance.isMaster === true
   return (
     <FinanceShell
@@ -49,7 +53,15 @@ export default function ReceivablesPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setCreating('sale')}>Venda avulsa</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setCreating('tab')}>Comanda do cliente</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                setSaleClient(null)
+                setCreating('sale')
+              }}
+            >
+              Venda sem cliente
+            </DropdownMenuItem>
             {isMaster && <DropdownMenuItem onSelect={() => setCreating('manual')}>Conta a receber</DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -58,7 +70,16 @@ export default function ReceivablesPage() {
       {(finance) => (
         <>
           <ReceivablesContent currency={finance.currency} isMaster={finance.isMaster} />
-          <NewSaleDialog open={creating === 'sale'} currency={finance.currency} onClose={() => setCreating(null)} />
+          <ClientTabDialog
+            open={creating === 'tab'}
+            currency={finance.currency}
+            onClose={() => setCreating((c) => (c === 'tab' ? null : c))}
+            onNewSale={(client) => {
+              setSaleClient(client)
+              setCreating('sale')
+            }}
+          />
+          <NewSaleDialog open={creating === 'sale'} currency={finance.currency} initialClient={saleClient} onClose={() => setCreating(null)} />
           <NewReceivableDialog
             open={creating === 'manual' && finance.isMaster}
             currency={finance.currency}
@@ -125,134 +146,6 @@ function ReceivablesContent({ currency, isMaster }: { currency: CurrencyCode; is
       />
       <ReceivableDialog receivableId={selected} currency={currency} isMaster={isMaster} onClose={() => setSelected(null)} />
     </div>
-  )
-}
-
-const NONE = '__none__'
-
-/** Venda avulsa: cria a comanda e abre "Fechar comanda" para adicionar itens e receber. */
-function NewSaleDialog({ open, currency, onClose }: { open: boolean; currency: CurrencyCode; onClose: () => void }) {
-  const [options, setOptions] = useState<SaleOptionsDto | null>(null)
-  const [description, setDescription] = useState('')
-  const [serviceId, setServiceId] = useState<string>(NONE)
-  const [professionalId, setProfessionalId] = useState<string>(NONE)
-  const [price, setPrice] = useState<number | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setDescription('')
-    setServiceId(NONE)
-    setProfessionalId(NONE)
-    setPrice(null)
-    financeFetch<SaleOptionsDto>('/api/finance/sales/options').then(setOptions).catch(() => setOptions({ services: [], professionals: [] }))
-  }, [open])
-
-  const service = options?.services.find((s) => s.id === serviceId)
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    const itemDescription = service?.name ?? description.trim()
-    if (!itemDescription) return toast.error('Escolha um serviço ou descreva a venda')
-    if (price == null) return toast.error('Informe o valor')
-    setSubmitting(true)
-    try {
-      const { sale } = await financeFetch<{ sale: SaleDto }>('/api/finance/sales', {
-        method: 'POST',
-        body: JSON.stringify({
-          description: description.trim() || itemDescription,
-          items: [
-            {
-              serviceId: service?.id ?? null,
-              description: itemDescription,
-              professionalId: professionalId === NONE ? null : professionalId,
-              quantity: 1,
-              unitPriceCents: price
-            }
-          ]
-        })
-      })
-      onClose()
-      window.dispatchEvent(new CustomEvent(FINANCE_CHANGED_EVENT))
-      openSaleSheet(sale.id)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Não foi possível criar a venda')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Venda avulsa</DialogTitle>
-          <DialogDescription>Um serviço sem agendamento ou um produto. Depois você confere e recebe na comanda.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Serviço</Label>
-            <Select
-              value={serviceId}
-              onValueChange={(v) => {
-                setServiceId(v)
-                const s = options?.services.find((x) => x.id === v)
-                if (s?.priceCents != null) setPrice(s.priceCents)
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Escolha" />
-              </SelectTrigger>
-              <SelectContent>
-                {options?.services.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value={NONE}>Outro (produto, taxa…)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {serviceId === NONE && (
-            <div className="space-y-1.5">
-              <Label htmlFor="sale-desc">Descrição</Label>
-              <Input id="sale-desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Shampoo 300ml" maxLength={120} />
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Profissional</Label>
-              <Select value={professionalId} onValueChange={setProfessionalId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {options?.professionals.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={NONE}>Nenhum</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Valor</Label>
-              <MoneyInput valueCents={price} onValueChange={setPrice} currency={currency} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Continuar
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 

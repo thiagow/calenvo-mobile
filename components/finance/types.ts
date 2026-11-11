@@ -29,6 +29,7 @@ export interface SaleItemDto {
   totalCents: number
   feeCents: number
   clientPackageItemId: string | null
+  productId: string | null
   packageName: string | null
   sessionValueCents: number | null
   commission: { amountCents: number; status: string; ruleType: 'PERCENT' | 'FIXED'; ruleValue: number } | null
@@ -53,6 +54,15 @@ export interface SaleDto {
 export interface SaleOptionsDto {
   services: { id: string; name: string; priceCents: number | null }[]
   professionals: { id: string; name: string | null }[]
+  products: ProductOptionDto[]
+}
+
+export interface ProductOptionDto {
+  id: string
+  name: string
+  priceCents: number
+  stockQty: number
+  trackStock: boolean
 }
 
 export interface PaymentMethodDto {
@@ -79,4 +89,75 @@ export const STATUS_LABELS: Record<EntryStatus, string> = {
   PARTIAL: 'Parcial',
   PAID: 'Pago',
   CANCELLED: 'Cancelado'
+}
+
+/** Produto do catálogo (tela de Produtos). */
+export interface ProductDto {
+  id: string
+  name: string
+  description: string | null
+  sku: string | null
+  category: string | null
+  priceCents: number
+  costCents: number | null
+  isActive: boolean
+  trackStock: boolean
+  stockQty: number
+  minStockQty: number | null
+}
+
+export interface StockMovementDto {
+  id: string
+  kind: 'INITIAL' | 'PURCHASE' | 'ADJUSTMENT' | 'SALE' | 'SALE_REVERSAL'
+  quantity: number
+  balanceAfter: number
+  note: string | null
+  createdAt: string
+  createdBy: string | null
+}
+
+export const STOCK_KIND_LABELS: Record<StockMovementDto['kind'], string> = {
+  INITIAL: 'Saldo inicial',
+  PURCHASE: 'Compra',
+  ADJUSTMENT: 'Ajuste',
+  SALE: 'Venda',
+  SALE_REVERSAL: 'Devolução'
+}
+
+/** Previsão de recebimento (resposta de /api/finance/forecast). */
+export interface ForecastDayDto {
+  date: string
+  confirmedCents: number
+  unconfirmedCents: number
+  receivablesCents: number
+  appointments: number
+}
+
+export interface ForecastDto {
+  days: ForecastDayDto[]
+  totals: {
+    confirmedCents: number
+    unconfirmedCents: number
+    receivablesCents: number
+    scheduledCents: number
+    expectedAppointmentsCents: number
+    expectedTotalCents: number
+  }
+  appointmentCount: number
+  noPriceCount: number
+  packageSessions: number
+  showRate: number | null
+  showRateSample: number
+  byProfessional: { id: string | null; name: string; cents: number; count: number }[]
+}
+
+export interface ForecastAppointmentDto {
+  id: string
+  date: string
+  status: 'SCHEDULED' | 'CONFIRMED' | 'IN_PROGRESS'
+  clientName: string
+  serviceName: string | null
+  professionalName: string | null
+  priceCents: number | null
+  isPackageSession: boolean
 }

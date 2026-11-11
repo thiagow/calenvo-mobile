@@ -174,6 +174,9 @@ model User {
   createdAdjustments          ProfessionalAdjustment[] @relation("AdjustmentCreatedBy")
   settlementsAsProfessional   CommissionSettlement[]   @relation("ProfessionalSettlements")
   createdSettlements          CommissionSettlement[]   @relation("SettlementCreatedBy")
+  products                    Product[]
+  stockMovements              StockMovement[]          @relation("TenantStockMovements")
+  createdStockMovements       StockMovement[]          @relation("StockMovementCreatedBy")
 
   @@unique([email, role])
 }
@@ -1150,14 +1153,77 @@ model SaleItem {
   feeCents            Int                @default(0)
   clientPackageItemId String?
   clientPackageItem   ClientPackageItem? @relation(fields: [clientPackageItemId], references: [id], onDelete: SetNull)
+  /// Produto vendido (exclusivo de serviço/pacote). Produto nunca gera comissão.
+  productId           String?
+  product             Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  /// Custo unitário do produto na hora da venda (margem não muda se o custo mudar depois).
+  costCents           Int?
   /// Base da comissão: total do item, ou o valor da sessão em pacote.
   commissionBaseCents Int
   sortOrder           Int                @default(0)
 
-  commission Commission?
+  commission     Commission?
+  stockMovements StockMovement[]
 
   @@index([saleId])
   @@index([professionalId])
+  @@index([productId])
+}
+
+enum StockMovementKind {
+  INITIAL       // Saldo inicial no cadastro
+  PURCHASE      // Entrada por compra
+  ADJUSTMENT    // Ajuste manual (contagem, perda)
+  SALE          // Baixa por venda em comanda
+  SALE_REVERSAL // Devolução por comanda editada ou cancelada
+}
+
+/// Produto vendido no balcão. Preço e custo em centavos; saldo é derivado de StockMovement.
+model Product {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  sku           String?
+  category      String?
+  priceCents    Int
+  costCents     Int?
+  isActive      Boolean  @default(true)
+  trackStock    Boolean  @default(true)
+  /// Saldo atual (pode ficar negativo: contagem errada não trava o caixa).
+  stockQty      Int      @default(0)
+  minStockQty   Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+
+  @@unique([userId, name])
+  @@index([userId, isActive])
+}
+
+/// Livro-razão de estoque: imutável, nunca editado ou apagado (mesmo princípio de FinancialTransaction).
+model StockMovement {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation("TenantStockMovements", fields: [userId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  kind         StockMovementKind
+  /// Assinada: entrada positiva, saída negativa.
+  quantity     Int
+  balanceAfter Int
+  saleItemId   String?
+  saleItem     SaleItem?         @relation(fields: [saleItemId], references: [id], onDelete: SetNull)
+  note         String?
+  createdById  String?
+  createdBy    User?             @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime          @default(now())
+
+  @@index([productId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Receivable {

@@ -13,6 +13,7 @@ import {
   type Tx
 } from './context'
 import { badRequest, conflict, notFound } from './errors'
+import { applySaleStockDeltas, computeStockDeltas, returnSaleStock } from './stock'
 
 /**
  * Comanda (Sale): o que foi vendido, com um item por serviço executado.
@@ -28,9 +29,11 @@ export interface SaleItemInput {
   unitPriceCents: number
   discountCents?: number
   clientPackageItemId?: string | null
+  /** Produto do catálogo. Exclusivo de serviço e pacote; nunca gera comissão. */
+  productId?: string | null
 }
 
-interface PreparedItem {
+export interface PreparedItem {
   serviceId: string | null
   description: string
   professionalId: string | null
@@ -39,6 +42,9 @@ interface PreparedItem {
   discountCents: number
   totalCents: number
   clientPackageItemId: string | null
+  productId: string | null
+  /** Custo unitário do produto na hora da venda. */
+  costCents: number | null
   sessionValueCents: number | null
   sortOrder: number
 }
@@ -105,10 +111,29 @@ async function ensureSessionValue(tx: Tx, clientPackageItemId: string): Promise<
   return values[pkg.items.findIndex((i) => i.id === clientPackageItemId)]
 }
 
+/**
+ * Produtos usados na comanda. Devolve o custo atual de cada um (snapshot da
+ * venda). Produto de outro tenant é tratado como inexistente.
+ */
+async function loadProducts(tx: Tx, tenantId: string, ids: string[]) {
+  const unique = [...new Set(ids)]
+  const products = unique.length
+    ? await tx.product.findMany({ where: { id: { in: unique }, userId: tenantId }, select: { id: true, costCents: true } })
+    : []
+  if (products.length !== unique.length) throw badRequest('Produto inválido')
+  return new Map(products.map((p) => [p.id, p.costCents]))
+}
+
 async function prepareItems(tx: Tx, tenantId: string, items: SaleItemInput[]): Promise<PreparedItem[]> {
   if (items.length === 0) throw badRequest('A comanda precisa de pelo menos um item')
+  for (const item of items) {
+    if (item.productId && (item.serviceId || item.clientPackageItemId)) {
+      throw badRequest('Produto não pode ser misturado com serviço ou pacote no mesmo item')
+    }
+  }
   await assertProfessionals(tx, tenantId, items.map((i) => i.professionalId).filter((v): v is string => Boolean(v)))
   await assertServices(tx, tenantId, items.map((i) => i.serviceId).filter((v): v is string => Boolean(v)))
+  const productCosts = await loadProducts(tx, tenantId, items.map((i) => i.productId).filter((v): v is string => Boolean(v)))
 
   const prepared: PreparedItem[] = []
   for (const [index, item] of items.entries()) {
@@ -130,12 +155,15 @@ async function prepareItems(tx: Tx, tenantId: string, items: SaleItemInput[]): P
     prepared.push({
       serviceId: item.serviceId ?? null,
       description: item.description.trim() || 'Item',
-      professionalId: item.professionalId ?? null,
+      // Produto não tem executor: quem vendeu não influencia comissão (não há).
+      professionalId: item.productId ? null : item.professionalId ?? null,
       quantity: item.quantity,
       unitPriceCents,
       discountCents: item.clientPackageItemId ? 0 : item.discountCents ?? 0,
       totalCents: 0,
       clientPackageItemId: item.clientPackageItemId ?? null,
+      productId: item.productId ?? null,
+      costCents: item.productId ? productCosts.get(item.productId) ?? null : null,
       sessionValueCents,
       sortOrder: index
     })
@@ -169,6 +197,14 @@ async function writeSaleContent(
   const settled = await tx.commission.count({ where: { saleItem: { saleId }, status: 'SETTLED' } })
   if (settled > 0) throw conflict('Esta comanda já entrou num acerto e não pode ser alterada')
 
+  // Itens anteriores: base do delta de estoque e do custo já registrado (a margem não
+  // muda se o custo do produto mudar depois de vendido).
+  const previous = await tx.saleItem.findMany({
+    where: { saleId },
+    select: { productId: true, quantity: true, costCents: true }
+  })
+  const previousCost = new Map(previous.filter((p) => p.productId && p.costCents != null).map((p) => [p.productId as string, p.costCents as number]))
+
   await tx.saleItem.deleteMany({ where: { saleId } }) // comissões PENDING caem em cascata
 
   const rules = await tx.commissionRule.findMany({ where: { userId: tenantId } })
@@ -189,12 +225,15 @@ async function writeSaleContent(
         discountCents: line.discountCents,
         totalCents: line.totalCents,
         clientPackageItemId: item.clientPackageItemId,
+        productId: item.productId,
+        costCents: item.productId ? previousCost.get(item.productId) ?? item.costCents : null,
         commissionBaseCents: base,
         sortOrder: item.sortOrder
       }
     })
 
-    if (item.professionalId) {
+    // Produto nunca comissiona (decisão do dono): só serviço com executor.
+    if (item.professionalId && !item.productId) {
       const rule = resolveCommissionRule(rules, item.professionalId, item.serviceId)
       if (rule) {
         const result = computeCommission(rule, base, item.quantity)
@@ -212,6 +251,12 @@ async function writeSaleContent(
       }
     }
   }
+
+  await applySaleStockDeltas(tx, computeStockDeltas(previous, items), {
+    tenantId,
+    actorId: params.actorId,
+    note: ('Comanda: ' + params.description).slice(0, 200)
+  })
 
   const status = totals.totalCents === 0 ? 'CLOSED' : 'OPEN'
   await tx.sale.update({
@@ -500,6 +545,13 @@ export async function cancelSaleRecord(
     }
   }
 
+  await returnSaleStock(tx, {
+    tenantId: params.tenantId,
+    actorId: params.actorId,
+    saleId: sale.id,
+    note: ('Comanda cancelada: ' + sale.description).slice(0, 200)
+  })
+
   if (sale.receivable) {
     await tx.receivable.update({ where: { id: sale.receivable.id }, data: { status: 'CANCELLED', cancelledAt: new Date() } })
   }
@@ -557,6 +609,8 @@ export async function createSaleForPackage(
         discountCents: 0,
         totalCents: 0,
         clientPackageItemId: null,
+        productId: null,
+        costCents: null,
         sessionValueCents: null,
         sortOrder: 0
       }

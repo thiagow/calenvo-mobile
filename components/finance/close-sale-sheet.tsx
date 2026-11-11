@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clock, Loader2, Package, Plus, Receipt, Trash2 } from 'lucide-react'
+import { Clock, Loader2, Minus, Package, Plus, Receipt, ShoppingBag, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -12,6 +13,7 @@ import { financeFetch } from '@/lib/finance/client'
 import { formatMoney, type CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
 import { Money, MoneyInput } from './money'
+import { SegmentedControl } from './segmented-control'
 import { OpenCashInline } from './open-cash-inline'
 import { newPaymentRow, PaymentSplit, type PaymentMethodOption, type PaymentRow } from './payment-split'
 import type { SaleDto, SaleOptionsDto } from './types'
@@ -20,6 +22,9 @@ export const FINANCE_CHANGED_EVENT = 'calenvo:finance-changed'
 
 interface EditableItem {
   key: string
+  /** Produto do catálogo ou serviço (padrão). Produto não tem profissional nem comissão. */
+  kind: 'service' | 'product'
+  productId: string | null
   serviceId: string | null
   description: string
   professionalId: string | null
@@ -32,10 +37,29 @@ interface EditableItem {
 const NO_PROFESSIONAL = '__none__'
 const CUSTOM_SERVICE = '__custom__'
 const key = () => Math.random().toString(36).slice(2)
+const LAST_METHOD_KEY = 'calenvo:finance:last-payment-method'
+
+function readLastMethod(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_METHOD_KEY)
+  } catch {
+    return null
+  }
+}
+
+function saveLastMethod(id: string) {
+  try {
+    window.localStorage.setItem(LAST_METHOD_KEY, id)
+  } catch {
+    // storage indisponível (janela privada etc.): só deixa de lembrar
+  }
+}
 
 function toEditable(sale: SaleDto): EditableItem[] {
   return sale.items.map((i) => ({
     key: key(),
+    kind: i.productId ? 'product' : 'service',
+    productId: i.productId,
     serviceId: i.serviceId,
     description: i.description,
     professionalId: i.professionalId,
@@ -70,6 +94,8 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [invalidKeys, setInvalidKeys] = useState<Set<string>>(new Set())
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
 
   const load = useCallback(async (id: string) => {
     setLoading(true)
@@ -90,7 +116,10 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
       setSaleDiscount(sale.discountCents)
       setDirty(false)
       const due = sale.receivable ? sale.receivable.amountCents - sale.receivable.paidCents : 0
-      setPayments(paymentMethods.length ? [newPaymentRow(paymentMethods[0].id, due)] : [])
+      const last = readLastMethod()
+      const preferred = paymentMethods.find((m) => m.id === last) ?? paymentMethods[0]
+      setPayments(preferred ? [newPaymentRow(preferred.id, due)] : [])
+      setInvalidKeys(new Set())
       setReceiveNow(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível abrir a comanda')
@@ -130,16 +159,38 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
 
   const patchItem = (k: string, patch: Partial<EditableItem>) => {
     setDirty(true)
+    setInvalidKeys((cur) => {
+      if (!cur.has(k)) return cur
+      const next = new Set(cur)
+      next.delete(k)
+      return next
+    })
     setItems((current) => current.map((i) => (i.key === k ? { ...i, ...patch } : i)))
   }
 
-  const addItem = () => {
+  const addItem = (kind: 'service' | 'product' = 'service') => {
     setDirty(true)
-    const professionalId = items.find((i) => i.professionalId)?.professionalId ?? null
+    const professionalId = kind === 'product' ? null : items.find((i) => i.professionalId)?.professionalId ?? null
     setItems((current) => [
       ...current,
-      { key: key(), serviceId: null, description: '', professionalId, quantity: 1, unitPriceCents: null, discountCents: 0, clientPackageItemId: null }
+      { key: key(), kind, productId: null, serviceId: null, description: '', professionalId, quantity: 1, unitPriceCents: null, discountCents: 0, clientPackageItemId: null }
     ])
+  }
+
+  const pickProduct = (k: string, productId: string) => {
+    const product = options?.products.find((p) => p.id === productId)
+    patchItem(k, { productId, description: product?.name ?? '', unitPriceCents: product?.priceCents ?? null })
+  }
+
+  // Estoque disponível para esta comanda = saldo atual + o que ela mesma já baixou.
+  // Só avisa (venda sem estoque não é bloqueada: contagem errada não trava o caixa).
+  const stockInfo = (productId: string | null) => {
+    const product = productId ? options?.products.find((p) => p.id === productId) : null
+    if (!product || !product.trackStock) return null
+    const alreadyInSale = (sale?.items ?? []).filter((i) => i.productId === product.id).reduce((a, i) => a + i.quantity, 0)
+    const available = product.stockQty + alreadyInSale
+    const requested = items.filter((i) => i.productId === product.id).reduce((a, i) => a + i.quantity, 0)
+    return { available, short: Math.max(0, requested - available) }
   }
 
   const pickService = (k: string, serviceId: string) => {
@@ -156,8 +207,21 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
 
     if (editable) {
       if (items.length === 0) return setError('A comanda precisa de pelo menos um serviço')
-      if (items.some((i) => !i.description.trim())) return setError('Descreva todos os itens')
-      if (items.some((i) => !i.clientPackageItemId && i.unitPriceCents == null)) return setError('Informe o preço de todos os itens')
+      const bad = items.filter(
+        (i) => !i.description.trim() || (i.kind === 'product' && !i.productId) || (!i.clientPackageItemId && i.unitPriceCents == null)
+      )
+      if (bad.length > 0) {
+        setInvalidKeys(new Set(bad.map((i) => i.key)))
+        setError(
+          bad.some((i) => i.kind === 'product' && !i.productId)
+            ? 'Escolha o produto nos itens marcados'
+            : bad.some((i) => !i.description.trim())
+              ? 'Descreva os itens marcados'
+              : 'Informe o preço dos itens marcados'
+        )
+        document.getElementById('sale-item-' + bad[0].key)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        return
+      }
       if (saleDiscount == null) return setError('Desconto inválido')
     }
     const paying = receiveNow && dueCents > 0
@@ -176,9 +240,10 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
           body: JSON.stringify({
             discountCents: saleDiscount ?? 0,
             items: items.map((i) => ({
-              serviceId: i.serviceId,
+              serviceId: i.kind === 'product' ? null : i.serviceId,
+              productId: i.kind === 'product' ? i.productId : null,
               description: i.description.trim(),
-              professionalId: i.professionalId,
+              professionalId: i.kind === 'product' ? null : i.professionalId,
               quantity: i.quantity,
               unitPriceCents: i.clientPackageItemId ? 0 : i.unitPriceCents ?? 0,
               discountCents: i.discountCents ?? 0,
@@ -198,6 +263,7 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
           body: JSON.stringify({ payments: payments.map((p) => ({ paymentMethodId: p.paymentMethodId, amountCents: p.amountCents })) })
         })
         const received = payments.reduce((a, p) => a + (p.amountCents ?? 0), 0)
+        if (payments[0]) saveLastMethod(payments[0].paymentMethodId)
         toast.success(`Recebido ${formatMoney(received, currency)}`)
       } else {
         toast.success(dueCents > 0 ? 'Comanda salva em aberto' : 'Comanda fechada')
@@ -217,8 +283,14 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
 
   const professionals = options?.professionals ?? []
 
+  // Fechar com edições não salvas pede confirmação (antes descartava em silêncio).
+  const requestClose = () => {
+    if (editable && dirty && !submitting) setConfirmDiscard(true)
+    else onClose()
+  }
+
   return (
-    <Sheet open={Boolean(saleId)} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={Boolean(saleId)} onOpenChange={(open) => !open && requestClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-xl overflow-y-auto rounded-t-2xl px-4 pb-6 pt-5 sm:px-6">
         <SheetHeader className="space-y-1 pr-6 text-left">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -243,14 +315,101 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
           <div className="mt-5 space-y-5">
             {/* Serviços executados */}
             <section className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Serviços executados</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Itens da comanda</p>
               <ul className="space-y-2">
                 {items.map((item) => {
                   const isPackage = Boolean(item.clientPackageItemId)
                   const original = sale.items.find((i) => i.clientPackageItemId && i.clientPackageItemId === item.clientPackageItemId)
                   return (
-                    <li key={item.key} className="space-y-2 rounded-xl border border-border bg-card p-3">
-                      {editable && !isPackage ? (
+                    <li
+                      key={item.key}
+                      id={'sale-item-' + item.key}
+                      className={cn('space-y-2 rounded-xl border bg-card p-3', invalidKeys.has(item.key) ? 'border-money-negative ring-1 ring-money-negative' : 'border-border')}
+                    >
+                      {editable && !isPackage && item.kind === 'product' ? (
+                        <>
+                          <div className="flex gap-2">
+                            <Select value={item.productId ?? ''} onValueChange={(v) => pickProduct(item.key, v)}>
+                              <SelectTrigger className="flex-1" aria-label="Produto">
+                                <SelectValue placeholder="Escolha o produto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {item.productId && !options?.products.some((p) => p.id === item.productId) && (
+                                  <SelectItem value={item.productId}>{item.description}</SelectItem>
+                                )}
+                                {options?.products.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name}
+                                    {p.trackStock && <span className="text-muted-foreground"> · {p.stockQty} em estoque</span>}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <span title={items.length === 1 ? 'A comanda precisa de pelo menos um item' : undefined} className="flex-shrink-0">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-11 w-11 text-muted-foreground"
+                                onClick={() => {
+                                  setDirty(true)
+                                  setItems((c) => c.filter((i) => i.key !== item.key))
+                                }}
+                                disabled={items.length === 1}
+                                aria-label={items.length === 1 ? 'Remover produto (a comanda precisa de pelo menos um item)' : 'Remover produto'}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                            <div className="flex items-center gap-1" role="group" aria-label="Quantidade">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-11 w-11"
+                                aria-label="Diminuir quantidade"
+                                disabled={item.quantity <= 1}
+                                onClick={() => patchItem(item.key, { quantity: Math.max(1, item.quantity - 1) })}
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                              <span className="w-8 text-center text-sm font-medium tabular-nums" aria-live="polite">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-11 w-11"
+                                aria-label="Aumentar quantidade"
+                                disabled={item.quantity >= 99}
+                                onClick={() => patchItem(item.key, { quantity: Math.min(99, item.quantity + 1) })}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <MoneyInput
+                              valueCents={item.unitPriceCents}
+                              onValueChange={(cents) => patchItem(item.key, { unitPriceCents: cents })}
+                              currency={currency}
+                              aria-label="Preço unitário"
+                            />
+                          </div>
+                          {(() => {
+                            const info = stockInfo(item.productId)
+                            if (!info) return null
+                            return info.short > 0 ? (
+                              <p role="status" className="text-xs font-medium text-money-warn">
+                                Só há {Math.max(0, info.available)} em estoque. Você pode vender mesmo assim; o saldo fica negativo.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">{info.available} em estoque</p>
+                            )
+                          })()}
+                        </>
+                      ) : editable && !isPackage ? (
                         <>
                           <div className="flex gap-2">
                             <Select value={item.serviceId ?? CUSTOM_SERVICE} onValueChange={(v) => pickService(item.key, v)}>
@@ -266,20 +425,22 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
                                 <SelectItem value={CUSTOM_SERVICE}>Outro (descrever)</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-10 w-10 flex-shrink-0 text-muted-foreground"
-                              onClick={() => {
-                                setDirty(true)
-                                setItems((c) => c.filter((i) => i.key !== item.key))
-                              }}
-                              disabled={items.length === 1}
-                              aria-label="Remover serviço"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <span title={items.length === 1 ? 'A comanda precisa de pelo menos um serviço' : undefined} className="flex-shrink-0">
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-11 w-11 text-muted-foreground"
+                                onClick={() => {
+                                  setDirty(true)
+                                  setItems((c) => c.filter((i) => i.key !== item.key))
+                                }}
+                                disabled={items.length === 1}
+                                aria-label={items.length === 1 ? 'Remover serviço (a comanda precisa de pelo menos um)' : 'Remover serviço'}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </span>
                           </div>
                           {!item.serviceId && (
                             <Input
@@ -319,10 +480,12 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
                           <div className="min-w-0">
                             <p className="flex items-center gap-1.5 text-sm font-medium">
                               {isPackage && <Package className="h-3.5 w-3.5 text-primary" />}
+                              {item.kind === 'product' && <ShoppingBag className="h-3.5 w-3.5 text-primary" aria-label="Produto" />}
                               {item.description}
+                              {item.kind === 'product' && item.quantity > 1 && <span className="text-muted-foreground"> × {item.quantity}</span>}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {professionals.find((p) => p.id === item.professionalId)?.name ?? 'Sem profissional'}
+                              {item.kind === 'product' ? 'Produto' : professionals.find((p) => p.id === item.professionalId)?.name ?? 'Sem profissional'}
                               {isPackage && original?.packageName && ` · pacote ${original.packageName}`}
                             </p>
                           </div>
@@ -336,10 +499,18 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
                 })}
               </ul>
               {editable && (
-                <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-primary" onClick={addItem}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Adicionar serviço
-                </Button>
+                <div className="flex flex-wrap gap-1">
+                  <Button type="button" variant="ghost" size="sm" className="min-h-11 px-2 text-primary" onClick={() => addItem('service')}>
+                    <Plus className="mr-1 h-4 w-4" />
+                    Adicionar serviço
+                  </Button>
+                  {(options?.products.length ?? 0) > 0 && (
+                    <Button type="button" variant="ghost" size="sm" className="min-h-11 px-2 text-primary" onClick={() => addItem('product')}>
+                      <ShoppingBag className="mr-1 h-4 w-4" />
+                      Adicionar produto
+                    </Button>
+                  )}
+                </div>
               )}
             </section>
 
@@ -381,26 +552,15 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
             {/* Pagamento */}
             {dueCents > 0 && (
               <section className="space-y-3">
-                <div role="radiogroup" aria-label="Pagamento" className="grid grid-cols-2 rounded-lg bg-muted p-1">
-                  {[
-                    { value: true, label: 'Receber agora' },
-                    { value: false, label: 'Deixar em aberto' }
-                  ].map((option) => (
-                    <button
-                      key={option.label}
-                      type="button"
-                      role="radio"
-                      aria-checked={receiveNow === option.value}
-                      onClick={() => setReceiveNow(option.value)}
-                      className={cn(
-                        'rounded-md py-2 text-sm font-medium transition-all',
-                        receiveNow === option.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  aria-label="Pagamento"
+                  value={receiveNow ? 'now' : 'open'}
+                  onChange={(v) => setReceiveNow(v === 'now')}
+                  options={[
+                    { value: 'now', label: 'Receber agora' },
+                    { value: 'open', label: 'Deixar em aberto' }
+                  ]}
+                />
 
                 {receiveNow ? (
                   !cashOpen ? (
@@ -425,13 +585,17 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
               </section>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-
-            <div className="flex gap-2 pt-1">
-              <Button type="button" variant="ghost" className="flex-1" onClick={onClose} disabled={submitting}>
+            <div className="sticky -bottom-6 -mx-4 space-y-2 border-t border-border bg-background px-4 pb-6 pt-3 sm:-mx-6 sm:px-6">
+              {error && (
+                <p role="alert" className="text-sm font-medium text-money-negative">
+                  {error}
+                </p>
+              )}
+              <div className="flex gap-2">
+              <Button type="button" variant="ghost" className="min-h-11 flex-1" onClick={requestClose} disabled={submitting}>
                 Depois
               </Button>
-              <Button type="button" className="flex-[2]" onClick={submit} disabled={submitting || (receiveNow && dueCents > 0 && !cashOpen)}>
+              <Button type="button" className="min-h-11 flex-[2]" onClick={submit} disabled={submitting || (receiveNow && dueCents > 0 && !cashOpen)}>
                 {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {dueCents === 0
                   ? 'Fechar comanda'
@@ -439,9 +603,20 @@ export function CloseSaleSheet({ saleId, currency, onClose }: CloseSaleSheetProp
                     ? `Receber ${formatMoney(payments.reduce((a, p) => a + (p.amountCents ?? 0), 0), currency)}`
                     : 'Salvar em aberto'}
               </Button>
+              </div>
             </div>
           </div>
         )}
+        <ConfirmDialog
+          open={confirmDiscard}
+          onOpenChange={setConfirmDiscard}
+          title="Descartar alterações?"
+          description="Você editou esta comanda e ainda não salvou. Se sair agora, as alterações se perdem."
+          confirmText="Descartar"
+          cancelText="Continuar editando"
+          variant="destructive"
+          onConfirm={onClose}
+        />
       </SheetContent>
     </Sheet>
   )

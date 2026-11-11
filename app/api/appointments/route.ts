@@ -148,7 +148,9 @@ export async function GET(request: NextRequest) {
             id: true,
             name: true
           }
-        }
+        },
+        // Comanda do Financeiro (quando o módulo está ativo): permite "Ver comanda" na agenda.
+        sale: { select: { id: true, status: true } }
       },
       orderBy: {
         date: 'asc'
@@ -177,7 +179,8 @@ export async function GET(request: NextRequest) {
       professionalId: appointment.professionalId,
       service: appointment.service,
       professionalRelation: appointment.professionalUser,
-      isOverbooked: appointment.isOverbooked
+      isOverbooked: appointment.isOverbooked,
+      financeSaleId: appointment.sale?.status && appointment.sale.status !== 'CANCELLED' ? appointment.sale.id : null
     }))
 
     return NextResponse.json(transformedAppointments)

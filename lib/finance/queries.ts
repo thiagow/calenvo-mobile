@@ -54,6 +54,7 @@ export async function saleDetail(tx: Tx, tenantId: string, saleId: string) {
       totalCents: i.totalCents,
       feeCents: i.feeCents,
       clientPackageItemId: i.clientPackageItemId,
+      productId: i.productId,
       packageName: i.clientPackageItem?.clientPackage.name ?? null,
       sessionValueCents: i.clientPackageItem?.sessionValueCents ?? null,
       commission: i.commission
@@ -97,17 +98,23 @@ function serializeTransaction(t: TransactionWithMethod) {
 
 /** Itens sugeridos para a comanda de um agendamento: serviços ativos do tenant e equipe. */
 export async function saleFormOptions(tx: Tx, tenantId: string) {
-  const [services, professionals] = await Promise.all([
+  const [services, professionals, products] = await Promise.all([
     tx.service.findMany({ where: { userId: tenantId, isActive: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, price: true } }),
     tx.user.findMany({
       where: { masterId: tenantId, role: 'PROFESSIONAL', isActive: true },
       orderBy: { name: 'asc' },
       select: { id: true, name: true }
+    }),
+    tx.product.findMany({
+      where: { userId: tenantId, isActive: true },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, priceCents: true, stockQty: true, trackStock: true }
     })
   ])
   return {
     services: services.map((s) => ({ id: s.id, name: s.name, priceCents: toCents(s.price) })),
-    professionals
+    professionals,
+    products
   }
 }
 
@@ -126,11 +133,19 @@ function statusWhere(filter: EntryFilter, todayStart: Date) {
   }
 }
 
-export async function listReceivables(tx: Tx, tenantId: string, filter: EntryFilter, todayStart: Date, search?: string | null) {
+export async function listReceivables(
+  tx: Tx,
+  tenantId: string,
+  filter: EntryFilter,
+  todayStart: Date,
+  search?: string | null,
+  clientId?: string | null
+) {
   const rows = await tx.receivable.findMany({
     where: {
       userId: tenantId,
       ...statusWhere(filter, todayStart),
+      ...(clientId && { clientId }),
       ...(search && {
         OR: [
           { description: { contains: search, mode: 'insensitive' as const } },
@@ -155,6 +170,7 @@ export async function listReceivables(tx: Tx, tenantId: string, filter: EntryFil
     paidCents: r.paidCents,
     dueDate: r.dueDate,
     status: r.status,
+    clientId: r.client?.id ?? null,
     saleId: r.sale?.id ?? null,
     origin: r.sale?.origin ?? 'MANUAL'
   }))

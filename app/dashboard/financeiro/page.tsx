@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, HandCoins, Landmark, Receipt, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, HandCoins, Landmark, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
 import { BackButton } from '@/components/dashboard/back-button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AnimatedMoney } from '@/components/finance/animated-money'
 import { Money } from '@/components/finance/money'
+import { ErrorState } from '@/components/finance/empty-state'
 import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
 import { useFeatures } from '@/hooks/use-features'
 import { financeFetch } from '@/lib/finance/client'
@@ -108,11 +110,19 @@ export default function FinanceHomePage() {
 
 function OverviewContent({ currency }: { currency: CurrencyCode }) {
   const [data, setData] = useState<Overview | null>(null)
+  const [failed, setFailed] = useState(false)
+  // Previsão de 7 dias: complemento da tela; se falhar, o tile só não aparece.
+  const [forecast, setForecast] = useState<{ cents: number; count: number } | null>(null)
 
   const load = useCallback(async () => {
+    financeFetch<{ totals: { expectedTotalCents: number }; appointmentCount: number }>('/api/finance/forecast?days=7')
+      .then((f) => setForecast({ cents: f.totals.expectedTotalCents, count: f.appointmentCount }))
+      .catch(() => setForecast(null))
     try {
       setData(await financeFetch<Overview>('/api/finance/overview'))
+      setFailed(false)
     } catch (err) {
+      setFailed(true)
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar o Financeiro')
     }
   }, [])
@@ -123,12 +133,16 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
     return () => window.removeEventListener(FINANCE_CHANGED_EVENT, load)
   }, [load])
 
+  if (!data && failed) {
+    return <ErrorState message="Não foi possível carregar a visão geral." onRetry={() => void load()} />
+  }
+
   if (!data) {
     return (
       <div className="space-y-3">
         <Skeleton className="h-44 w-full rounded-2xl" />
         <div className="grid grid-cols-2 gap-2">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2].map((i) => (
             <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
@@ -137,15 +151,16 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
   }
 
   const net = data.todayInCents - data.todayOutCents
+  const noMovement = data.todayInCents === 0 && data.todayOutCents === 0
 
   return (
     <div className="space-y-4">
       {data.pendingAppointments > 0 && (
         <Link
           href="/dashboard/financeiro/pendencias"
-          className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 transition-colors hover:bg-amber-500/10"
+          className="flex items-center gap-3 rounded-xl border border-money-warn/30 bg-money-warn/5 px-4 py-3 transition-colors hover:bg-money-warn/10"
         >
-          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-amber-500" />
+          <AlertTriangle className="h-4 w-4 flex-shrink-0 text-money-warn" />
           <p className="flex-1 text-sm">
             <span className="font-medium">{data.pendingAppointments}</span>{' '}
             {data.pendingAppointments === 1 ? 'atendimento concluído sem comanda' : 'atendimentos concluídos sem comanda'}
@@ -159,17 +174,18 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">Saldo de hoje</p>
-            <Money cents={net} currency={currency} signed className={cn('block text-4xl font-semibold tracking-tight', net < 0 && 'text-destructive')} />
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Saldo de hoje</p>
+            <AnimatedMoney cents={net} currency={currency} signed tone="auto" className="block text-4xl font-semibold tracking-tight" />
+            {noMovement && <p className="text-xs text-muted-foreground">Nenhuma movimentação hoje ainda.</p>}
           </div>
           <div className="flex gap-6 text-sm">
             <div className="flex items-center gap-1.5">
-              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              <ArrowUpRight className="h-4 w-4 text-money-positive" />
               <Money cents={data.todayInCents} currency={currency} />
               <span className="text-muted-foreground">entradas</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <ArrowDownRight className="h-4 w-4 text-rose-500" />
+              <ArrowDownRight className="h-4 w-4 text-money-negative" />
               <Money cents={data.todayOutCents} currency={currency} />
               <span className="text-muted-foreground">saídas</span>
             </div>
@@ -179,7 +195,7 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
             className="flex items-center justify-between rounded-xl bg-muted/60 px-3.5 py-3 transition-colors hover:bg-muted"
           >
             <span className="flex items-center gap-2.5">
-              <span className={cn('h-2 w-2 rounded-full', data.cashSession ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+              <span className={cn('h-2 w-2 rounded-full', data.cashSession ? 'bg-money-positive' : 'bg-muted-foreground/40')} />
               <span className="text-sm">
                 {data.cashSession ? (
                   <>
@@ -199,6 +215,16 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
 
       {/* Próximos 7 dias */}
       <div className="grid grid-cols-2 gap-2">
+        {forecast && (
+          <Tile
+            href="/dashboard/financeiro/previsao"
+            icon={CalendarClock}
+            label={`Previsão · 7 dias (${forecast.count} ${forecast.count === 1 ? 'agendamento' : 'agendamentos'})`}
+            cents={forecast.cents}
+            currency={currency}
+            className="col-span-2"
+          />
+        )}
         <Tile
           href="/dashboard/financeiro/receber"
           icon={Receipt}
@@ -215,8 +241,14 @@ function OverviewContent({ currency }: { currency: CurrencyCode }) {
           currency={currency}
           note={data.payablesOverdueCents > 0 ? { cents: data.payablesOverdueCents, text: 'vencido' } : null}
         />
-        <Tile href="/dashboard/financeiro/comissoes" icon={HandCoins} label="Comissões a acertar" cents={data.pendingCommissionsCents} currency={currency} />
-        <Tile href="/dashboard/financeiro/caixa" icon={Wallet} label="Na gaveta agora" cents={data.cashSessionSummary?.expectedCashCents ?? 0} currency={currency} muted={!data.cashSession} />
+        <Tile
+          href="/dashboard/financeiro/comissoes"
+          icon={HandCoins}
+          label="Comissões a acertar"
+          cents={data.pendingCommissionsCents}
+          currency={currency}
+          className="col-span-2"
+        />
       </div>
     </div>
   )
@@ -229,7 +261,7 @@ function Tile({
   cents,
   currency,
   note,
-  muted
+  className
 }: {
   href: string
   icon: React.ElementType
@@ -237,19 +269,25 @@ function Tile({
   cents: number
   currency: CurrencyCode
   note?: { cents: number; text: string } | null
-  muted?: boolean
+  className?: string
 }) {
   return (
-    <Link href={href} className="group space-y-2 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-foreground/20">
+    <Link
+      href={href}
+      className={cn(
+        'group space-y-2 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        className
+      )}
+    >
       <div className="flex items-center justify-between">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <ArrowRight aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </div>
       <div>
-        <Money cents={cents} currency={currency} className={cn('block text-lg font-semibold tracking-tight', muted && 'text-muted-foreground')} />
-        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <Money cents={cents} currency={currency} className="block text-lg font-semibold tracking-tight" />
+        <p className="text-xs text-muted-foreground">{label}</p>
         {note && (
-          <p className="mt-1 text-[11px] font-medium text-rose-500">
+          <p className="mt-1 text-xs font-medium text-money-negative">
             <Money cents={note.cents} currency={currency} /> {note.text}
           </p>
         )}

@@ -1,6 +1,7 @@
 import { addCalendarDays, tenantCalendarDayWindow, todayInZone } from '@/lib/timezone'
 import { cashSessionReport } from './cash'
 import { findOpenCashSession, loadTimezone, type Tx } from './context'
+import { splitRevenueByKind } from './revenue'
 
 /* ------------------------------- Visão geral ------------------------------- */
 
@@ -109,14 +110,24 @@ export async function incomeStatement(tx: Tx, tenantId: string, from: Date, to: 
     tx.financialTransaction.findMany({
       where: { userId: tenantId, occurredAt: { gte: from, lte: to } },
       include: {
-        receivable: { select: { category: { select: { id: true, name: true } } } },
+        receivable: {
+          select: {
+            category: { select: { id: true, name: true } },
+            sale: { select: { items: { select: { productId: true, totalCents: true } } } }
+          }
+        },
         payable: { select: { category: { select: { id: true, name: true } } } },
         reverses: { select: { kind: true } }
       }
     }),
     tx.sale.findMany({
       where: { userId: tenantId, status: { not: 'CANCELLED' }, occurredAt: { gte: from, lte: to } },
-      select: { origin: true, totalCents: true, receivable: { select: { category: { select: { id: true, name: true } } } } }
+      select: {
+        origin: true,
+        totalCents: true,
+        receivable: { select: { category: { select: { id: true, name: true } } } },
+        items: { select: { productId: true, totalCents: true } }
+      }
     }),
     tx.payable.findMany({
       where: { userId: tenantId, status: { not: 'CANCELLED' }, dueDate: { gte: from, lte: to } },
@@ -128,6 +139,13 @@ export async function incomeStatement(tx: Tx, tenantId: string, from: Date, to: 
     })
   ])
 
+  // Receita de produto tem categoria própria (a do sistema, que o dono pode renomear).
+  const productCategory = await tx.financeCategory.findUnique({
+    where: { userId_systemKey: { userId: tenantId, systemKey: 'products' } },
+    select: { id: true, name: true }
+  })
+  const productLine = { key: productCategory?.id ?? 'products', label: productCategory?.name ?? 'Produtos' }
+
   // --- Regime de caixa ---
   const cashIncome = new Map<string, Line>()
   const cashExpense = new Map<string, Line>()
@@ -138,7 +156,11 @@ export async function incomeStatement(tx: Tx, tenantId: string, from: Date, to: 
     const amount = sign * t.amountCents
     switch (kind) {
       case 'RECEIPT':
-        pushTo(cashIncome, t.receivable?.category.id ?? 'other', t.receivable?.category.name ?? 'Outras receitas', amount)
+        const split = splitRevenueByKind(amount, t.receivable?.sale?.items ?? [])
+        if (split.productCents !== 0) pushTo(cashIncome, productLine.key, productLine.label, split.productCents)
+        if (split.otherCents !== 0 || split.productCents === 0) {
+          pushTo(cashIncome, t.receivable?.category.id ?? 'other', t.receivable?.category.name ?? 'Outras receitas', split.otherCents)
+        }
         fees += sign * t.feeCents
         break
       case 'PAYMENT':
@@ -158,7 +180,9 @@ export async function incomeStatement(tx: Tx, tenantId: string, from: Date, to: 
   const accrualIncome = new Map<string, Line>()
   for (const s of sales) {
     if (s.totalCents === 0) continue
-    pushTo(accrualIncome, s.receivable?.category.id ?? s.origin, s.receivable?.category.name ?? 'Vendas', s.totalCents)
+    const split = splitRevenueByKind(s.totalCents, s.items)
+    if (split.productCents !== 0) pushTo(accrualIncome, productLine.key, productLine.label, split.productCents)
+    if (split.otherCents !== 0) pushTo(accrualIncome, s.receivable?.category.id ?? s.origin, s.receivable?.category.name ?? 'Vendas', split.otherCents)
   }
   const manualReceivables = await tx.receivable.findMany({
     where: { userId: tenantId, saleId: null, status: { not: 'CANCELLED' }, dueDate: { gte: from, lte: to } },

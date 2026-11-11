@@ -26,6 +26,7 @@ export const DEFAULT_PAYMENT_METHODS: DefaultPaymentMethod[] = [
 export const SYSTEM_CATEGORY_KEYS = {
   services: 'services',
   packages: 'packages',
+  products: 'products',
   commissions: 'commissions'
 } as const
 
@@ -40,7 +41,7 @@ interface DefaultCategory {
 export const DEFAULT_CATEGORIES: DefaultCategory[] = [
   { kind: 'INCOME', systemKey: 'services', name: { pt: 'Serviços', en: 'Services' } },
   { kind: 'INCOME', systemKey: 'packages', name: { pt: 'Pacotes', en: 'Packages' } },
-  { kind: 'INCOME', name: { pt: 'Produtos', en: 'Products' } },
+  { kind: 'INCOME', systemKey: 'products', name: { pt: 'Produtos', en: 'Products' } },
   { kind: 'INCOME', name: { pt: 'Outras receitas', en: 'Other income' } },
   { kind: 'EXPENSE', systemKey: 'commissions', name: { pt: 'Comissões', en: 'Commissions' } },
   { kind: 'EXPENSE', name: { pt: 'Aluguel', en: 'Rent' } },

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowDownToLine, ArrowUpFromLine, CheckCircle2, ChevronRight, HandCoins, Loader2, Lock } from 'lucide-react'
+import { Plus, ArrowDownToLine, ArrowUpFromLine, CheckCircle2, ChevronRight, HandCoins, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,13 +13,18 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { AnimatedMoney } from '@/components/finance/animated-money'
+import { DifferenceBadge } from '@/components/finance/difference-badge'
+import { ErrorState } from '@/components/finance/empty-state'
 import { Money, MoneyInput } from '@/components/finance/money'
 import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
 import { financeFetch } from '@/lib/finance/client'
-import { formatMoney, type CurrencyCode } from '@/lib/finance/money'
-import { cn } from '@/lib/utils'
+import type { CurrencyCode } from '@/lib/finance/money'
 import { FinanceShell } from '../_components/finance-shell'
 import { CashBreakdown, CashTransactions, type CashReport } from '../_components/cash-report'
+import { ClientTabDialog } from '../_components/client-tab-dialog'
+import { NewSaleDialog } from '../_components/new-sale-dialog'
+import type { ClientOption } from '@/components/finance/client-combobox'
 
 interface SessionRow {
   id: string
@@ -49,6 +54,9 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
   const [movement, setMovement] = useState<'SUPPLY' | 'WITHDRAWAL' | null>(null)
   const [closing, setClosing] = useState(false)
   const [reverseId, setReverseId] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [newSale, setNewSale] = useState<'tab' | 'sale' | null>(null)
+  const [saleClient, setSaleClient] = useState<ClientOption | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -58,7 +66,9 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
       ])
       setReport(report)
       setHistory(sessions.filter((s) => s.status === 'CLOSED'))
+      setFailed(false)
     } catch (err) {
+      setFailed(true)
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar o caixa')
     }
   }, [])
@@ -69,6 +79,25 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
     return () => window.removeEventListener(FINANCE_CHANGED_EVENT, load)
   }, [load])
 
+  // O resumo do fechamento vive na URL (?fechado=<id>): sobrevive a recarregar a página.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('fechado')
+    if (!id) return
+    financeFetch<{ report: CashReport }>('/api/finance/cash-sessions/' + encodeURIComponent(id))
+      .then(({ report }) => setClosedReport(report))
+      .catch(() => window.history.replaceState(null, '', window.location.pathname))
+  }, [])
+
+  const showClosed = (closed: CashReport) => {
+    setClosedReport(closed)
+    window.history.replaceState(null, '', '?fechado=' + encodeURIComponent(closed.session.id))
+  }
+
+  const dismissClosed = () => {
+    setClosedReport(null)
+    window.history.replaceState(null, '', window.location.pathname)
+  }
+
   const reverse = async (id: string) => {
     try {
       await financeFetch(`/api/finance/transactions/${id}/reverse`, { method: 'POST', body: JSON.stringify({}) })
@@ -77,6 +106,10 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível estornar')
     }
+  }
+
+  if (report === undefined && failed) {
+    return <ErrorState message="Não foi possível carregar o caixa." onRetry={() => void load()} />
   }
 
   if (report === undefined) {
@@ -89,7 +122,7 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
   }
 
   if (closedReport) {
-    return <ClosedSummary report={closedReport} currency={currency} isMaster={isMaster} onDone={() => setClosedReport(null)} />
+    return <ClosedSummary report={closedReport} currency={currency} isMaster={isMaster} onDone={dismissClosed} />
   }
 
   if (!report) {
@@ -105,52 +138,58 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
   return (
     <div className="space-y-5">
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
-        <div aria-hidden className="pointer-events-none absolute -left-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -left-16 -top-20 h-52 w-52 rounded-full bg-money-positive/10 blur-3xl" />
         <div className="relative space-y-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-money-positive/60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-money-positive" />
             </span>
             Aberto às {time.format(new Date(session.openedAt))}
             {session.openedBy && ` por ${session.openedBy}`}
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground">Esperado na gaveta</p>
-            <Money cents={summary.expectedCashCents} currency={currency} className="block text-4xl font-semibold tracking-tight" />
+            <AnimatedMoney cents={summary.expectedCashCents} currency={currency} className="block text-4xl font-semibold tracking-tight" />
           </div>
           <dl className="grid grid-cols-3 gap-3 text-sm">
             <div>
-              <dt className="text-[11px] text-muted-foreground">Troco inicial</dt>
+              <dt className="text-xs text-muted-foreground">Troco inicial</dt>
               <dd>
                 <Money cents={summary.openingCents} currency={currency} />
               </dd>
             </div>
             <div>
-              <dt className="text-[11px] text-muted-foreground">Entrou em dinheiro</dt>
+              <dt className="text-xs text-muted-foreground">Entrou em dinheiro</dt>
               <dd>
                 <Money cents={summary.cashInCents} currency={currency} />
               </dd>
             </div>
             <div>
-              <dt className="text-[11px] text-muted-foreground">Saiu em dinheiro</dt>
+              <dt className="text-xs text-muted-foreground">Saiu em dinheiro</dt>
               <dd>
                 <Money cents={summary.cashOutCents} currency={currency} />
               </dd>
             </div>
           </dl>
           <div className="grid grid-cols-3 gap-2 pt-1">
-            <Button variant="outline" onClick={() => setMovement('SUPPLY')}>
-              <ArrowDownToLine className="mr-1.5 h-4 w-4" />
-              Suprimento
+            <Button variant="outline" className="h-auto min-h-11 flex-col gap-0 px-2 py-2" onClick={() => setMovement('SUPPLY')}>
+              <span className="flex items-center">
+                <ArrowDownToLine className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                Suprimento
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">colocar troco</span>
             </Button>
-            <Button variant="outline" onClick={() => setMovement('WITHDRAWAL')}>
-              <ArrowUpFromLine className="mr-1.5 h-4 w-4" />
-              Sangria
+            <Button variant="outline" className="h-auto min-h-11 flex-col gap-0 px-2 py-2" onClick={() => setMovement('WITHDRAWAL')}>
+              <span className="flex items-center">
+                <ArrowUpFromLine className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                Sangria
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">retirar dinheiro</span>
             </Button>
-            <Button onClick={() => setClosing(true)}>
-              <Lock className="mr-1.5 h-4 w-4" />
-              Fechar
+            <Button className="h-auto min-h-11 px-2 py-2" onClick={() => setClosing(true)}>
+              <Lock className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Fechar caixa
             </Button>
           </div>
         </div>
@@ -163,6 +202,26 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
         <CashTransactions report={report} currency={currency} onReverse={isMaster ? setReverseId : undefined} />
       </section>
 
+      <Button
+        type="button"
+        size="lg"
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-40 h-12 rounded-full px-5 shadow-lg"
+        onClick={() => setNewSale('tab')}
+      >
+        <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+        Nova venda
+      </Button>
+      <ClientTabDialog
+        open={newSale === 'tab'}
+        currency={currency}
+        onClose={() => setNewSale((c) => (c === 'tab' ? null : c))}
+        onNewSale={(client) => {
+          setSaleClient(client)
+          setNewSale('sale')
+        }}
+      />
+      <NewSaleDialog open={newSale === 'sale'} currency={currency} initialClient={saleClient} onClose={() => setNewSale(null)} />
+
       <MovementDialog kind={movement} currency={currency} onClose={() => setMovement(null)} onDone={load} />
       <CloseDialog
         open={closing}
@@ -171,7 +230,7 @@ function CashContent({ currency, isMaster }: { currency: CurrencyCode; isMaster:
         onClose={() => setClosing(false)}
         onClosed={(closed) => {
           setClosing(false)
-          setClosedReport(closed)
+          showClosed(closed)
           void load()
         }}
       />
@@ -220,13 +279,14 @@ function OpenCashCard({ currency, onOpened }: { currency: CurrencyCode; onOpened
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="opening">Troco inicial</Label>
-        <MoneyInput id="opening" valueCents={openingCents} onValueChange={setOpeningCents} currency={currency} placeholder="0,00" autoFocus />
+        <MoneyInput id="opening" valueCents={openingCents} onValueChange={setOpeningCents} currency={currency} placeholder="0,00" autoFocus aria-describedby="opening-hint" />
+        <p id="opening-hint" className="text-xs text-muted-foreground">Se a gaveta está vazia, informe 0.</p>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="opening-notes">Observação (opcional)</Label>
         <Input id="opening-notes" value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={300} />
       </div>
-      <Button type="submit" className="w-full" disabled={submitting}>
+      <Button type="submit" className="min-h-11 w-full" disabled={submitting}>
         {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Abrir caixa
       </Button>
@@ -362,17 +422,8 @@ function CloseDialog({
             <MoneyInput id="counted" valueCents={counted} onValueChange={setCounted} currency={currency} autoFocus />
           </div>
           {difference != null && (
-            <p
-              className={cn(
-                'rounded-lg px-3 py-2 text-sm',
-                difference === 0 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-              )}
-            >
-              {difference === 0
-                ? 'Bateu certinho.'
-                : difference > 0
-                  ? `Sobra de ${formatMoney(difference, currency)}`
-                  : `Falta de ${formatMoney(-difference, currency)}`}
+            <p role="status" className="rounded-lg bg-muted/60 px-3 py-2">
+              <DifferenceBadge cents={difference} currency={currency} />
             </p>
           )}
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observação (opcional)" maxLength={300} rows={2} />
@@ -396,32 +447,27 @@ function ClosedSummary({ report, currency, isMaster, onDone }: { report: CashRep
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2" style={{ animationDuration: '400ms' }}>
       <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-center gap-2 text-emerald-500">
+        <div className="flex items-center gap-2 text-money-positive">
           <CheckCircle2 className="h-5 w-5" />
           <span className="text-sm font-medium">Caixa fechado</span>
         </div>
         <dl className="grid grid-cols-3 gap-3">
           <div>
-            <dt className="text-[11px] text-muted-foreground">Esperado</dt>
+            <dt className="text-xs text-muted-foreground">Esperado</dt>
             <dd>
               <Money cents={report.session.expectedCashCents ?? 0} currency={currency} className="text-lg font-semibold" />
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted-foreground">Contado</dt>
+            <dt className="text-xs text-muted-foreground">Contado</dt>
             <dd>
               <Money cents={report.session.countedCashCents ?? 0} currency={currency} className="text-lg font-semibold" />
             </dd>
           </div>
           <div>
-            <dt className="text-[11px] text-muted-foreground">Diferença</dt>
+            <dt className="text-xs text-muted-foreground">Diferença</dt>
             <dd>
-              <Money
-                cents={diff}
-                currency={currency}
-                signed
-                className={cn('text-lg font-semibold', diff === 0 ? 'text-emerald-500' : 'text-amber-500')}
-              />
+              <DifferenceBadge cents={diff} currency={currency} />
             </dd>
           </div>
         </dl>
@@ -443,7 +489,7 @@ function ClosedSummary({ report, currency, isMaster, onDone }: { report: CashRep
         </Link>
       )}
 
-      <Button variant="outline" className="w-full" onClick={onDone}>
+      <Button variant="outline" className="min-h-11 w-full" onClick={onDone}>
         Concluir
       </Button>
     </div>
@@ -460,21 +506,16 @@ function History({ sessions, currency }: { sessions: SessionRow[]; currency: Cur
           {sessions.map((s, index) => (
             <div key={s.id}>
               {index > 0 && <Separator />}
-              <Link href={`/dashboard/financeiro/caixa/${s.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
+              <Link href={`/dashboard/financeiro/caixa/${s.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
                 <div className="flex-1">
                   <p className="text-sm">{dateTime.format(new Date(s.openedAt))}</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     {s.openedBy}
                     {s.closedAt && ` · fechado ${time.format(new Date(s.closedAt))}`}
                   </p>
                 </div>
                 {s.differenceCents != null && (
-                  <Money
-                    cents={s.differenceCents}
-                    currency={currency}
-                    signed
-                    className={cn('text-xs font-medium', s.differenceCents === 0 ? 'text-emerald-500' : 'text-amber-500')}
-                  />
+                  <DifferenceBadge cents={s.differenceCents} currency={currency} compact />
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Link>

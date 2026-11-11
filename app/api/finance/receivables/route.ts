@@ -9,14 +9,14 @@ import { tenantCalendarDayWindow, todayInZone } from '@/lib/timezone'
 
 const FILTERS: EntryFilter[] = ['open', 'overdue', 'paid', 'all']
 
-/** GET /api/finance/receivables?status=open|overdue|paid|all&q= */
+/** GET /api/finance/receivables?status=open|overdue|paid|all&q=&clientId= */
 export const GET = financeRoute({ requireCashOperator: true }, 'receivables_list', async ({ scope }, request) => {
   const params = request.nextUrl.searchParams
   const filter = (FILTERS as string[]).includes(params.get('status') ?? '') ? (params.get('status') as EntryFilter) : 'open'
   const receivables = await inTransaction(async (tx) => {
     const tz = await loadTimezone(tx, scope.tenantId)
     const { start } = tenantCalendarDayWindow(tz, todayInZone(tz))
-    return listReceivables(tx, scope.tenantId, filter, start, params.get('q')?.trim().slice(0, 80) || null)
+    return listReceivables(tx, scope.tenantId, filter, start, params.get('q')?.trim().slice(0, 80) || null, params.get('clientId')?.slice(0, 64) || null)
   })
   return json({ receivables })
 })

@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Clock, User, Loader2, AlertCircle, DollarSign, Trash2 } from 'lucide-react'
+import { Calendar, Clock, User, Loader2, AlertCircle, DollarSign, Trash2, Receipt } from 'lucide-react'
 import { AppointmentStatus } from '@prisma/client'
 import { STATUS_LABELS, STATUS_COLORS } from '@/lib/types'
 import toast from 'react-hot-toast'
+import { useFeatures } from '@/hooks/use-features'
+import { openSaleSheet } from '@/lib/finance/client'
 
 interface EditAppointmentDialogProps {
   isOpen: boolean
@@ -41,6 +43,9 @@ export function EditAppointmentDialog({
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
+  const finance = useFeatures().features?.finance
+  // Quem opera o caixa conclui e recebe de uma vez (a comanda abre sozinha ao concluir).
+  const canCheckout = Boolean(finance?.active && finance.canOperateCash)
   const [services, setServices] = useState<any[]>([])
   const [professionals, setProfessionals] = useState<any[]>([])
   const [professionalName, setProfessionalName] = useState<string>('')
@@ -129,7 +134,10 @@ export function EditAppointmentDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    await save(formData.status)
+  }
 
+  const save = async (status: AppointmentStatus) => {
     if (!formData.date || !formData.time) {
       toast.error('Data e hora são obrigatórios')
       return
@@ -143,7 +151,7 @@ export function EditAppointmentDialog({
       const updateData: any = {
         date: dateTime.toISOString(),
         duration: Number(formData.duration),
-        status: formData.status,
+        status,
         serviceId: formData.serviceId || null,
         professionalId: formData.professionalId || null,
         specialty: formData.serviceId ? (services.find(s => s.id === formData.serviceId)?.name || null) : null,
@@ -153,7 +161,7 @@ export function EditAppointmentDialog({
       }
 
       await onUpdate(appointment.id, updateData)
-      toast.success('Agendamento atualizado com sucesso!')
+      toast.success(status === 'COMPLETED' && canCheckout ? 'Atendimento concluído' : 'Agendamento atualizado com sucesso!')
       onClose()
     } catch (error) {
       console.error('Error updating appointment:', error)
@@ -326,6 +334,32 @@ export function EditAppointmentDialog({
               className="bg-gray-100"
             />
           </div>
+
+          {canCheckout && ['SCHEDULED', 'CONFIRMED', 'IN_PROGRESS'].includes(appointment.status) && (
+            <Button
+              type="button"
+              className="min-h-11 w-full bg-emerald-600 hover:bg-emerald-700"
+              disabled={loading || deleting}
+              onClick={() => save('COMPLETED')}
+            >
+              <Receipt className="mr-2 h-4 w-4" />
+              Concluir e receber
+            </Button>
+          )}
+          {canCheckout && appointment.status === 'COMPLETED' && appointment.financeSaleId && (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full"
+              onClick={() => {
+                onClose()
+                openSaleSheet(appointment.financeSaleId)
+              }}
+            >
+              <Receipt className="mr-2 h-4 w-4" />
+              Ver comanda
+            </Button>
+          )}
 
           <DialogFooter className="flex gap-2">
             {onDelete && (

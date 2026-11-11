@@ -82,7 +82,52 @@ export const saleItemSchema = z
     quantity: z.number().int().min(1).max(99),
     unitPriceCents: cents,
     discountCents: cents.optional(),
-    clientPackageItemId: id.nullish()
+    clientPackageItemId: id.nullish(),
+    productId: id.nullish()
+  })
+  .strict()
+  .refine((item) => !(item.productId && (item.serviceId || item.clientPackageItemId)), {
+    message: 'Produto não pode ser misturado com serviço ou pacote no mesmo item'
+  })
+
+/* ------------------------------ Produtos e estoque ------------------------------ */
+
+export const productCreateSchema = z
+  .object({
+    name: text(80).min(1, 'Informe o nome do produto'),
+    description: text(300).nullish(),
+    sku: text(40).nullish(),
+    category: text(40).nullish(),
+    priceCents: cents,
+    costCents: cents.nullish(),
+    trackStock: z.boolean().default(true),
+    minStockQty: z.number().int().min(0).max(1_000_000).nullish(),
+    /** Saldo inicial; vira um movimento INITIAL. */
+    initialStock: z.number().int().min(0).max(1_000_000).optional()
+  })
+  .strict()
+
+export const productUpdateSchema = z
+  .object({
+    name: text(80).min(1, 'Informe o nome do produto'),
+    description: text(300).nullish(),
+    sku: text(40).nullish(),
+    category: text(40).nullish(),
+    priceCents: cents,
+    costCents: cents.nullish(),
+    trackStock: z.boolean(),
+    minStockQty: z.number().int().min(0).max(1_000_000).nullish(),
+    isActive: z.boolean()
+  })
+  .partial()
+  .strict()
+
+export const stockAdjustSchema = z
+  .object({
+    kind: z.enum(['PURCHASE', 'ADJUSTMENT']),
+    /** Compra: positiva. Ajuste: pode ser negativo (perda, contagem). */
+    quantity: z.number().int().min(-1_000_000).max(1_000_000),
+    note: text(200).optional()
   })
   .strict()
 
