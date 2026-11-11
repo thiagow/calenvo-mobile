@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
-import { cn } from '@/lib/utils'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import type { CommissionBase, FinanceConfigDto } from './types'
 
 const COMMISSION_BASES: { value: CommissionBase; title: string; text: string }[] = [
@@ -33,40 +33,14 @@ export function FinanceRulesCard({ config, saving, onChange }: FinanceRulesCardP
             <p className="text-sm font-medium">Base da comissão</p>
             <p className="text-xs text-muted-foreground">Vale para comissões em percentual.</p>
           </div>
-          <div role="radiogroup" aria-label="Base da comissão" className="grid grid-cols-2 gap-2">
-            {COMMISSION_BASES.map((option) => {
-              const selected = config.commissionBase === option.value
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={saving}
-                  onClick={() => !selected && onChange({ commissionBase: option.value })}
-                  className={cn(
-                    'rounded-xl border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    selected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50',
-                    saving && 'opacity-60'
-                  )}
-                >
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'flex h-3.5 w-3.5 items-center justify-center rounded-full border',
-                        selected ? 'border-primary' : 'border-muted-foreground/40'
-                      )}
-                    >
-                      {selected && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                    </span>
-                    {option.title}
-                  </span>
-                  <span className="mt-1 block text-[11px] leading-snug text-muted-foreground">{option.text}</span>
-                </button>
-              )
-            })}
-          </div>
+          <SegmentedControl
+            aria-label="Base da comissão"
+            variant="cards"
+            disabled={saving}
+            value={config.commissionBase}
+            onChange={(value) => onChange({ commissionBase: value })}
+            options={COMMISSION_BASES.map((o) => ({ value: o.value, label: o.title, description: o.text }))}
+          />
         </div>
 
         <ToggleRow

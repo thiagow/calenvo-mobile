@@ -28,9 +28,9 @@ export function OpenCashInline({ currency, onOpened }: { currency: CurrencyCode;
   }
 
   return (
-    <div className="space-y-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+    <div className="space-y-2.5 rounded-xl border border-money-warn/30 bg-money-warn/5 p-3">
       <div className="flex items-center gap-2 text-sm font-medium">
-        <Wallet className="h-4 w-4 text-amber-500" />
+        <Wallet className="h-4 w-4 text-money-warn" />
         O caixa está fechado
       </div>
       <p className="text-xs text-muted-foreground">Abra o caixa para registrar o recebimento. Informe o troco que está na gaveta.</p>

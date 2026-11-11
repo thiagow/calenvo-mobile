@@ -50,6 +50,11 @@ const config: Config = {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        money: {
+          positive: 'hsl(var(--money-positive))',
+          negative: 'hsl(var(--money-negative))',
+          warn: 'hsl(var(--money-warn))',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

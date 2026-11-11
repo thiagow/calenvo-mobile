@@ -1,10 +1,12 @@
 'use client'
 
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Inbox } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/finance/empty-state'
 import { Money } from '@/components/finance/money'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import { STATUS_LABELS, type EntryStatus } from '@/components/finance/types'
 import type { CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
@@ -19,25 +21,7 @@ export const FILTERS: { value: EntryFilter; label: string }[] = [
 ]
 
 export function FilterPills({ value, onChange }: { value: EntryFilter; onChange: (v: EntryFilter) => void }) {
-  return (
-    <div role="tablist" className="grid grid-cols-4 rounded-lg bg-muted p-1">
-      {FILTERS.map((f) => (
-        <button
-          key={f.value}
-          role="tab"
-          type="button"
-          aria-selected={value === f.value}
-          onClick={() => onChange(f.value)}
-          className={cn(
-            'rounded-md py-1.5 text-xs font-medium transition-all sm:text-sm',
-            value === f.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
-          )}
-        >
-          {f.label}
-        </button>
-      ))}
-    </div>
-  )
+  return <SegmentedControl aria-label="Filtrar por situação" value={value} onChange={onChange} options={FILTERS} />
 }
 
 export interface EntryRow {
@@ -86,7 +70,7 @@ export function EntryList({
       </div>
     )
   }
-  if (rows.length === 0) return <p className="py-10 text-center text-sm text-muted-foreground">{empty}</p>
+  if (rows.length === 0) return <EmptyState icon={Inbox} title={empty} />
 
   const totalOpen = rows.reduce((acc, r) => acc + (r.status === 'PAID' ? r.amountCents : r.amountCents - r.paidCents), 0)
   return (
@@ -102,12 +86,12 @@ export function EntryList({
                 <button
                   type="button"
                   onClick={() => onSelect(row.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+                  className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none active:bg-muted"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{row.title}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      <span className={cn(overdue && 'font-medium text-rose-500')}>{dueLabel(row.dueDate, row.status)}</span>
+                    <p className="truncate text-xs text-muted-foreground">
+                      <span className={cn(overdue && 'font-medium text-money-negative')}>{dueLabel(row.dueDate, row.status)}</span>
                       {row.subtitle && ` · ${row.subtitle}`}
                     </p>
                   </div>
@@ -118,7 +102,7 @@ export function EntryList({
                       className={cn('text-sm font-semibold', row.status === 'PAID' && 'text-muted-foreground')}
                     />
                     {row.status === 'PARTIAL' && (
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         de <Money cents={row.amountCents} currency={currency} />
                       </p>
                     )}

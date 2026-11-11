@@ -9,11 +9,21 @@ import {
   Users,
   BarChart2,
   MoreHorizontal,
+  Wallet,
 } from 'lucide-react'
 import { useUserPermissions } from '@/hooks/use-user-permissions'
 import { useReactivationSummary } from '@/hooks/use-reactivation-summary'
+import { useFeatures } from '@/hooks/use-features'
 
-const mainNav = [
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  exact?: boolean
+  permission?: 'canViewFullReports'
+}
+
+const mainNav: NavItem[] = [
   { name: 'Hoje', href: '/dashboard', icon: CalendarCheck, exact: true },
   { name: 'Agendar', href: '/dashboard/agenda', icon: Calendar },
   { name: 'Clientes', href: '/dashboard/clients', icon: Users },
@@ -28,9 +38,19 @@ export function BottomNav() {
   // Badge só para atrasados: é o que pede ação agora
   const badges: Record<string, number> = { '/dashboard/clients': returnCounts?.overdue ?? 0 }
 
-  const visibleNav = mainNav.filter(item =>
-    !item.permission || permissions[item.permission]
-  )
+  const { features } = useFeatures()
+  const finance = features?.finance
+  // Operador de caixa (não dono) usa o Caixa o dia todo: 1 toque, no lugar de Relatórios.
+  const showCash = !!finance?.active && finance.canOperateCash && !finance.isMaster
+
+  const visibleNav = mainNav
+    .filter(item => !item.permission || permissions[item.permission])
+    .flatMap(item =>
+      item.href === '/dashboard/mais' && showCash
+        ? [{ name: 'Caixa', href: '/dashboard/financeiro/caixa', icon: Wallet } as NavItem, item]
+        : [item]
+    )
+    .slice(0, 5)
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border"

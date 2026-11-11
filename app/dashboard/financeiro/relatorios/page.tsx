@@ -1,13 +1,18 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/finance/empty-state'
 import { Money } from '@/components/finance/money'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import { financeFetch } from '@/lib/finance/client'
+import { centsToNumber, downloadCsv, toCsv, type CsvCell } from '@/lib/finance/csv'
 import type { CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
 import { FinanceShell } from '../_components/finance-shell'
@@ -56,7 +61,12 @@ const PRESETS: { value: Preset; label: string }[] = [
   { value: 'custom', label: 'Período' }
 ]
 
-const shortDay = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
+const REGIMES: { value: 'cash' | 'accrual'; label: string }[] = [
+  { value: 'cash', label: 'Quando o dinheiro entrou' },
+  { value: 'accrual', label: 'Quando foi vendido' }
+]
+
+const shortDay =new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', timeZone: 'UTC' })
 
 export default function ReportsPage() {
   return (
@@ -71,11 +81,14 @@ function ReportsContent({ currency }: { currency: CurrencyCode }) {
   const [range, setRange] = useState(presetRange('month'))
   const [regime, setRegime] = useState<'cash' | 'accrual'>('cash')
   const [report, setReport] = useState<Report | null>(null)
+  const [failed, setFailed] = useState(false)
 
   const load = useCallback(async () => {
     try {
       setReport(await financeFetch<Report>(`/api/finance/reports?from=${range.from}&to=${range.to}&days=30`))
+      setFailed(false)
     } catch (err) {
+      setFailed(true)
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar relatórios')
     }
   }, [range])
@@ -84,29 +97,52 @@ function ReportsContent({ currency }: { currency: CurrencyCode }) {
     void load()
   }, [load])
 
+  const exportCsv = () => {
+    if (!report || !report.statement[regime]) return
+    const st = report.statement[regime]
+    const rows: CsvCell[][] = [
+      ['Relatório financeiro', range.from + ' a ' + range.to],
+      ['Regime', REGIMES.find((r) => r.value === regime)?.label],
+      [],
+      ['Receitas', 'Valor'],
+      ...st.income.map((l) => [l.label, centsToNumber(l.cents)]),
+      ['Total de receitas', centsToNumber(st.incomeCents)],
+      [],
+      ['Despesas', 'Valor'],
+      ...st.expense.map((l) => [l.label, centsToNumber(l.cents)]),
+      ['Total de despesas', centsToNumber(st.expenseCents)],
+      [],
+      ['Resultado', centsToNumber(st.resultCents)],
+      [],
+      ['Caixa projetado', 'Entra', 'Sai', 'Saldo'],
+      ...report.cashFlow.days.map((d) => [d.date, centsToNumber(d.inCents), centsToNumber(d.outCents), centsToNumber(d.balanceCents)])
+    ]
+    downloadCsv('financeiro-' + range.from + '-a-' + range.to + '.csv', toCsv(rows))
+  }
+
   const statement = report?.statement[regime]
   const movingDays = useMemo(() => report?.cashFlow.days.filter((d) => d.inCents || d.outCents) ?? [], [report])
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <div role="tablist" className="grid grid-cols-4 rounded-lg bg-muted p-1">
-          {PRESETS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              role="tab"
-              aria-selected={preset === p.value}
-              onClick={() => {
-                setPreset(p.value)
-                if (p.value !== 'custom') setRange(presetRange(p.value))
-              }}
-              className={cn('rounded-md py-1.5 text-xs font-medium transition-all sm:text-sm', preset === p.value ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="Período"
+          value={preset}
+          options={PRESETS}
+          onChange={(value) => {
+            setPreset(value)
+            if (value !== 'custom') setRange(presetRange(value))
+          }}
+        />
+        {report && statement && (
+          <div className="flex justify-end">
+            <Button type="button" variant="ghost" className="min-h-11 text-muted-foreground" onClick={exportCsv}>
+              <Download className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              Exportar CSV
+            </Button>
+          </div>
+        )}
         {preset === 'custom' && (
           <div className="grid grid-cols-2 gap-2">
             <Input type="date" value={range.from} max={range.to} onChange={(e) => e.target.value && setRange((r) => ({ ...r, from: e.target.value }))} aria-label="De" />
@@ -115,7 +151,9 @@ function ReportsContent({ currency }: { currency: CurrencyCode }) {
         )}
       </div>
 
-      {!report || !statement ? (
+      {(!report || !statement) && failed ? (
+        <ErrorState message="Não foi possível carregar os relatórios." onRetry={() => void load()} />
+      ) : !report || !statement ? (
         <div className="space-y-3">
           <Skeleton className="h-56 w-full rounded-2xl" />
           <Skeleton className="h-48 w-full rounded-2xl" />
@@ -124,30 +162,17 @@ function ReportsContent({ currency }: { currency: CurrencyCode }) {
         <>
           {/* DRE */}
           <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resultado</h2>
-              <div role="radiogroup" aria-label="Regime" className="grid grid-cols-2 rounded-lg bg-muted p-0.5 text-xs">
-                {[
-                  { value: 'cash' as const, label: 'Caixa' },
-                  { value: 'accrual' as const, label: 'Competência' }
-                ].map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={regime === r.value}
-                    onClick={() => setRegime(r.value)}
-                    className={cn('rounded-md px-3 py-1 font-medium transition-all', regime === r.value ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Resultado</h2>
+            <SegmentedControl
+              aria-label="Como contar o resultado"
+              value={regime}
+              onChange={setRegime}
+              options={REGIMES}
+            />
+            <p className="text-xs text-muted-foreground">
               {regime === 'cash'
-                ? 'O que de fato entrou e saiu no período.'
-                : 'O que foi vendido e o que venceu no período, pago ou não. Inclui comissões geradas.'}
+                ? 'Regime de caixa: o que de fato entrou e saiu no período.'
+                : 'Regime de competência: o que foi vendido e o que venceu no período, pago ou não. Inclui comissões geradas.'}
             </p>
 
             <Card className="border border-border">
@@ -161,7 +186,8 @@ function ReportsContent({ currency }: { currency: CurrencyCode }) {
                     cents={statement.resultCents}
                     currency={currency}
                     signed
-                    className={cn('text-2xl font-semibold tracking-tight', statement.resultCents < 0 && 'text-destructive')}
+                    tone="auto"
+                    className="text-2xl font-semibold tracking-tight"
                   />
                 </div>
               </CardContent>

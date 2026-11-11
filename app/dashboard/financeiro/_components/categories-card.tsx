@@ -5,6 +5,7 @@ import { Loader2, Lock, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { financeFetch, type CategoryKind, type FinanceCategoryDto } from './types'
@@ -63,23 +64,7 @@ export function CategoriesCard({ categories, onChanged }: CategoriesCardProps) {
   return (
     <Card className="border border-border">
       <CardContent className="space-y-4 p-4">
-        <div role="tablist" aria-label="Tipo de categoria" className="grid grid-cols-2 rounded-lg bg-muted p-1">
-          {KINDS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="tab"
-              aria-selected={kind === option.value}
-              onClick={() => setKind(option.value)}
-              className={cn(
-                'rounded-md py-1.5 text-sm font-medium transition-all',
-                kind === option.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl aria-label="Tipo de categoria" value={kind} onChange={setKind} options={KINDS} />
 
         <ul className="flex flex-wrap gap-1.5" aria-label="Categorias">
           {visible.map((category) => (

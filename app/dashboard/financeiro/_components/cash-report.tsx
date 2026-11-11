@@ -147,7 +147,7 @@ export function CashTransactions({
                 <span
                   className={cn(
                     'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full',
-                    t.direction === 'IN' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                    t.direction === 'IN' ? 'bg-money-positive/10 text-money-positive' : 'bg-money-negative/10 text-money-negative'
                   )}
                 >
                   {t.direction === 'IN' ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}

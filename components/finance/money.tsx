@@ -5,22 +5,46 @@ import { Input } from '@/components/ui/input'
 import { formatMoney, parseMoneyInput, type CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
 
-/** Valor em dinheiro com algarismos tabulares (colunas alinham). */
+export type MoneyTone = 'none' | 'auto' | 'positive' | 'negative' | 'warn' | 'muted'
+
+const TONE_CLASS: Record<Exclude<MoneyTone, 'none' | 'auto'>, string> = {
+  positive: 'text-money-positive',
+  negative: 'text-money-negative',
+  warn: 'text-money-warn',
+  muted: 'text-muted-foreground'
+}
+
+/**
+ * Valor em dinheiro com algarismos tabulares (colunas alinham).
+ * `tone="auto"` colore negativo/positivo pelos tokens de contraste; o sinal
+ * é lido por leitores de tela ("menos"/"mais"), nunca só pela cor.
+ */
 export function Money({
   cents,
   currency = 'BRL',
   className,
-  signed = false
+  signed = false,
+  tone = 'none'
 }: {
   cents: number
   currency?: CurrencyCode
   className?: string
   /** Mostra "+" em positivos e "−" em negativos. */
   signed?: boolean
+  tone?: MoneyTone
 }) {
   const formatted = formatMoney(Math.abs(cents), currency)
   const prefix = signed ? (cents > 0 ? '+ ' : cents < 0 ? '− ' : '') : cents < 0 ? '− ' : ''
-  return <span className={cn('tabular-nums', className)}>{prefix}{formatted}</span>
+  const spoken = cents < 0 ? 'menos ' : signed && cents > 0 ? 'mais ' : ''
+  const resolved = tone === 'auto' ? (cents < 0 ? 'negative' : cents > 0 ? 'positive' : 'muted') : tone
+  const toneClass = resolved === 'none' ? undefined : TONE_CLASS[resolved]
+  return (
+    <span className={cn('tabular-nums', toneClass, className)}>
+      {prefix && <span aria-hidden="true">{prefix}</span>}
+      {spoken && <span className="sr-only">{spoken}</span>}
+      {formatted}
+    </span>
+  )
 }
 
 const toText = (cents: number | null) => (cents == null ? '' : (cents / 100).toFixed(2).replace('.', ','))

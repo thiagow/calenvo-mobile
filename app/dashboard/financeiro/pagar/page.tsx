@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import { Money, MoneyInput } from '@/components/finance/money'
 import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
 import { STATUS_LABELS, type EntryStatus, type TransactionDto } from '@/components/finance/types'
@@ -215,7 +216,7 @@ function PayableDialog({
                     <p className="text-[11px] text-muted-foreground">{payableOpen ? 'Em aberto' : 'Valor'}</p>
                     <Money cents={payableOpen ? open : payable.amountCents} currency={currency} className="text-3xl font-semibold tracking-tight" />
                   </div>
-                  <Badge variant="outline" className={cn(payable.status === 'PAID' && 'border-emerald-500/30 text-emerald-500')}>
+                  <Badge variant="outline" className={cn(payable.status === 'PAID' && 'border-money-positive/30 text-money-positive')}>
                     {STATUS_LABELS[payable.status]}
                   </Badge>
                 </div>
@@ -411,20 +412,7 @@ function NewPayableDialog({
             </div>
           </div>
 
-          <div role="radiogroup" aria-label="Tipo" className="grid grid-cols-3 rounded-lg bg-muted p-1">
-            {MODES.map((m) => (
-              <button
-                key={m.value}
-                type="button"
-                role="radio"
-                aria-checked={mode === m.value}
-                onClick={() => setMode(m.value)}
-                className={cn('rounded-md py-1.5 text-sm font-medium transition-all', mode === m.value ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl aria-label="Tipo" value={mode} onChange={setMode} options={MODES} />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">

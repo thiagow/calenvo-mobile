@@ -145,7 +145,7 @@ export function ReceivableDialog({
                     <p className="text-[11px] text-muted-foreground">{canReceive ? 'Em aberto' : 'Valor'}</p>
                     <Money cents={canReceive ? open : detail.amountCents} currency={currency} className="text-3xl font-semibold tracking-tight" />
                   </div>
-                  <Badge variant="outline" className={cn(detail.status === 'PAID' && 'border-emerald-500/30 text-emerald-500')}>
+                  <Badge variant="outline" className={cn(detail.status === 'PAID' && 'border-money-positive/30 text-money-positive')}>
                     {STATUS_LABELS[detail.status]}
                   </Badge>
                 </div>

@@ -1,18 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, Clock, Lock, Package } from 'lucide-react'
+import { ChevronRight, Clock, Package } from 'lucide-react'
 import { toast } from 'sonner'
-import { BackButton } from '@/components/dashboard/back-button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AnimatedMoney } from '@/components/finance/animated-money'
+import { ErrorState } from '@/components/finance/empty-state'
 import { Money } from '@/components/finance/money'
-import { useFeatures } from '@/hooks/use-features'
 import { financeFetch } from '@/lib/finance/client'
 import { formatBps, formatMoney, type CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
+import { FinanceShell } from '../_components/finance-shell'
 
 interface Line {
   id: string
@@ -41,42 +42,48 @@ const day = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
 
 /** Extrato do profissional: o que tem a receber, o que espera o cliente pagar e os acertos. Só leitura. */
 export default function MyEarningsPage() {
-  const { features, isLoading } = useFeatures()
+  return (
+    <FinanceShell title="Meus ganhos" description="O que você tem a receber e o que já foi acertado." access="any">
+      {() => <EarningsContent />}
+    </FinanceShell>
+  )
+}
+
+function EarningsContent() {
   const [data, setData] = useState<Earnings | null>(null)
-  const active = features?.finance.active === true
+  const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    if (!active) return
+  const load = useCallback(() => {
     financeFetch<Earnings>('/api/finance/my-earnings')
-      .then(setData)
-      .catch((err) => toast.error(err instanceof Error ? err.message : 'Erro ao carregar seus ganhos'))
-  }, [active])
+      .then((d) => {
+        setData(d)
+        setFailed(false)
+      })
+      .catch((err) => {
+        setFailed(true)
+        toast.error(err instanceof Error ? err.message : 'Erro ao carregar seus ganhos')
+      })
+  }, [])
 
-  if (isLoading) return <Skeleton className="h-64 w-full rounded-2xl" />
-  if (!active) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <Lock className="h-6 w-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">O Financeiro não está ativo nesta conta.</p>
-      </div>
-    )
-  }
+  useEffect(load, [load])
+
+  if (!data && failed) return <ErrorState message="Não foi possível carregar seus ganhos." onRetry={load} />
   if (!data) return <Skeleton className="h-64 w-full rounded-2xl" />
 
   const { currency, totals } = data
   return (
-    <div className="space-y-5 pb-6">
-      <BackButton />
-      <header className="space-y-0.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Financeiro</p>
-        <h1 className="text-2xl font-semibold tracking-tight">Meus ganhos</h1>
-      </header>
+    <div className="space-y-5">
 
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative space-y-3">
           <p className="text-xs text-muted-foreground">A receber no próximo acerto</p>
-          <Money cents={Math.max(0, totals.netCents)} currency={currency} className="block text-4xl font-semibold tracking-tight" />
+          <AnimatedMoney cents={totals.netCents} currency={currency} tone={totals.netCents < 0 ? 'negative' : 'none'} className="block text-4xl font-semibold tracking-tight" />
+          {totals.netCents < 0 && (
+            <p className="text-xs text-muted-foreground">
+              Seus vales e descontos passam das comissões. O acerto só acontece quando entrarem novas comissões.
+            </p>
+          )}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>
               Comissões <Money cents={totals.commissionsCents} currency={currency} className="text-foreground" />
@@ -117,7 +124,7 @@ export default function MyEarningsPage() {
                           {c.isPackageSession && <Package className="h-3.5 w-3.5 text-primary" />}
                           {c.description}
                         </p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {day.format(new Date(c.occurredAt))}
                           {c.clientName && ` · ${c.clientName}`} · {c.ruleType === 'PERCENT' ? `${formatBps(c.ruleValue)}%` : 'fixo'}
                           {waiting && ' · aguardando pagamento'}

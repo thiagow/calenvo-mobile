@@ -5,10 +5,10 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DifferenceBadge } from '@/components/finance/difference-badge'
 import { Money } from '@/components/finance/money'
 import { financeFetch } from '@/lib/finance/client'
 import type { CurrencyCode } from '@/lib/finance/money'
-import { cn } from '@/lib/utils'
 import { FinanceShell } from '../../_components/finance-shell'
 import { CashBreakdown, CashTransactions, type CashReport } from '../../_components/cash-report'
 
@@ -52,7 +52,7 @@ function SessionContent({ id, currency }: { id: string; currency: CurrencyCode }
               {diff == null ? (
                 <span className="text-sm text-muted-foreground">em aberto</span>
               ) : (
-                <Money cents={diff} currency={currency} signed className={cn('text-lg font-semibold', diff === 0 ? 'text-emerald-500' : 'text-amber-500')} />
+                <DifferenceBadge cents={diff} currency={currency} />
               )}
             </dd>
           </div>

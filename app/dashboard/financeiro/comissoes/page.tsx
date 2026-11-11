@@ -16,7 +16,9 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { ErrorState } from '@/components/finance/empty-state'
 import { Money, MoneyInput } from '@/components/finance/money'
+import { SegmentedControl } from '@/components/finance/segmented-control'
 import { FINANCE_CHANGED_EVENT } from '@/components/finance/close-sale-sheet'
 import type { PaymentMethodOption } from '@/components/finance/payment-split'
 import { financeFetch } from '@/lib/finance/client'
@@ -95,6 +97,9 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
   const [settling, setSettling] = useState<Professional | null>(null)
   const [editingRules, setEditingRules] = useState<Professional | null>(null)
   const [adjusting, setAdjusting] = useState<Professional | null>(null)
+  const [failed, setFailed] = useState(false)
+  // "Acertar todos": fila de profissionais, um acerto de cada vez (cada um confere o próprio total).
+  const [queueIds, setQueueIds] = useState<string[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -106,7 +111,9 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
       setSettlements(settlements)
       setEditingRules((current) => (current ? teamData.professionals.find((p) => p.id === current.id) ?? null : null))
       setAdjusting((current) => (current ? teamData.professionals.find((p) => p.id === current.id) ?? null : null))
+      setFailed(false)
     } catch (err) {
+      setFailed(true)
       toast.error(err instanceof Error ? err.message : 'Erro ao carregar comissões')
     }
   }, [])
@@ -116,6 +123,10 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
     window.addEventListener(FINANCE_CHANGED_EVENT, load)
     return () => window.removeEventListener(FINANCE_CHANGED_EVENT, load)
   }, [load])
+
+  if (!team && failed) {
+    return <ErrorState message="Não foi possível carregar as comissões." onRetry={() => void load()} />
+  }
 
   if (!team) {
     return (
@@ -127,6 +138,9 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
     )
   }
 
+  const settleable = team.professionals.filter((p) => p.pendingCount > 0 || p.openAdjustments.length > 0)
+  const queued = queueIds.length > 0 ? team.professionals.find((p) => p.id === queueIds[0]) ?? null : null
+  const advanceQueue = () => setQueueIds((q) => q.slice(1))
   const totalPending = team.professionals.reduce((a, p) => a + p.pendingCents, 0)
   const professionals = [...team.professionals].sort((a, b) => Number(a.isOwner) - Number(b.isOwner) || b.pendingCents - a.pendingCents)
 
@@ -143,6 +157,15 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
         <p className="text-xs text-muted-foreground">A acertar com a equipe</p>
         <Money cents={totalPending} currency={currency} className="text-xl font-semibold tracking-tight" />
       </div>
+      {settleable.length > 1 && (
+        <Button className="min-h-11 w-full" variant="outline" onClick={() => setQueueIds(settleable.map((p) => p.id))}>
+          Acertar todos ({settleable.length})
+        </Button>
+      )}
+      <p className="-mt-3 px-0.5 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">Acertar</span> paga as comissões de uma vez.{' '}
+        <span className="font-medium text-foreground">Vale</span> é adiantamento, descontado no próximo acerto.
+      </p>
 
       <ul className="space-y-2.5">
         {professionals.map((p) => (
@@ -153,41 +176,49 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 font-medium">
                       {p.name}
-                      {p.isOwner && <Crown className="h-3.5 w-3.5 text-amber-500" aria-label="Dono da conta" />}
+                      {p.isOwner && <Crown className="h-3.5 w-3.5 text-money-warn" aria-label="Dono da conta" />}
                     </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                    <ul className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
                       {p.defaultRule ? (
-                        <span>{ruleLabel(p.defaultRule, currency)} padrão</span>
+                        <li className="rounded-full bg-muted px-2.5 py-1 font-medium tabular-nums">{ruleLabel(p.defaultRule, currency)} padrão</li>
                       ) : (
-                        <span>{p.isOwner ? 'Dono · sem comissão' : 'Sem comissão definida'}</span>
+                        <li className={cn('rounded-full px-2.5 py-1', p.isOwner ? 'bg-muted text-muted-foreground' : 'bg-money-warn/10 font-medium text-money-warn')}>
+                          {p.isOwner ? 'Dono · sem comissão' : 'Sem comissão definida'}
+                        </li>
                       )}
-                      {p.serviceRules.map((r) => (
-                        <span key={r.id}>
-                          · {ruleLabel(r, currency)} em {r.serviceName}
-                        </span>
-                      ))}
-                    </p>
+                      {p.serviceRules.length > 0 && (
+                        <li
+                          className="rounded-full border border-border px-2.5 py-1 text-muted-foreground"
+                          title={p.serviceRules.map((r) => ruleLabel(r, currency) + ' em ' + r.serviceName).join(' · ')}
+                        >
+                          {p.serviceRules.length} {p.serviceRules.length === 1 ? 'exceção' : 'exceções'}
+                        </li>
+                      )}
+                    </ul>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0" onClick={() => setEditingRules(p)} aria-label="Regras de comissão">
-                    <Settings2 className="h-4 w-4" />
+                  <Button variant="outline" size="sm" className="min-h-11 flex-shrink-0" onClick={() => setEditingRules(p)} aria-label={'Regras de comissão de ' + (p.name ?? 'profissional')}>
+                    <Settings2 className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                    Regras
                   </Button>
                 </div>
 
                 <div className="flex items-end justify-between gap-3">
                   <div>
                     <Money cents={p.pendingCents} currency={currency} className="block text-2xl font-semibold tracking-tight" />
-                    <p className="text-[11px] text-muted-foreground">
-                      {p.pendingCount} {p.pendingCount === 1 ? 'atendimento' : 'atendimentos'} a acertar
+                    <p className="text-xs text-muted-foreground">
+                      {p.pendingCount === 0 && p.openAdjustments.length === 0
+                        ? 'Nada a acertar agora'
+                        : p.pendingCount + (p.pendingCount === 1 ? ' atendimento' : ' atendimentos') + ' a acertar'}
                       {p.openAdjustments.length > 0 &&
                         ` · ${p.openAdjustments.length} ${p.openAdjustments.length === 1 ? 'lançamento' : 'lançamentos'} de vale/bônus`}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setAdjusting(p)}>
-                      <Wallet className="mr-1 h-3.5 w-3.5" />
+                    <Button variant="outline" className="min-h-11" onClick={() => setAdjusting(p)}>
+                      <Wallet className="mr-1.5 h-4 w-4" aria-hidden="true" />
                       Vale
                     </Button>
-                    <Button size="sm" onClick={() => setSettling(p)} disabled={p.pendingCount === 0 && p.openAdjustments.length === 0}>
+                    <Button className="min-h-11" onClick={() => setSettling(p)} disabled={p.pendingCount === 0 && p.openAdjustments.length === 0}>
                       Acertar
                     </Button>
                   </div>
@@ -206,10 +237,10 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
               {settlements.map((s, index) => (
                 <div key={s.id}>
                   {index > 0 && <Separator />}
-                  <Link href={`/dashboard/financeiro/acertos/${s.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
+                  <Link href={`/dashboard/financeiro/acertos/${s.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50">
                     <div className="flex-1">
                       <p className={cn('text-sm', s.status === 'CANCELLED' && 'line-through opacity-60')}>{s.professionalName}</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(s.paidAt))}
                         {s.paymentMethod && ` · ${s.paymentMethod}`}
                         {s.status === 'CANCELLED' && ' · cancelado'}
@@ -225,7 +256,17 @@ function CommissionsContent({ currency }: { currency: CurrencyCode }) {
         </section>
       )}
 
-      <SettlementSheet professional={settling} currency={currency} onClose={() => setSettling(null)} />
+      <SettlementSheet
+        professional={queued ?? settling}
+        currency={currency}
+        queue={queued ? { position: settleable.length - queueIds.length + 1, total: settleable.length } : undefined}
+        onClose={() => {
+          setSettling(null)
+          setQueueIds([])
+        }}
+        onSettled={queued ? advanceQueue : undefined}
+        onSkip={queued ? advanceQueue : undefined}
+      />
       <RulesDialog professional={editingRules} services={team.services} currency={currency} onClose={() => setEditingRules(null)} onChanged={load} />
       <AdjustmentDialog professional={adjusting} currency={currency} onClose={() => setAdjusting(null)} onChanged={load} />
     </div>
@@ -256,7 +297,23 @@ interface Preview {
 
 const day = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
 
-function SettlementSheet({ professional, currency, onClose }: { professional: Professional | null; currency: CurrencyCode; onClose: () => void }) {
+function SettlementSheet({
+  professional,
+  currency,
+  onClose,
+  queue,
+  onSettled,
+  onSkip
+}: {
+  professional: Professional | null
+  currency: CurrencyCode
+  onClose: () => void
+  /** Presente no "Acertar todos": posição na fila. */
+  queue?: { position: number; total: number }
+  /** Se informado, em vez de abrir o comprovante segue para o próximo da fila. */
+  onSettled?: () => void
+  onSkip?: () => void
+}) {
   const router = useRouter()
   const [preview, setPreview] = useState<Preview | null>(null)
   const [methods, setMethods] = useState<PaymentMethodOption[]>([])
@@ -276,7 +333,7 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
         setMethodId(paymentMethods.find((m) => m.type === 'PIX')?.id ?? paymentMethods[0]?.id ?? '')
       })
       .catch((err) => toast.error(err instanceof Error ? err.message : 'Erro ao calcular o acerto'))
-  }, [professional])
+  }, [professional?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirm = async () => {
     if (!professional || !preview) return
@@ -288,8 +345,12 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
       })
       toast.success(`Acerto de ${formatMoney(preview.totals.netCents, currency)} com ${professional.name}`)
       window.dispatchEvent(new CustomEvent(FINANCE_CHANGED_EVENT))
-      onClose()
-      router.push(`/dashboard/financeiro/acertos/${settlement.id}`)
+      if (onSettled) {
+        onSettled()
+      } else {
+        onClose()
+        router.push(`/dashboard/financeiro/acertos/${settlement.id}`)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Não foi possível concluir o acerto')
     } finally {
@@ -302,9 +363,9 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
     <Sheet open={Boolean(professional)} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="bottom" className="mx-auto max-h-[92dvh] max-w-xl overflow-y-auto rounded-t-2xl px-4 pb-6 pt-5 sm:px-6">
         <SheetHeader className="space-y-1 pr-6 text-left">
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             <HandCoins className="h-3.5 w-3.5" />
-            Acerto
+            Acerto{queue && ` · ${queue.position} de ${queue.total}`}
           </div>
           <SheetTitle className="text-xl tracking-tight">{professional?.name}</SheetTitle>
           <SheetDescription>Comissões dos atendimentos já pagos, com vales e descontos abatidos.</SheetDescription>
@@ -326,7 +387,7 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
                         {c.isPackageSession && <Package className="h-3.5 w-3.5 flex-shrink-0 text-primary" />}
                         {c.description}
                       </p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {day.format(new Date(c.occurredAt))}
                         {c.clientName && ` · ${c.clientName}`} · {c.ruleType === 'PERCENT' ? `${formatBps(c.ruleValue)}% de ${formatMoney(c.baseCents, currency)}` : 'valor fixo'}
                       </p>
@@ -343,11 +404,11 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
                   <li key={a.id} className="flex items-center gap-3 px-3 py-2.5">
                     <div className="flex-1">
                       <p className="text-sm">{a.description}</p>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         {ADJUSTMENT_LABELS[a.kind]} · {day.format(new Date(a.createdAt))}
                       </p>
                     </div>
-                    <Money cents={a.kind === 'BONUS' ? a.amountCents : -a.amountCents} currency={currency} signed className={cn('text-sm font-medium', a.kind !== 'BONUS' && 'text-rose-500')} />
+                    <Money cents={a.kind === 'BONUS' ? a.amountCents : -a.amountCents} currency={currency} signed className={cn('text-sm font-medium', a.kind !== 'BONUS' && 'text-money-negative')} />
                   </li>
                 ))}
               </ul>
@@ -386,7 +447,7 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
                   </SelectContent>
                 </Select>
                 {methods.find((m) => m.id === methodId)?.type === 'CASH' && (
-                  <p className="text-[11px] text-muted-foreground">Sai da gaveta do caixa aberto.</p>
+                  <p className="text-xs text-muted-foreground">Sai da gaveta do caixa aberto.</p>
                 )}
               </div>
             )}
@@ -396,11 +457,11 @@ function SettlementSheet({ professional, currency, onClose }: { professional: Pr
             )}
 
             <div className="flex gap-2">
-              <Button variant="ghost" className="flex-1" onClick={onClose}>
-                Cancelar
+              <Button variant="ghost" className="min-h-11 flex-1" onClick={onSkip ?? onClose}>
+                {onSkip ? 'Pular' : 'Cancelar'}
               </Button>
               <Button
-                className="flex-[2]"
+                className="min-h-11 flex-[2]"
                 onClick={confirm}
                 disabled={submitting || t.netCents < 0 || (preview.commissions.length === 0 && preview.adjustments.length === 0)}
               >
@@ -454,18 +515,16 @@ function RuleEditor({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="grid grid-cols-2 rounded-lg bg-muted p-0.5">
-        {(['PERCENT', 'FIXED'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setType(t)}
-            aria-pressed={type === t}
-            className={cn('h-8 rounded-md px-2.5 text-xs font-medium transition-all', type === t ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-          >
-            {t === 'PERCENT' ? '%' : currency === 'USD' ? '$' : 'R$'}
-          </button>
-        ))}
+      <div className="w-28 flex-shrink-0">
+        <SegmentedControl
+          aria-label="Tipo de comissão"
+          value={type}
+          onChange={setType}
+          options={[
+            { value: 'PERCENT', label: '%' },
+            { value: 'FIXED', label: currency === 'USD' ? '$' : 'R$' }
+          ]}
+        />
       </div>
       <div className="flex-1">
         {type === 'PERCENT' ? (
@@ -554,7 +613,7 @@ function RulesDialog({
             <div className="flex items-center justify-between">
               <Label>Comissão padrão</Label>
               {professional.defaultRule && (
-                <button type="button" className="text-xs text-muted-foreground hover:text-destructive" onClick={() => remove(professional.defaultRule!.id)}>
+                <button type="button" className="min-h-11 px-2 text-xs text-muted-foreground hover:text-destructive" onClick={() => remove(professional.defaultRule!.id)}>
                   Remover
                 </button>
               )}
@@ -581,8 +640,8 @@ function RulesDialog({
                     <Badge variant="secondary" className="tabular-nums">
                       {ruleLabel(r, currency)}
                     </Badge>
-                    <button type="button" onClick={() => remove(r.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover regra de ${r.serviceName}`}>
-                      <Trash2 className="h-3.5 w-3.5" />
+                    <button type="button" onClick={() => remove(r.id)} className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-destructive" aria-label={`Remover regra de ${r.serviceName}`}>
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </span>
                 </li>
@@ -702,21 +761,13 @@ function AdjustmentDialog({
           <DialogDescription>{professional.name} · entra no próximo acerto.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
-          <div role="radiogroup" className="grid grid-cols-3 rounded-lg bg-muted p-1">
-            {(Object.keys(ADJUSTMENT_LABELS) as Adjustment['kind'][]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="radio"
-                aria-checked={kind === k}
-                onClick={() => setKind(k)}
-                className={cn('rounded-md py-1.5 text-sm font-medium transition-all', kind === k ? 'bg-background shadow-sm' : 'text-muted-foreground')}
-              >
-                {ADJUSTMENT_LABELS[k]}
-              </button>
-            ))}
-          </div>
-          <p className="-mt-1 text-[11px] text-muted-foreground">
+          <SegmentedControl
+            aria-label="Tipo de lançamento"
+            value={kind}
+            onChange={setKind}
+            options={(Object.keys(ADJUSTMENT_LABELS) as Adjustment['kind'][]).map((k) => ({ value: k, label: ADJUSTMENT_LABELS[k] }))}
+          />
+          <p className="-mt-1 text-xs text-muted-foreground">
             {kind === 'ADVANCE' && 'Dinheiro adiantado agora. Sai do caixa e é descontado no acerto.'}
             {kind === 'BONUS' && 'Valor extra somado ao próximo acerto.'}
             {kind === 'DEDUCTION' && 'Valor descontado no próximo acerto (ex.: produto consumido).'}
@@ -746,7 +797,7 @@ function AdjustmentDialog({
           </div>
           <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" maxLength={120} />
           <DialogFooter>
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="min-h-11 w-full" disabled={submitting}>
               {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
               Registrar {ADJUSTMENT_LABELS[kind].toLowerCase()}
             </Button>
@@ -761,10 +812,10 @@ function AdjustmentDialog({
                 <li key={a.id} className="flex items-center gap-3 px-3 py-2.5">
                   <div className="flex-1">
                     <p className="text-sm">{a.description}</p>
-                    <p className="text-[11px] text-muted-foreground">{ADJUSTMENT_LABELS[a.kind]}</p>
+                    <p className="text-xs text-muted-foreground">{ADJUSTMENT_LABELS[a.kind]}</p>
                   </div>
                   <Money cents={a.kind === 'BONUS' ? a.amountCents : -a.amountCents} currency={currency} signed className="text-sm" />
-                  <button type="button" onClick={() => cancel(a.id)} className="text-muted-foreground hover:text-destructive" aria-label="Cancelar lançamento">
+                  <button type="button" onClick={() => cancel(a.id)} className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-destructive" aria-label="Cancelar lançamento">
                     <X className="h-4 w-4" />
                   </button>
                 </li>

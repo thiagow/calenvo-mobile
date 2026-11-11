@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { BackButton } from '@/components/dashboard/back-button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { useFeatures } from '@/hooks/use-features'
 import { useUserRole } from '@/hooks/use-user-role'
 import { FinanceShell } from '../_components/finance-shell'
@@ -137,19 +138,9 @@ export default function FinanceSettingsPage() {
 
   return (
     <FinanceShell
-      title="Ajustes"
+      title="Configurações"
       description={config.activatedAt ? `Ativo desde ${dateFormatter.format(new Date(config.activatedAt))}` : 'Ativo'}
       access="master"
-      actions={
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500/60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Ligado
-          <Switch checked disabled={saving} onCheckedChange={() => setConfirmOff(true)} aria-label="Desativar Financeiro" />
-        </label>
-      }
     >
       {() => (
         <div className="space-y-6">
@@ -157,12 +148,35 @@ export default function FinanceSettingsPage() {
             <FinanceRulesCard config={config} saving={saving} onChange={updateConfig} />
           </Section>
 
+          <Link
+            href="/dashboard/financeiro/comissoes"
+            className="flex min-h-11 items-center justify-between rounded-xl border px-4 py-3 text-sm transition-colors hover:bg-muted/50"
+          >
+            <span>
+              <span className="block font-medium">Comissão por profissional</span>
+              <span className="block text-xs text-muted-foreground">Percentual ou valor fixo, com exceções por serviço.</span>
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground">→</span>
+          </Link>
+
           <Section title="Formas de pagamento" description="Cadastre a taxa de cada maquininha para ver o valor líquido real.">
             <PaymentMethodsCard methods={paymentMethods} currency={currency} onChanged={load} />
           </Section>
 
           <Section title="Categorias" description="Organizam receitas e despesas nos relatórios.">
             <CategoriesCard categories={categories} onChanged={load} />
+          </Section>
+
+          <Section title="Zona de risco" description="Nada do que já foi lançado é apagado.">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Desativar o Financeiro</p>
+                <p className="text-xs text-muted-foreground">Você pode ligar de novo quando quiser.</p>
+              </div>
+              <Button variant="outline" className="min-h-11 flex-shrink-0" disabled={saving} onClick={() => setConfirmOff(true)}>
+                Desativar
+              </Button>
+            </div>
           </Section>
 
           <ConfirmDialog

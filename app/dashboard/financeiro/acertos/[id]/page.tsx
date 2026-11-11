@@ -14,6 +14,7 @@ import { useFeatures } from '@/hooks/use-features'
 import { financeFetch } from '@/lib/finance/client'
 import { formatBps, formatMoney, type CurrencyCode } from '@/lib/finance/money'
 import { cn } from '@/lib/utils'
+import { FinanceShell } from '../../_components/finance-shell'
 
 interface Receipt {
   id: string
@@ -51,6 +52,15 @@ const full = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', y
 
 /** Comprovante do acerto: o que o profissional recebeu e por quê, atendimento por atendimento. */
 export default function SettlementReceiptPage({ params }: { params: { id: string } }) {
+  return (
+    <FinanceShell title="Acerto" access="any">
+      {() => <ReceiptContent id={params.id} />}
+    </FinanceShell>
+  )
+}
+
+function ReceiptContent({ id }: { id: string }) {
+  const params = { id }
   const { features } = useFeatures()
   const isMaster = features?.finance.isMaster === true
   const [receipt, setReceipt] = useState<Receipt | null>(null)
@@ -121,7 +131,7 @@ export default function SettlementReceiptPage({ params }: { params: { id: string
       <article className={cn('space-y-6 rounded-2xl border border-border bg-card p-6 print:border-0 print:p-0', receipt.status === 'CANCELLED' && 'opacity-70')}>
         <header className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Comprovante de acerto</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Comprovante de acerto</p>
             {receipt.status === 'CANCELLED' && <Badge variant="destructive">Cancelado</Badge>}
           </div>
           <div>
@@ -154,7 +164,7 @@ export default function SettlementReceiptPage({ params }: { params: { id: string
                         {c.isPackageSession && <Package className="h-3.5 w-3.5 text-primary" />}
                         {c.description}
                       </span>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block text-xs text-muted-foreground">
                         {c.clientName && `${c.clientName} · `}
                         {c.ruleType === 'PERCENT' ? `${formatBps(c.ruleValue)}% de ${formatMoney(c.baseCents, currency)}` : 'valor fixo'}
                       </span>
@@ -209,7 +219,7 @@ export default function SettlementReceiptPage({ params }: { params: { id: string
         </section>
 
         {receipt.notes && <p className="text-xs text-muted-foreground">{receipt.notes}</p>}
-        {receipt.createdBy && <p className="text-[11px] text-muted-foreground">Acerto registrado por {receipt.createdBy}.</p>}
+        {receipt.createdBy && <p className="text-xs text-muted-foreground">Acerto registrado por {receipt.createdBy}.</p>}
       </article>
 
       {isMaster && receipt.status === 'PAID' && (
