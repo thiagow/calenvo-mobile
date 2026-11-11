@@ -108,21 +108,17 @@ export function FinanceShell({ title, description, access, actions, children }: 
           {actions && <div className="flex flex-shrink-0 items-center gap-2 pt-5">{actions}</div>}
         </div>
         {links.length > 1 && (
-          <nav aria-label="Financeiro" className="-mx-3 sm:mx-0">
-            <ul className="flex snap-x gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <nav aria-label="Financeiro">
+            <ul className="flex flex-wrap gap-1.5">
               {links.map((link) => {
                 const active = link.href === '/dashboard/financeiro' ? pathname === link.href : pathname?.startsWith(link.href)
                 return (
-                  <li key={link.href} className="flex-shrink-0 snap-start">
+                  <li key={link.href}>
                     <Link
                       href={link.href}
                       aria-current={active ? 'page' : undefined}
-                      ref={(el) => {
-                        // Aba ativa sempre visível quando a linha rola.
-                        if (active && el) el.scrollIntoView({ block: 'nearest', inline: 'center' })
-                      }}
                       className={cn(
-                        'inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'inline-flex min-h-10 items-center rounded-full border px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                         active
                           ? 'border-foreground bg-foreground text-background'
                           : 'border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground'
