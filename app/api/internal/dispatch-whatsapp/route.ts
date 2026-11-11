@@ -65,6 +65,9 @@ async function dispatchConfirmationRequest(appointmentId: string) {
     where: { id: appointmentId, status: 'SCHEDULED', deletedAt: null },
     include: {
       client: true,
+      // onAppointmentConfirmationRequest lê appointment.user.businessName;
+      // sem este include ele lança TypeError e nenhuma confirmação é enviada.
+      user: { select: { businessName: true } },
       service: { select: { name: true } },
       professionalUser: { select: { name: true } },
     },

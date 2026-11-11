@@ -141,6 +141,19 @@ describe('POST /api/internal/dispatch-whatsapp', () => {
     expect(confirmationDeleteCalls).toHaveLength(0)
   })
 
+  it('confirmation-request: carrega o negócio (user.businessName) exigido pelo envio', async () => {
+    const { prisma } = await import('@/lib/db')
+    const { POST } = await import('./route')
+
+    await POST(makeRequest({ kind: 'confirmation-request', appointmentId: 'appt-1' }))
+
+    expect(prisma.appointment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({ user: { select: { businessName: true } } }),
+      })
+    )
+  })
+
   it('confirmation-request: já reivindicado por outro job (P2002) → não envia', async () => {
     confirmationCreateShouldFail = true
     const { WhatsAppTriggerService } = await import('@/lib/whatsapp-trigger')
